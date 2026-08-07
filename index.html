@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DAMJAN: MEAT PROTOCOL</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;background:#05030a;overflow:hidden;
+    font-family:"Courier New",monospace;color:#c8b8a0;cursor:none}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(ellipse at 50% 50%, #120a12 0%, #05030a 70%)}
+  #game{
+    image-rendering:pixelated;
+    image-rendering:-moz-crisp-edges;
+    image-rendering:crisp-edges;
+    background:#000;
+    box-shadow:0 0 0 2px #1a1016, 0 0 60px 8px rgba(140,10,20,.28), 0 0 160px 40px rgba(0,0,0,.9);
+    width:960px;height:540px; /* 200% floor; game.js scales up further to fit */
+  }
+  #boot{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+    flex-direction:column;gap:14px;background:#05030a;z-index:50;cursor:pointer;text-align:center}
+  #boot h1{font-size:clamp(18px,4vw,42px);letter-spacing:.35em;color:#d8202a;
+    text-shadow:0 0 18px #7a0d14;animation:flick 3.4s infinite}
+  #boot p{font-size:clamp(10px,1.4vw,14px);letter-spacing:.22em;color:#6c5c52;animation:pulse 1.6s infinite}
+  @keyframes flick{0%,96%,100%{opacity:1}97%{opacity:.15}98%{opacity:.85}99%{opacity:.3}}
+  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="game" width="480" height="270"></canvas></div>
+
+<div id="boot">
+  <h1>MEAT PROTOCOL</h1>
+  <p>[ CLICK TO WAKE UP ]</p>
+  <p style="font-size:10px;letter-spacing:.12em;color:#3d332e">headphones recommended. it is louder in the dark.</p>
+</div>
+
+<script src="js/sprites.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
