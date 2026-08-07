@@ -230,9 +230,9 @@ function ST() {
 function diff() {
   const ev = S.evo | 0;
   return {
-    hp: (1 + S.room * 0.85) * (1 + ev * 0.38),
-    dmg: (1 + S.room * 0.55) * (1 + ev * 0.26),
-    spd: (1 + S.room * 0.07) * (1 + ev * 0.05),
+    hp: (1 + S.room * 0.95) * (1 + ev * 0.38),
+    dmg: (1 + S.room * 0.62) * (1 + ev * 0.26),
+    spd: (1 + S.room * 0.08) * (1 + ev * 0.05),
     score: (1 + S.room * 0.7) * (1 + ev * 0.5)
   };
 }
@@ -759,19 +759,23 @@ function startWave(n) {
   S.spawnT = 0.5;
   if (BOSS_WAVES[n] !== undefined) {
     spawnBoss(BOSS_WAVES[n]);
-    for (let i = 0; i < 3 + S.room * 2; i++) S.queue.push('crawler');
+    for (let i = 0; i < Math.round(4 + n * 0.9 + S.room * 3.5); i++) S.queue.push(pick(['crawler', 'crawler', 'shrieker']));
     msg('WAVE ' + n, 'BOSS', 2.4);
   } else {
-    let budget = Math.round(5 + n * 2.4 + S.room * 6);
-    const pool = [['crawler', 1]];
-    if (n >= 2 || S.room > 0) pool.push(['shrieker', 2]);
-    if (n >= 4 || S.room > 0) pool.push(['stalker', 3]);
-    if (n >= 6 || S.room > 0) pool.push(['bloater', 4]);
-    let guard = 200;
-    while (budget > 0 && guard-- > 0) {
-      const c = pick(pool);
-      if (c[1] > budget) { S.queue.push('crawler'); budget -= 1; continue; }
-      S.queue.push(c[0]); budget -= c[1];
+    // Head count, not a spend budget — a budget buys fewer/tougher enemies as it
+    // grows, which is backwards. This grows quadratically across a floor and is
+    // multiplied again for every floor down and every evolution.
+    const count = Math.round((5 + n * 2.2 + n * n * 0.22) * (1 + S.room * 0.5) * (1 + (S.evo | 0) * 0.12));
+    // Weights shift toward the nastier things as the wave and floor climb.
+    const pool = [['crawler', 10]];
+    if (n >= 2 || S.room > 0) pool.push(['shrieker', 3 + n * 0.4 + S.room]);
+    if (n >= 4 || S.room > 0) pool.push(['stalker', 2 + n * 0.45 + S.room]);
+    if (n >= 6 || S.room > 0) pool.push(['bloater', 1 + n * 0.35 + S.room * 1.5]);
+    let total = 0;
+    for (const c of pool) total += c[1];
+    for (let i = 0; i < count; i++) {
+      let r = Math.random() * total;
+      for (const c of pool) { r -= c[1]; if (r <= 0) { S.queue.push(c[0]); break; } }
     }
     msg('WAVE ' + n, S.queue.length + ' SIGNATURES', 1.8);
   }
@@ -782,9 +786,11 @@ function startWave(n) {
 function updateWaves(dt) {
   if (S.waveState === 'fight') {
     S.spawnT -= dt;
-    if (S.spawnT <= 0 && S.queue.length && S.en.length < 24) {
-      S.spawnT = Math.max(0.28, 0.95 - S.wave * 0.05 - S.room * 0.08);
-      const batch = 1 + (Math.random() < 0.35 ? 1 : 0) + (S.room > 0 ? 1 : 0);
+    // How many can be breathing at once, how fast they arrive, how many per crack
+    const cap = Math.min(64, Math.round(16 + S.wave * 1.2 + S.room * 7 + (S.evo | 0) * 2));
+    if (S.spawnT <= 0 && S.queue.length && S.en.length < cap) {
+      S.spawnT = Math.max(0.15, 0.85 - S.wave * 0.05 - S.room * 0.09);
+      const batch = 1 + Math.floor(S.wave / 4) + S.room + (Math.random() < 0.4 ? 1 : 0);
       for (let i = 0; i < batch && S.queue.length; i++) {
         const t = S.queue.shift();
         const p = freeSpot(140);
