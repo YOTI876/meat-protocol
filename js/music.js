@@ -29,16 +29,17 @@ const MUSIC = (() => {
   let inten = 0, intenTarget = 0;
   let floorIdx = 0, boss = false, menuMode = false;
 
-  const MINOR = [0, 2, 3, 5, 7, 8, 10];
   const PHRYG = [0, 1, 3, 5, 7, 8, 10];
+  const LOCR  = [0, 1, 3, 5, 6, 8, 10];   // flat fifth — nothing here resolves
 
-  /* One key per floor. Deeper floors sit lower, run faster and lean
-     phrygian, which is where the flat second lives — the sour interval. */
+  /* Every floor is phrygian or locrian now: flat second throughout, and the
+     lower two lose the perfect fifth entirely, so the harmony never settles.
+     Roots dropped an octave-ish into the range you feel more than hear. */
   const KEYS = [
-    { root: 110.00, scale: MINOR, bpm: 94,  prog: [0, 5, 3, 6] },  // A minor
-    { root: 92.50,  scale: MINOR, bpm: 100, prog: [0, 3, 5, 4] },  // F# minor
-    { root: 73.42,  scale: PHRYG, bpm: 107, prog: [0, 1, 5, 4] },  // D phrygian
-    { root: 65.41,  scale: PHRYG, bpm: 113, prog: [0, 6, 1, 0] }   // C phrygian
+    { root: 55.00, scale: PHRYG, bpm: 82, prog: [0, 1, 0, 6] },  // A phrygian
+    { root: 49.00, scale: PHRYG, bpm: 88, prog: [0, 1, 5, 1] },  // G phrygian
+    { root: 43.65, scale: LOCR,  bpm: 94, prog: [0, 4, 1, 0] },  // F locrian
+    { root: 38.89, scale: LOCR,  bpm: 99, prog: [0, 1, 4, 1] }   // D# locrian
   ];
   const key = () => KEYS[Math.min(floorIdx, KEYS.length - 1)];
 
@@ -131,13 +132,15 @@ const MUSIC = (() => {
     o.start(t); o.stop(t + 0.24); o2.start(t); o2.stop(t + 0.24);
   }
   function vPad(t, degree, dur) {
-    // root, fifth and third an octave up — sustained, slowly opening filter
-    const tones = [nf(degree, 0), nf(degree + 4, 0), nf(degree + 2, 1)];
+    // Root, the flat second above it and the third an octave up. That second is
+    // a semitone rub against the root and it never goes away.
+    const tones = [nf(degree, 0), nf(degree + 1, 1), nf(degree + 2, 1)];
     tones.forEach((f0, i) => {
       const o = ac.createOscillator();
       o.type = i === 2 ? 'triangle' : 'sawtooth';
       o.frequency.value = f0;
-      o.detune.value = (i - 1) * 7;
+      // heavy, uneven detune so the layers beat against each other
+      o.detune.value = (i - 1) * 16 + (i === 1 ? 11 : 0);
       const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
       lp.frequency.setValueAtTime(220, t);
       lp.frequency.linearRampToValueAtTime(430 + inten * 700, t + dur * 0.6);
@@ -152,6 +155,62 @@ const MUSIC = (() => {
       o.start(t); o.stop(t + dur + 0.1);
     });
   }
+  /* A slow tritone smear underneath everything — the interval that refuses to
+     resolve. Rises out of the floor, bends, and sinks back. */
+  function vDread(t, degree, dur) {
+    const f0 = nf(degree, -1);
+    [f0, f0 * Math.pow(2, 6 / 12)].forEach((f, i) => {
+      const o = ac.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.setValueAtTime(f * 0.985, t);
+      o.frequency.linearRampToValueAtTime(f * 1.02, t + dur * 0.55);
+      o.frequency.linearRampToValueAtTime(f * 0.97, t + dur);
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 300; lp.Q.value = 4;
+      o.connect(lp);
+      const g = ac.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.10 - i * 0.035, t + dur * 0.4);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      lp.connect(g); g.connect(busses.pad.g);
+      o.start(t); o.stop(t + dur + 0.1);
+    });
+  }
+
+  /* Something metal being dragged, somewhere off to the side. Irregular. */
+  function vScrape(t) {
+    const s = ac.createBufferSource();
+    s.buffer = noise;
+    s.playbackRate.value = 0.18 + Math.random() * 0.5;
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(1400 + Math.random() * 2600, t);
+    bp.frequency.exponentialRampToValueAtTime(500 + Math.random() * 900, t + 0.7);
+    bp.Q.value = 14;
+    s.connect(bp);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.055, t + 0.18);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.8);
+    bp.connect(g); g.connect(busses.pad.g);
+    s.start(t); s.stop(t + 0.9);
+  }
+
+  /* A high thread of a tone that shouldn't be in the key at all. */
+  function vWhine(t) {
+    const o = ac.createOscillator();
+    o.type = 'sine';
+    const f = 1900 + Math.random() * 1700;
+    o.frequency.setValueAtTime(f, t);
+    o.frequency.linearRampToValueAtTime(f * (0.86 + Math.random() * 0.3), t + 1.6);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.016, t + 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.7);
+    o.connect(g); g.connect(busses.pad.g);
+    o.start(t); o.stop(t + 1.8);
+  }
+
   function vStab(t, degree) {
     // the chord tone and the note a semitone above it, together
     const f0 = nf(degree, 1);
@@ -183,7 +242,14 @@ const MUSIC = (() => {
     const deg = k.prog[bar];
     const hot = boss ? 1 : inten;
 
-    if (i16 === 0) vPad(t, deg, (60 / bpm) * 4 * 0.98);
+    const barLen = (60 / bpm) * 4;
+    if (i16 === 0) {
+      vPad(t, deg, barLen * 0.98);
+      if (bar % 2 === 0) vDread(t, deg, barLen * 1.9);
+    }
+    // irregular room noises — never on the beat, never the same gap twice
+    if (Math.random() < 0.010 + hot * 0.012) vScrape(t + Math.random() * 0.2);
+    if (i16 === 7 && Math.random() < 0.16) vWhine(t);
 
     if (hot > 0.10 && P_BASS[i16]) {
       const oct = (i16 === 8 && hot > 0.55) ? 1 : 0;

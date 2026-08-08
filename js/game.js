@@ -129,7 +129,7 @@ const ETYPE = {
   bloater:  { spr: SPR.bloater,  hp: 105, spd: 25, dmg: 32, r: 9, score: 40, gib: '#8a3540', name: 'BLOATER' }
 };
 const CONTACT_CD = 0.78;   // was 0.70 — bigger bites, taken less often
-const OMEGA_CARDS = 18;    // the beam is the one thing that got dearer
+const OMEGA_CARDS = 50;    // the beam is the long game now
 const EVO_COST = ev => 100 * Math.pow(2, ev);   // 100, 200, 400, 800 ...
 
 const BOSSES = [
@@ -164,7 +164,7 @@ const WEP = {
   micro: { id: 'micro', name: 'MICROWAVE',     spr: SPR.micro, price: 60,  mag: 16,  rate: 0.24,  dmg: 34, spread: 0.02,  spd: 270, pellets: 1, reload: 2.1,  sfx: 'plasma',   col: '#4fd6e8', bounce: 3, burn: 16, size: 3, tag: 'reheats the dead' },
   hog:   { id: 'hog',   name: 'THE HOG',       spr: SPR.hog,   price: 100, mag: 120, rate: 0.032, dmg: 10, spread: 0.13,  spd: 500, pellets: 1, reload: 3.4,  sfx: 'minigun',  col: '#ffd28a', spin: 1, slow: 0.45, tag: 'spins up. never stops.' },
   rail:  { id: 'rail',  name: 'GOD FINGER',    spr: SPR.rail,  price: 175, mag: 5,   rate: 0.55,  dmg: 165, spread: 0,    spd: 950, pellets: 1, reload: 2.4,  sfx: 'railgun',  col: '#a8e8ff', charge: 0.5, pierce: 99, size: 3, knock: 200, tag: 'points. things stop existing.' },
-  omega: { id: 'omega', name: 'OMEGA BEAM',    spr: SPR.omega, price: 0, cards: OMEGA_CARDS, mag: 300, rate: 0.02, dmg: 720, spread: 0, spd: 0, pellets: 0, reload: 2.6, sfx: 'beam', col: '#c05cff', beam: 1, girth: 11, tag: 'eighteen cards. one very wide line.' }
+  omega: { id: 'omega', name: 'OMEGA BEAM',    spr: SPR.omega, price: 0, cards: OMEGA_CARDS, mag: 300, rate: 0.02, dmg: 720, spread: 0, spd: 0, pellets: 0, reload: 2.6, sfx: 'beam', col: '#c05cff', beam: 1, girth: 11, tag: 'fifty cards. one very wide line.' }
 };
 const WORDER = ['scar', 'saw', 'nail', 'micro', 'hog', 'rail', 'omega'];
 const BUYABLE = ['saw', 'nail', 'micro', 'hog', 'rail'];
@@ -248,6 +248,8 @@ function freshState() {
     coins: sv.coins || 0, cards: sv.cards || 0, vault: sv.vault || 0,
     evo: sv.evo || 0, modagazFound: sv.modagaz || 0,
     goro: false, goroHits: 0, goroT: 0, vacuum: 0,
+    xp: 0, level: 1, xpNext: 65, upgPts: 0, upg: { spd: 0, dmg: 0, def: 0 },
+    scarLv: 1, scarStarted: false, lvlChoices: null,
     score: 0, combo: 1, comboT: 0, kills: 0, streak: 0,
     flash: 0, flashCol: '#fff', hitstop: 0, slow: 0, redness: 0, modT: 0,
     jump: 0, jumpSpr: null, muzzle: null, beamHit: null,
@@ -261,23 +263,80 @@ freshState();
 /* ============================================================
    DERIVED STATS
    ============================================================ */
+/* Grocery bonuses are deliberately smaller than they were: the XP upgrade tree
+   now supplies a chunk of your power, and stacking both at full strength made
+   floor 2 trivial. */
 function ST() {
   const it = S.items;
   const b = it.banana | 0, m = it.melon | 0, k = it.coolade | 0, g = it.glock | 0, bk = it.bike | 0;
+  const u = S.upg;
   return {
-    speed: 94 * (1 + (b === 1 ? 0.35 : b >= 2 ? 0.70 : 0) + (bk === 1 ? 0.25 : bk >= 2 ? 0.45 : 0)),
-    maxhp: 100 + (m === 1 ? 55 : m >= 2 ? 110 : 0),
-    dmgMul: (k === 1 ? 1.6 : k >= 2 ? 2.3 : 1) * (S.god ? 3 : 1) * (S.goro ? 1.25 : 1),
-    pierce: k === 1 ? 1 : k >= 2 ? 3 : 0,
-    shieldMax: m === 1 ? 3 : m >= 2 ? 6 : 0,
-    shieldCd: m >= 2 ? 7 : 13,
+    speed: 94 * (1 + (b === 1 ? 0.22 : b >= 2 ? 0.44 : 0) + (bk === 1 ? 0.16 : bk >= 2 ? 0.30 : 0))
+              * (1 + u.spd * 0.06),
+    maxhp: 100 + (m === 1 ? 38 : m >= 2 ? 76 : 0),
+    dmgMul: (k === 1 ? 1.38 : k >= 2 ? 1.85 : 1) * (S.god ? 3 : 1) * (S.goro ? 1.25 : 1)
+              * (1 + u.dmg * 0.08),
+    /* every point of DEFENCE shaves damage taken, with diminishing returns */
+    resist: 1 - Math.min(0.60, u.def * 0.07),
+    pierce: k === 1 ? 1 : k >= 2 ? 2 : 0,
+    shieldMax: m === 1 ? 2 : m >= 2 ? 4 : 0,
+    shieldCd: m >= 2 ? 8 : 14,
     peel: b > 0, peelBoom: b >= 2,
     glocks: g === 1 ? 1 : g >= 2 ? 2 : 0,
-    glockRate: g >= 2 ? 0.085 : 0.16,
-    ram: bk === 1 ? 55 : bk >= 2 ? 130 : 0,
+    glockRate: g >= 2 ? 0.11 : 0.20,
+    glockDmg: 13,
+    ram: bk === 1 ? 40 : bk >= 2 ? 95 : 0,
     ramFire: bk >= 2,
-    dashCd: bk ? 0.42 : (b ? 0.55 : 0.85)
+    dashCd: bk ? 0.45 : (b ? 0.58 : 0.85),
+    /* the base rifle gains a mark every wave: +5% each, new colour, new voice */
+    scarMul: 1 + 0.05 * (S.scarLv - 1)
   };
+}
+
+const SCAR_COLS = ['#ffe9a8', '#7fd0ff', '#8fff9a', '#ff7fe0', '#ffb03a',
+                   '#c05cff', '#ff4a54', '#4fd6e8', '#eaff6a', '#ff8a3a'];
+const scarCol = () => SCAR_COLS[(S.scarLv - 1) % SCAR_COLS.length];
+function roman(n) {
+  const M = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+  let s = '', v = n;
+  while (v > 0) for (const [d, r] of M) if (v >= d) { s += r; v -= d; break; }
+  return s;
+}
+const scarName = () => 'SCAR-L MK ' + roman(S.scarLv);
+
+/* ---------- XP & upgrades ---------- */
+const UPGRADES = [
+  { id: 'spd', name: 'ADRENALINE', col: '#7fe08a', d: '+6% move speed' },
+  { id: 'dmg', name: 'MALICE',     col: '#ff6a72', d: '+8% damage' },
+  { id: 'def', name: 'CALLUS',     col: '#7fd0ff', d: '-7% damage taken' }
+];
+function gainXP(n) {
+  S.xp += n;
+  while (S.xp >= S.xpNext) {
+    S.xp -= S.xpNext;
+    S.level++;
+    S.upgPts++;
+    S.xpNext = Math.round(S.xpNext * 1.32);
+    A.bigpickup();
+    S.flash = Math.max(S.flash, 0.4); S.flashCol = '#9fe08a';
+    ring(S.p.x, S.p.y, 46, '#9fe08a', 0.5, 2);
+    float(S.p.x, S.p.y - 26, 'LEVEL ' + S.level, '#9fe08a', true);
+  }
+  if (S.upgPts > 0 && S.mode === 'play') openLevelUp();
+}
+function openLevelUp() {
+  S.mode = 'levelup';
+  S.lvlChoices = UPGRADES.slice();
+  if (A.duck) A.duck(0.5, 3);
+}
+function takeUpgrade(id) {
+  if (S.upgPts <= 0) return;
+  S.upg[id] = (S.upg[id] | 0) + 1;
+  S.upgPts--;
+  A.buy();
+  S.flash = 0.5; S.flashCol = UPGRADES.find(u => u.id === id).col;
+  if (S.p) S.p.hp = Math.min(ST().maxhp, S.p.hp + 12);
+  if (S.upgPts <= 0) S.mode = 'play';
 }
 /* One knob for how hard the floor hits. Evolutions stack on top forever. */
 function diff() {
@@ -588,12 +647,15 @@ function emit(w) {
 
   const base = (w.spread + p.recoil * 0.05) * (S.god ? 0.4 : 1);
   const mx = p.x + Math.cos(p.ang) * 11, my = p.y + Math.sin(p.ang) * 11 - 1;
+  const isScar = w.id === 'scar';
+  const dmg = w.dmg * st.dmgMul * (isScar ? st.scarMul : 1);
+  const col = S.god ? '#ff6cf5' : (isScar ? scarCol() : w.col);
   for (let i = 0; i < w.pellets; i++) {
     const a = p.ang + rnd(-base, base);
     S.bul.push({
       x: mx, y: my, vx: Math.cos(a) * w.spd, vy: Math.sin(a) * w.spd,
-      dmg: w.dmg * st.dmgMul, pierce: (w.pierce || 0) + st.pierce, hitIds: [], life: 1.4,
-      col: S.god ? '#ff6cf5' : w.col, size: w.size || 1,
+      dmg, pierce: (w.pierce || 0) + st.pierce, hitIds: [], life: 1.4,
+      col, size: (w.size || 1) + (isScar && S.scarLv > 4 ? 1 : 0),
       knock: w.knock || 60, pin: w.pin || 0, burn: w.burn || 0, bounce: w.bounce || 0, god: S.god
     });
   }
@@ -605,7 +667,10 @@ function emit(w) {
   S.muzzle = { x: mx, y: my, t: 0.06, big: w.pellets > 3 || !!w.charge };
   shake(w.pellets > 3 ? 3.4 : w.charge ? 5.5 : S.god ? 1.4 : 1.0);
   if (w.charge) punch(0.05);
-  if (S.god) A.godshoot(); else A[w.sfx] ? A[w.sfx](spin) : A.shoot();
+  if (S.god) A.godshoot();
+  else if (isScar) A.scarMk(S.scarLv);       // voice morphs toward a laser each mark
+  else if (A[w.sfx]) A[w.sfx](spin);
+  else A.shoot();
   if (!w.beam) A.shell();
   const ca = p.ang + Math.PI / 2 + rnd(-0.4, 0.4);
   S.gibs.push({ x: mx, y: my, vx: Math.cos(ca) * 70, vy: Math.sin(ca) * 70, col: '#c9a227', life: 0.9, s: 1 });
@@ -716,6 +781,7 @@ function killEnemy(e, ang) {
   const pts = Math.round(e.score * diff().score * S.combo);
   S.score += pts;
   float(e.x, e.y - 10, '+' + pts, '#ffd070');
+  gainXP(e.boss ? 90 : Math.max(3, Math.round(e.score * 0.55)));
   deathBurst(e, ang);
   S.hitstop = Math.max(S.hitstop, e.boss ? 0.3 : 0.035);
   shake(e.boss ? 18 : 2.5);
@@ -757,6 +823,7 @@ function killEnemy(e, ang) {
 function hurtPlayer(dmg, sx, sy) {
   const p = S.p;
   if (S.god || p.iframe > 0 || p.tempShield > 0 || S.mode !== 'play') return;
+  dmg *= ST().resist;
   if (p.shield > 0) {
     p.shield--; p.shieldT = ST().shieldCd; p.iframe = 0.45;
     part(p.x, p.y, '#63b04a', 16, 130, 0.5);
@@ -834,6 +901,13 @@ function startWave(n) {
   S.waveState = 'fight';
   S.queue = [];
   S.spawnT = 0.5;
+  // The base rifle earns a new mark every wave — colour, voice and +5% damage.
+  if (S.scarStarted) {
+    S.scarLv++;
+    S.banner = { scar: S.scarLv, t: 3.4 };
+    A.rack();
+  }
+  S.scarStarted = true;
   if (BOSS_WAVES[n] !== undefined) {
     spawnBoss(BOSS_WAVES[n]);
     for (let i = 0; i < Math.round(4 + n * 0.9 + S.room * 3.5); i++) S.queue.push(pick(['crawler', 'crawler', 'shrieker']));
@@ -844,7 +918,9 @@ function startWave(n) {
     // multiplied again for every floor down and every evolution.
     // Every gun you own is another mouth the floor sends to meet it.
     const armed = 1 + Math.max(0, S.p.owned.length - 1) * 0.10;
-    const count = Math.round((7 + n * 2.8 + n * n * 0.26) * (1 + S.room * 0.55) * (1 + (S.evo | 0) * 0.12) * armed);
+    const levelled = 1 + Math.max(0, S.level - 1) * 0.06;   // the stronger you get, the more come
+    const count = Math.round((7 + n * 2.8 + n * n * 0.26) * (1 + S.room * 0.55)
+                             * (1 + (S.evo | 0) * 0.12) * armed * levelled);
     // Weights shift toward the nastier things as the wave and floor climb.
     const pool = [['crawler', 10]];
     if (n >= 2 || S.room > 0) pool.push(['shrieker', 3 + n * 0.4 + S.room]);
@@ -868,8 +944,9 @@ function updateWaves(dt) {
   if (S.waveState === 'fight') {
     S.spawnT -= dt;
     // How many can be breathing at once, how fast they arrive, how many per crack
-    const cap = Math.min(72, Math.round(19 + S.wave * 1.4 + S.room * 7.5 + (S.evo | 0) * 2 +
-                                        Math.max(0, S.p.owned.length - 1) * 1.5));
+    const cap = Math.min(78, Math.round(19 + S.wave * 1.4 + S.room * 7.5 + (S.evo | 0) * 2 +
+                                        Math.max(0, S.p.owned.length - 1) * 1.5 +
+                                        Math.max(0, S.level - 1) * 0.8));
     if (S.spawnT <= 0 && S.queue.length && S.en.length < cap) {
       S.spawnT = Math.max(0.15, 0.85 - S.wave * 0.05 - S.room * 0.09);
       const batch = 1 + Math.floor(S.wave / 4) + S.room + (Math.random() < 0.4 ? 1 : 0);
@@ -1114,6 +1191,23 @@ function update(rdt) {
   /* ---- bullets ---- */
   for (let i = S.bul.length - 1; i >= 0; i--) {
     const b = S.bul[i];
+    // Seeking rounds steer toward the nearest thing they haven't already hit.
+    if (b.home) {
+      let best = null, bd = 260;
+      for (const e of S.en) {
+        if (e.dead || b.hitIds.indexOf(e) >= 0) continue;
+        const d2 = Math.hypot(e.x - b.x, e.y - b.y);
+        if (d2 < bd) { bd = d2; best = e; }
+      }
+      if (best) {
+        const want = Math.atan2(best.y - b.y, best.x - b.x);
+        let cur = Math.atan2(b.vy, b.vx);
+        let diff = ((want - cur + Math.PI * 3) % TAU) - Math.PI;
+        cur += clamp(diff, -b.home * dt, b.home * dt);
+        b.vx = Math.cos(cur) * b.spd; b.vy = Math.sin(cur) * b.spd;
+      }
+      if (Math.random() < dt * 40) part(b.x, b.y, b.col, 1, 18, 0.3);
+    }
     let removed = false;
     for (let sub = 0; sub < 2; sub++) {
       const px = b.x, py = b.y;
@@ -1288,9 +1382,10 @@ function update(rdt) {
         for (let k = 0; k < N; k++) {
           const a = k / N * TAU + Math.random() * 0.1;
           S.bul.push({
-            x: p.x, y: p.y, vx: Math.cos(a) * 400, vy: Math.sin(a) * 400,
-            dmg: 90 * st2.dmgMul, pierce: 2 + st2.pierce, hitIds: [], life: 1.5,
-            col: '#ffb03a', size: 3, knock: 180, pin: 0, burn: 12, bounce: 0, god: S.god
+            x: p.x, y: p.y, vx: Math.cos(a) * 340, vy: Math.sin(a) * 340,
+            dmg: 90 * st2.dmgMul, pierce: 2 + st2.pierce, hitIds: [], life: 2.6,
+            col: '#ffb03a', size: 3, knock: 180, pin: 0, burn: 12, bounce: 0, god: S.god,
+            home: 5.5, spd: 340         // they go looking
           });
         }
         float(p.x, p.y - 18, 'NOVA', '#ffb03a', true);
@@ -2303,6 +2398,14 @@ function drawHUD() {
   if (S.evo) txt('EVO ' + S.evo, 130, 33, '#ff5a62');
   if (S.goro) txt('GOROMANIA', 130, 43, '#b028ff', 'left', 7);
 
+  // XP bar + level
+  const xw = 96, xf = clamp(S.xp / S.xpNext, 0, 1);
+  ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(6, 22, xw + 2, 4);
+  ctx.fillStyle = '#4d8f52'; ctx.fillRect(7, 23, xw * xf, 2);
+  ctx.fillStyle = 'rgba(190,255,190,0.35)'; ctx.fillRect(7, 23, xw * xf, 1);
+  txt('LV' + S.level, xw + 12, 26, '#9fe08a', 'left', 7);
+  if (S.upgPts > 0) txt('+' + S.upgPts, xw + 34, 26, Math.sin(S.t * 8) > 0 ? '#ffffff' : '#9fe08a', 'left', 7);
+
   /* ammo + reload */
   const mag = Math.ceil(p.mags[w.id] || 0);
   if (S.god) txt('∞ AMMO', 8, H - 22, 'hsl(' + ((S.t * 240) % 360) + ',90%,65%)');
@@ -2335,9 +2438,11 @@ function drawHUD() {
     ctx.fillStyle = i === p.wi ? 'rgba(40,30,20,0.9)' : 'rgba(10,8,10,0.6)';
     ctx.fillRect(x - 9, y - 7, 18, 14);
     if (i === p.wi) { ctx.fillStyle = ww.col; ctx.fillRect(x - 9, y + 6, 18, 1); }
-    drawSpr(ctx, ww.spr, x, y, 0.85, false, i === p.wi ? 1 : 0.45);
+    drawSpr(ctx, ww.spr, x, y, 0.85, false, i === p.wi ? 1 : 0.45,
+            ww.id === 'scar' && S.scarLv > 1 ? scarCol() : null);
   }
-  txt(w.name, W / 2, H - 20, w.col, 'center', 7);
+  const isScar = w.id === 'scar';
+  txt(isScar ? scarName() : w.name, W / 2, H - 20, isScar ? scarCol() : w.col, 'center', 7);
 
   /* wave / room */
   txt(R.name, W / 2, 12, '#8e7a68', 'center');
@@ -2385,12 +2490,13 @@ function drawHUD() {
     const a = clamp(b.t / 1.2, 0, 1);
     ctx.globalAlpha = a;
     ctx.fillStyle = 'rgba(8,4,8,0.86)'; ctx.fillRect(0, H / 2 + 18, W, 44);
-    const col = b.wep ? WEP[b.wep].col : b.key === 'god' ? '#ff2b2b' : ITEMS[b.key].col;
+    const col = b.scar ? scarCol() : b.wep ? WEP[b.wep].col : b.key === 'god' ? '#ff2b2b' : ITEMS[b.key].col;
     ctx.fillStyle = col; ctx.fillRect(0, H / 2 + 18, W, 1); ctx.fillRect(0, H / 2 + 61, W, 1);
-    const spr = b.wep ? WEP[b.wep].spr : b.key === 'god' ? SPR.eye : ITEMS[b.key].spr;
-    drawSpr(ctx, spr, W / 2 - 84, H / 2 + 40, b.wep ? 2 : 1.8);
-    const nm = b.wep ? WEP[b.wep].name : b.key === 'god' ? 'THE THIRD EYE OF DAMJAN' : ITEMS[b.key].n[Math.min(b.lv - 1, 1)];
-    const de = b.wep ? WEP[b.wep].tag : b.key === 'god' ? 'you are no longer bound by meat.' : ITEMS[b.key].d[Math.min(b.lv - 1, 1)];
+    const spr = b.scar ? SPR.scar : b.wep ? WEP[b.wep].spr : b.key === 'god' ? SPR.eye : ITEMS[b.key].spr;
+    drawSpr(ctx, spr, W / 2 - 84, H / 2 + 40, b.wep || b.scar ? 2 : 1.8, false, 1, b.scar ? col : null);
+    const nm = b.scar ? scarName() : b.wep ? WEP[b.wep].name : b.key === 'god' ? 'THE THIRD EYE OF DAMJAN' : ITEMS[b.key].n[Math.min(b.lv - 1, 1)];
+    const de = b.scar ? ('the rifle reforged — +' + Math.round((ST().scarMul - 1) * 100) + '% damage')
+             : b.wep ? WEP[b.wep].tag : b.key === 'god' ? 'you are no longer bound by meat.' : ITEMS[b.key].d[Math.min(b.lv - 1, 1)];
     ctx.globalAlpha = 1;
     htxt(nm, W / 2 - 58, H / 2 + 36, col, 'left', 12, { weight: '700', alpha: a, glow: col, glowSize: 12, track: 0.10 });
     htxt(de, W / 2 - 58, H / 2 + 50, '#b09a84', 'left', 8, { alpha: a, track: 0.05 });
@@ -2700,6 +2806,53 @@ function drawDead() {
   }
 }
 
+function drawLevelUp() {
+  S.ui = [];
+  ctx.fillStyle = 'rgba(4,6,4,0.86)'; ctx.fillRect(0, 0, W, H);
+  const bg = ctx.createRadialGradient(W / 2, H / 2, 6, W / 2, H / 2, 190);
+  bg.addColorStop(0, 'rgba(30,140,60,0.18)'); bg.addColorStop(1, 'rgba(30,140,60,0)');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  htxt('LEVEL ' + S.level, W / 2, 48, '#9fe08a', 'center', 26,
+       { weight: '700', glow: '#2e7a38', glowSize: 22, track: 0.18 });
+  htxt(S.upgPts > 1 ? S.upgPts + ' POINTS TO SPEND' : 'CHOOSE ONE', W / 2, 64, '#7d8f78', 'center', 8.5, { track: 0.26 });
+
+  const CW = 116, CH = 92, gap = 12;
+  const x0 = W / 2 - (CW * 3 + gap * 2) / 2;
+  (S.lvlChoices || UPGRADES).forEach((u, i) => {
+    const x = x0 + i * (CW + gap), y = 86;
+    const hot = mouse.x > x && mouse.x < x + CW && mouse.y > y && mouse.y < y + CH;
+    const k = 'lvl' + u.id;
+    hoverT[k] = clamp((hoverT[k] || 0) + (hot ? 0.22 : -0.18), 0, 1);
+    const t = hoverT[k], off = t * 3;
+
+    ctx.fillStyle = 'rgba(' + Math.round(10 + t * 26) + ',' + Math.round(12 + t * 30) + ',' + Math.round(11 + t * 22) + ',0.94)';
+    ctx.fillRect(x, y - off, CW, CH);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = t * 0.14;
+    ctx.fillStyle = u.col; ctx.fillRect(x, y - off, CW, CH); ctx.restore();
+    ctx.fillStyle = u.col;
+    ctx.globalAlpha = 0.5 + t * 0.5;
+    ctx.fillRect(x, y - off, CW, 2);
+    ctx.globalAlpha = 0.22 + t * 0.7;
+    ctx.fillRect(x, y + CH - 1 - off, CW, 1);
+    ctx.fillRect(x, y - off, 1, CH); ctx.fillRect(x + CW - 1, y - off, 1, CH);
+    ctx.globalAlpha = 1;
+
+    const lvl = S.upg[u.id] | 0;
+    htxt(u.name, x + CW / 2, y + 26 - off, t > 0.4 ? '#ffffff' : u.col, 'center', 13,
+         { weight: '700', glow: t > 0.15 ? u.col : null, glowSize: 16 * t, track: 0.10 });
+    htxt(u.d, x + CW / 2, y + 44 - off, '#9a8f84', 'center', 8, { track: 0.04 });
+    htxt('RANK ' + lvl, x + CW / 2, y + 66 - off, lvl ? u.col : '#4f4a44', 'center', 9, { track: 0.16 });
+    for (let j = 0; j < Math.min(lvl, 10); j++) {
+      ctx.fillStyle = u.col;
+      ctx.fillRect(x + CW / 2 - Math.min(lvl, 10) * 3 + j * 6, y + 74 - off, 4, 3);
+    }
+    S.ui.push({ x, y, w: CW, h: CH, fn: () => takeUpgrade(u.id) });
+  });
+
+  htxt('kills feed the meter. it does not stop climbing.', W / 2, H - 16, 'rgba(120,132,116,0.6)', 'center', 7.5, { track: 0.14 });
+}
+
 function drawPause() {
   S.ui = [];
   ctx.fillStyle = 'rgba(5,3,8,0.84)'; ctx.fillRect(0, 0, W, H);
@@ -2781,6 +2934,7 @@ function frame(now) {
     post();
     drawHUD();
     if (S.mode === 'pause') drawPause();
+    if (S.mode === 'levelup') drawLevelUp();
     if (S.mode === 'dead') drawDead();
   }
 
@@ -2827,6 +2981,7 @@ requestAnimationFrame(frame);
 window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantItem, grantGod, breakSecret,
                 giveWeapon, explode, triggerModagaz, triggerGoromania, populateShops,
                 evolve, resetEvolution, canEvolve, EVO_COST, OMEGA_CARDS,
+                gainXP, openLevelUp, takeUpgrade, UPGRADES, scarName, scarCol, ST,
                 ITEMS, BOSSES, WEP, WORDER, COSMETICS, frame, nextRoom };
 
 })();

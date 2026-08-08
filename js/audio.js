@@ -205,6 +205,21 @@ const A = (() => {
       tone('sawtooth', 40, 130, 0.34, 2.2, t);
       burst(0.3, 2.4, t, 'lowpass', 300, 1600);
     },
+    /* Each SCAR mark drifts further from a rifle crack toward a laser: the
+       noise body thins out, the tone rises and the sweep gets cleaner. */
+    scarMk(lv) {
+      if (!on) return; const t = now();
+      const k = Math.min(1, (lv - 1) / 9);          // 0 = rifle, 1 = beam weapon
+      const pitch = 1 + k * 0.9 + ((lv * 0.37) % 0.35);
+      burst(0.5 * (1 - k * 0.55), 0.07 - k * 0.03, t, 'lowpass', (2600 + k * 3000) * pitch, 300 + k * 900, 1);
+      tone('square', 150 * pitch, 44 * pitch, 0.24 * (1 - k * 0.4), 0.09, t);
+      if (k > 0.15) {
+        tone('sawtooth', 900 * pitch, 180 * pitch, 0.10 + k * 0.16, 0.10 + k * 0.05, t);
+        tone('sine', 1600 * pitch, 400 * pitch, 0.06 + k * 0.12, 0.08, t);
+      }
+      if (k > 0.6) burst(0.16, 0.10, t, 'bandpass', 4200 * pitch, 1400, 5);
+    },
+
     /* ---- weapons ---- */
     shotgun() {
       if (!on) return; const t = now();
