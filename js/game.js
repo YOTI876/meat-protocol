@@ -72,8 +72,11 @@ addEventListener('keydown', e => {
   if (e.code === 'Escape' || e.code === 'KeyP') {
     if (S.mode === 'play') S.mode = 'pause';
     else if (S.mode === 'pause') S.mode = 'play';
+    else if (S.mode === 'armory') S.mode = 'pause';
     else if (S.mode === 'cos') S.mode = S.cosReturn || 'title';
   }
+  if (e.code === 'KeyB' && (S.mode === 'play' || S.mode === 'pause')) S.mode = 'armory';
+  else if (e.code === 'KeyB' && S.mode === 'armory') S.mode = 'play';
   // cosmetics are reachable from anywhere that isn't a firefight
   if (e.code === 'KeyC' && S.mode !== 'cos' && S.mode !== 'play') { S.cosReturn = S.mode; S.mode = 'cos'; }
   if (S.mode === 'title' && (e.code === 'Enter' || e.code === 'Space')) startRun();
@@ -249,7 +252,7 @@ function freshState() {
     evo: sv.evo || 0, modagazFound: sv.modagaz || 0,
     goro: false, goroHits: 0, goroT: 0, vacuum: 0,
     xp: 0, level: 1, xpNext: 65, upgPts: 0, upg: { spd: 0, dmg: 0, def: 0 },
-    scarLv: 1, scarStarted: false, lvlChoices: null,
+    scarLv: 1, lvlChoices: null, wupg: {}, glusec: 0, armorySel: 0,
     score: 0, combo: 1, comboT: 0, kills: 0, streak: 0,
     flash: 0, flashCol: '#fff', hitstop: 0, slow: 0, redness: 0, modT: 0,
     jump: 0, jumpSpr: null, muzzle: null, beamHit: null,
@@ -288,9 +291,28 @@ function ST() {
     ram: bk === 1 ? 40 : bk >= 2 ? 95 : 0,
     ramFire: bk >= 2,
     dashCd: bk ? 0.45 : (b ? 0.58 : 0.85),
-    /* the base rifle gains a mark every wave: +5% each, new colour, new voice */
-    scarMul: 1 + 0.05 * (S.scarLv - 1)
+    /* the base rifle gains a mark every FLOOR: new colour, new voice, +20% each.
+       (Per-floor means far fewer marks than the old per-wave cadence, so each
+       one has to be worth something.) */
+    scarMul: 1 + 0.20 * (S.scarLv - 1)
   };
+}
+
+/* ---------- per-weapon upgrades, bought with coins ---------- */
+const WTRACKS = [
+  { id: 'rate',  name: 'CYCLE',  col: '#f5c518', max: 5, d: r => '+' + (r * 10) + '% fire rate' },
+  { id: 'split', name: 'SPLIT',  col: '#7fd0ff', max: 3, d: r => r ? (r * 2 + 1) + '-way fan' : 'single shot' },
+  { id: 'pow',   name: 'POWER',  col: '#ff6a72', max: 5, d: r => '+' + (r * 15) + '% damage' }
+];
+function wup(id) {
+  if (!S.wupg[id]) S.wupg[id] = { rate: 0, split: 0, pow: 0 };
+  return S.wupg[id];
+}
+/* Better guns cost more to improve, and each rank costs more than the last. */
+function wupCost(id, track, rank) {
+  const tier = 1 + (WEP[id].price || 120) / 190;
+  const base = track === 'split' ? 34 : 20;
+  return Math.round((base + rank * 24) * tier);
 }
 
 const SCAR_COLS = ['#ffe9a8', '#7fd0ff', '#8fff9a', '#ff7fe0', '#ffb03a',
@@ -641,23 +663,31 @@ function fire() {
 
 function emit(w) {
   const p = S.p, st = ST();
+  const u = wup(w.id);
   const spin = w.spin ? p.spin : 1;
-  p.fireT = w.spin ? lerp(0.16, w.rate, p.spin) : w.rate;
+  const rateMul = 1 - u.rate * 0.10;
+  p.fireT = (w.spin ? lerp(0.16, w.rate, p.spin) : w.rate) * rateMul;
   if (!S.god) p.mags[w.id]--;
 
   const base = (w.spread + p.recoil * 0.05) * (S.god ? 0.4 : 1);
   const mx = p.x + Math.cos(p.ang) * 11, my = p.y + Math.sin(p.ang) * 11 - 1;
   const isScar = w.id === 'scar';
-  const dmg = w.dmg * st.dmgMul * (isScar ? st.scarMul : 1);
+  const dmg = w.dmg * st.dmgMul * (isScar ? st.scarMul : 1) * (1 + u.pow * 0.15);
   const col = S.god ? '#ff6cf5' : (isScar ? scarCol() : w.col);
-  for (let i = 0; i < w.pellets; i++) {
-    const a = p.ang + rnd(-base, base);
-    S.bul.push({
-      x: mx, y: my, vx: Math.cos(a) * w.spd, vy: Math.sin(a) * w.spd,
-      dmg, pierce: (w.pierce || 0) + st.pierce, hitIds: [], life: 1.4,
-      col, size: (w.size || 1) + (isScar && S.scarLv > 4 ? 1 : 0),
-      knock: w.knock || 60, pin: w.pin || 0, burn: w.burn || 0, bounce: w.bounce || 0, god: S.god
-    });
+  // SPLIT rank n fires a fan of 2n+1 directions
+  const dirs = u.split ? u.split * 2 + 1 : 1;
+  const fan = 0.20;
+  for (let d = 0; d < dirs; d++) {
+    const off = dirs === 1 ? 0 : (d - (dirs - 1) / 2) * fan;
+    for (let i = 0; i < w.pellets; i++) {
+      const a = p.ang + off + rnd(-base, base);
+      S.bul.push({
+        x: mx, y: my, vx: Math.cos(a) * w.spd, vy: Math.sin(a) * w.spd,
+        dmg, pierce: (w.pierce || 0) + st.pierce, hitIds: [], life: 1.4,
+        col, size: (w.size || 1) + (isScar && S.scarLv > 3 ? 1 : 0),
+        knock: w.knock || 60, pin: w.pin || 0, burn: w.burn || 0, bounce: w.bounce || 0, god: S.god
+      });
+    }
   }
   p.recoil = Math.min(1, p.recoil + (w.pellets > 3 ? 0.7 : 0.24));
   p.kick = w.pellets > 3 ? 6 : w.charge ? 7 : 2.6;
@@ -686,10 +716,11 @@ function updateBeam(dt) {
   if (!S.god) p.mags.omega -= dt * 42;
   if (p.mags.omega < 0) p.mags.omega = 0;
 
+  const u = wup(w.id);
   const ox = p.x + Math.cos(p.ang) * 11, oy = p.y + Math.sin(p.ang) * 11 - 1;
   let ex = ox, ey = oy;
   const hits = [];
-  const girth = w.girth;
+  const girth = w.girth * (1 + u.split * 0.55);   // SPLIT widens the beam instead of forking it
   for (let i = 1; i < 220; i++) {
     const nx = ox + Math.cos(p.ang) * i * 4, ny = oy + Math.sin(p.ang) * i * 4;
     if (pointInWall(nx, ny)) break;
@@ -697,7 +728,7 @@ function updateBeam(dt) {
     for (const e of S.en) if (!e.dead && hits.indexOf(e) < 0 && Math.hypot(e.x - nx, e.y - ny) < e.r + girth) hits.push(e);
   }
   S.beamHit = { x: ox, y: oy, ex, ey, girth };
-  for (const e of hits) damageEnemy(e, w.dmg * st.dmgMul * dt, true, p.ang);
+  for (const e of hits) damageEnemy(e, w.dmg * st.dmgMul * (1 + u.pow * 0.15) * (1 + u.rate * 0.10) * dt, true, p.ang);
   if (Math.random() < dt * 70) spray(ex, ey, p.ang + Math.PI, '#e0a8ff', 4, 150, 0.35, 1.4);
   if (Math.random() < dt * 26) A.beam();
   shake(1.2);
@@ -901,13 +932,6 @@ function startWave(n) {
   S.waveState = 'fight';
   S.queue = [];
   S.spawnT = 0.5;
-  // The base rifle earns a new mark every wave — colour, voice and +5% damage.
-  if (S.scarStarted) {
-    S.scarLv++;
-    S.banner = { scar: S.scarLv, t: 3.4 };
-    A.rack();
-  }
-  S.scarStarted = true;
   if (BOSS_WAVES[n] !== undefined) {
     spawnBoss(BOSS_WAVES[n]);
     for (let i = 0; i < Math.round(4 + n * 0.9 + S.room * 3.5); i++) S.queue.push(pick(['crawler', 'crawler', 'shrieker']));
@@ -1006,6 +1030,7 @@ function update(rdt) {
   S.redness = Math.max(0, S.redness - rdt * 0.7);
   S.modT = Math.max(0, S.modT - rdt);
   S.goroT = Math.max(0, S.goroT - rdt);
+  S.glusec = Math.max(0, S.glusec - rdt);
   S.jump = Math.max(0, S.jump - rdt);
   if (S.comboT > 0) { S.comboT -= rdt; if (S.comboT <= 0) { S.combo = 1; S.streak = 0; } }
 
@@ -1371,7 +1396,7 @@ function update(rdt) {
       else if (d.kind === 'nade') { p.nades = Math.min(6, p.nades + 1); float(p.x, p.y - 16, '+1 FRAG', '#7aa35e'); A.pickup(); }
       else if (d.kind === 'coin') { S.coins++; S.vault++; float(p.x, p.y - 16, '+1', '#f5c518'); A.coin(); }
       else if (d.kind === 'shield') {
-        p.tempShield = Math.max(p.tempShield, 2.0);
+        p.tempShield = Math.max(p.tempShield, 3.0);
         float(p.x, p.y - 18, 'AEGIS', '#7fd0ff', true);
         ring(p.x, p.y, 30, '#7fd0ff', 0.4, 2);
         part(p.x, p.y, '#c6e8ff', 22, 130, 0.6);
@@ -1743,6 +1768,10 @@ function nextRoom() {
     populateShops();
     S.score += 2500 * nr;
     S.cam.cx = S.p.x; S.cam.cy = S.p.y;
+    // A new floor reforges the base rifle.
+    S.scarLv++;
+    S.glusec = 3.0;
+    A.rack(); A.bigpickup();
     msg(R.name, R.sub, 4);
     A.setDread(0.5 + nr * 0.15);
     if (A.music) { A.music.setFloor(nr); A.music.setBoss(false); A.music.setIntensity(0.2 + nr * 0.16); }
@@ -2145,7 +2174,7 @@ function drawPlayer(p) {
 
   // AEGIS bubble from the shield pickup
   if (p.tempShield > 0) {
-    const k = clamp(p.tempShield / 2, 0, 1);
+    const k = clamp(p.tempShield / 3, 0, 1);
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     ctx.strokeStyle = 'rgba(127,208,255,' + (0.35 + k * 0.4) + ')';
@@ -2341,6 +2370,25 @@ function post() {
     ctx.fillStyle = '#12000a'; ctx.fillRect(0, 0, W, H);
     drawSpr(ctx, S.jumpSpr.spr, W / 2 + rnd(-4, 4), H / 2 + rnd(-4, 4), 10, false, 1, 'rgba(180,10,20,0.5)');
     ctx.globalAlpha = 1;
+  }
+
+  /* GLUSEC — three seconds of the base rifle being reforged. The text cycles
+     hue continuously and each line lags the other so they never match. */
+  if (S.glusec > 0) {
+    const a = clamp(S.glusec / 0.6, 0, 1);
+    const h1 = (S.t * 210) % 360, h2 = (h1 + 140) % 360;
+    const c1 = 'hsl(' + h1 + ',95%,66%)', c2 = 'hsl(' + h2 + ',95%,70%)';
+    ctx.fillStyle = 'rgba(6,3,10,' + (a * 0.45) + ')';
+    ctx.fillRect(0, H / 2 - 46, W, 62);
+    ctx.fillStyle = c1; ctx.globalAlpha = a * 0.8;
+    ctx.fillRect(0, H / 2 - 46, W, 1); ctx.fillRect(0, H / 2 + 15, W, 1);
+    ctx.globalAlpha = 1;
+    htxt('THE POWER OF GLUSEC COMPELS YOU', W / 2, H / 2 - 22, c1, 'center', 17,
+         { weight: '700', alpha: a, glow: c2, glowSize: 30, track: 0.14 });
+    htxt('YOUR BASE GUN IS UPGRADED', W / 2, H / 2 - 4, c2, 'center', 11,
+         { weight: '700', alpha: a, glow: c1, glowSize: 22, track: 0.26 });
+    htxt(scarName() + '   +' + Math.round((ST().scarMul - 1) * 100) + '% DAMAGE',
+         W / 2, H / 2 + 10, scarCol(), 'center', 8, { alpha: a, track: 0.16 });
   }
 
   /* GOROMANIA — two seconds, as fast as the screen will go */
@@ -2806,6 +2854,74 @@ function drawDead() {
   }
 }
 
+function drawArmory() {
+  S.ui = [];
+  ctx.fillStyle = 'rgba(5,4,7,0.90)'; ctx.fillRect(0, 0, W, H);
+  const bg = ctx.createRadialGradient(W / 2, 18, 6, W / 2, 18, 200);
+  bg.addColorStop(0, 'rgba(200,150,30,0.13)'); bg.addColorStop(1, 'rgba(200,150,30,0)');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  htxt('ARMORY', W / 2, 22, '#f0c65a', 'center', 20, { weight: '700', glow: '#6a4a10', glowSize: 18, track: 0.24 });
+  drawSpr(ctx, SPR.coin, W / 2 - 34, 31, 1);
+  htxt(String(S.coins), W / 2 - 26, 34, '#f5c518', 'left', 9, { track: 0.08 });
+
+  const owned = S.p.owned;
+  owned.forEach((id, i) => {
+    const w = WEP[id], u = wup(id);
+    const y = 44 + i * 29, rh = 25;
+    ctx.fillStyle = 'rgba(13,10,14,0.8)'; ctx.fillRect(16, y, W - 32, rh);
+    ctx.fillStyle = w.col; ctx.globalAlpha = 0.75; ctx.fillRect(16, y, 2, rh); ctx.globalAlpha = 1;
+    drawSpr(ctx, w.spr, 34, y + 12, 0.95, false, 1, id === 'scar' && S.scarLv > 1 ? scarCol() : null);
+    htxt(id === 'scar' ? scarName() : w.name, 52, y + 11,
+         id === 'scar' ? scarCol() : w.col, 'left', 8.5, { track: 0.06 });
+    htxt(w.beam ? 'beam' : Math.round(1 / (w.rate * (1 - u.rate * 0.10))) + '/s  ·  ' +
+         (u.split ? (u.split * 2 + 1) + '-way' : '1-way'), 52, y + 20, 'rgba(140,122,108,0.9)', 'left', 6.5,
+         { track: 0.03, noShadow: true });
+
+    WTRACKS.forEach((tr, j) => {
+      const bx = 160 + j * 104, bw = 98, bh = 19, by = y + 3;
+      const rank = u[tr.id] | 0;
+      const maxed = rank >= tr.max;
+      const cost = wupCost(id, tr.id, rank);
+      const afford = S.coins >= cost;
+      const hot = !maxed && afford && mouse.x > bx && mouse.x < bx + bw && mouse.y > by && mouse.y < by + bh;
+      const key = 'arm' + id + tr.id;
+      hoverT[key] = clamp((hoverT[key] || 0) + (hot ? 0.22 : -0.18), 0, 1);
+      const t = hoverT[key];
+
+      ctx.fillStyle = maxed ? 'rgba(24,22,18,0.9)' : 'rgba(' + Math.round(10 + t * 40) + ',9,12,0.9)';
+      ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = maxed ? 'rgba(120,110,80,0.5)' : tr.col;
+      ctx.globalAlpha = maxed ? 0.5 : (afford ? 0.45 + t * 0.55 : 0.2);
+      ctx.fillRect(bx, by, bw, 1); ctx.fillRect(bx, by + bh - 1, bw, 1);
+      ctx.globalAlpha = 1;
+
+      htxt(tr.name, bx + 5, by + 8, maxed ? '#8b8168' : afford ? (t > 0.4 ? '#fff' : tr.col) : '#7a5c58',
+           'left', 7.5, { track: 0.10, glow: t > 0.2 ? tr.col : null, glowSize: 10 * t });
+      for (let k = 0; k < tr.max; k++) {
+        ctx.fillStyle = k < rank ? tr.col : 'rgba(90,80,74,0.45)';
+        ctx.fillRect(bx + 5 + k * 6, by + 11, 4, 3);
+      }
+      if (maxed) htxt('MAX', bx + bw - 5, by + 14, '#8b8168', 'right', 7.5, { track: 0.10 });
+      else {
+        htxt(String(cost), bx + bw - 5, by + 14, afford ? '#f5c518' : '#96605e', 'right', 8, { track: 0.06 });
+        drawSpr(ctx, SPR.coin, bx + bw - 9 - htxtWidth(String(cost), 8), by + 11, 0.62);
+      }
+      htxt(tr.d(rank), bx + 5, by + 17, 'rgba(132,118,106,0.75)', 'left', 6, { track: 0.02, noShadow: true });
+
+      if (!maxed) S.ui.push({ x: bx, y: by, w: bw, h: bh, fn: () => {
+        if (S.coins < cost) { A.denied(); return; }
+        S.coins -= cost; u[tr.id] = rank + 1;
+        persist(); A.buy();
+        S.flash = 0.3; S.flashCol = tr.col;
+      } });
+    });
+  });
+
+  uiBtn(W / 2 - 48, H - 22, 96, 17, 'BACK', '#e8b25a', () => { S.mode = 'pause'; }, 'esc');
+  htxt('upgrades are bought with run coins and last the run', W / 2, H - 27, 'rgba(120,106,94,0.65)', 'center', 6.5, { track: 0.10, noShadow: true });
+}
+
 function drawLevelUp() {
   S.ui = [];
   ctx.fillStyle = 'rgba(4,6,4,0.86)'; ctx.fillRect(0, 0, W, H);
@@ -2860,6 +2976,7 @@ function drawPause() {
   htxt('ESC resume  ·  M mute  ·  WHEEL / 1-7 swap gun  ·  E buy at pedestals',
        W / 2, 38, '#8b7a68', 'center', 7.5, { track: 0.08 });
   uiBtn(W - 112, 14, 96, 18, 'COSMETICS', '#b558ff', () => { S.cosReturn = 'pause'; S.mode = 'cos'; }, 'C');
+  uiBtn(W - 214, 14, 96, 18, 'ARMORY', '#f0c65a', () => { S.mode = 'armory'; }, 'B  ·  ' + S.coins + ' coins');
   if (S.evo | 0) uiBtn(16, 14, 96, 18, 'RESET EVO', '#7fe08a', () => resetEvolution(), 'evo ' + S.evo);
 
   let y = 62;
@@ -2934,6 +3051,7 @@ function frame(now) {
     post();
     drawHUD();
     if (S.mode === 'pause') drawPause();
+    if (S.mode === 'armory') drawArmory();
     if (S.mode === 'levelup') drawLevelUp();
     if (S.mode === 'dead') drawDead();
   }
