@@ -3,6 +3,9 @@
 Top-down pixel-art horror wave shooter. You are Damjan. You have a headband, a
 SCAR with a laser sight, and a shopping problem.
 
+Ten waves a floor, a boss every other wave, a shop every third boss, and no
+bottom to the descent.
+
 ## Run it
 
 ```bash
@@ -21,9 +24,11 @@ over `file://` too, no build step, no dependencies).
 | left click | fire |
 | **right click** | throw a frag |
 | **mouse wheel / 1-7 / Q** | swap weapon |
-| **E** | buy from a pedestal you're standing at |
+| **E** | buy from a pedestal you're standing at (in PACI's shop) |
 | R | reload |
 | SHIFT / SPACE | dash (i-frames) |
+| **B** | the armory — upgrade guns you own |
+| C | cosmetics |
 | ESC / P | pause — full inventory + arsenal list |
 | M | mute |
 
@@ -47,25 +52,57 @@ MELON ARMOR, PURPLE COOLADE, AKIMBO GLOCK-18s, STOLEN MOTORCYCLE) that stack.
 Enemies hit hard and their HP scales gently, so deeper floors get lethal rather
 than spongy.
 
+**There is no last floor.** Past the four hand-built ones the game keeps
+generating them — new names, new palettes, wider arenas, darker rooms — and the
+difficulty keeps climbing with no ceiling. Floor 201 is `THE SALT LINE XXV`.
+
+Every floor also rolls one of five arena layouts (scattered crates, a hall of
+pillars, long corridors, big bunkers, or a broken ring around the middle), so
+you're not always fighting in the same shape of room.
+
+## PACI
+
+Every **third boss** you kill, the next door leads sideways instead of down,
+into a small purple room with an enormous man in it.
+
+> HELLO TRAVELER, WELCOME TO MY SHOP
+
+He stocks three guns at random from whatever you don't own yet. Buy, or don't,
+then walk out the door at the bottom and the wave picks up where it left off.
+Your first visit is floor 1, wave 7.
+
 ## Guns
 
-Weapons sit on pedestals scattered around the floor. Walk up, press **E**, pay.
-They're yours for the rest of the run. Coins are deliberately scarce — bosses
-are the reliable source, regular enemies drop one about one time in twelve.
+Guns are bought from PACI, not found lying around. Walk onto a pedestal in his
+shop, press **E**, pay. They're yours for the rest of the run. Coins are
+deliberately scarce — bosses are the reliable source, regular enemies drop one
+about one time in six.
 
 | gun | cost | deal |
 | --- | --- | --- |
 | SCAR-L | free | reliable, boring, yours |
-| MEAT SPLITTER | 20 | 9 pellets and enormous knockback |
-| THE STAPLER | 45 | nailgun, pins enemies in place |
-| MICROWAVE | 80 | plasma orbs that ricochet and set things on fire |
-| THE HOG | 140 | minigun — spins up, slows you down, never stops |
-| GOD FINGER | 250 | railgun, charges, pierces the entire room |
-| **OMEGA BEAM** | **10 cards** | a continuous beam that deletes everything in the line |
+| MEAT SPLITTER | 15 | 9 pellets and enormous knockback |
+| THE STAPLER | 35 | nailgun, pins enemies in place |
+| MICROWAVE | 60 | plasma orbs that ricochet and set things on fire |
+| THE HOG | 100 | minigun — spins up, slows you down, never stops |
+| GOD FINGER | 175 | railgun, charges, pierces the entire room |
+| **OMEGA BEAM** | **50 cards** | a continuous beam that deletes everything in the line |
 
-**Cards** are the rare drop — about one enemy in fifty. Ten of them buys the
-OMEGA BEAM from its own pedestal, which is on every floor from the start so you
-can see what you're saving for.
+**Cards** are the rare drop — under one enemy in a hundred. Fifty of them buys
+the OMEGA BEAM, and only when PACI happens to be stocking it, so it is very
+much the long game.
+
+## The armory
+
+Press **B** any time to spend coins improving guns you already own:
+
+| track | cost | effect |
+| --- | --- | --- |
+| CYCLE ×5 | scales with the gun | +10% fire rate a rank |
+| **SPLIT ×1** | **flat 100 on every gun** | your shots come out as a 3-way fan |
+| POWER ×5 | scales with the gun | +15% damage a rank |
+
+The **OMEGA BEAM takes no upgrades at all** — it's already the ceiling.
 
 ## Money keeps
 
@@ -107,8 +144,11 @@ wall. Consider what you have never once thought to shoot at.
 - `js/sprites.js` — every sprite, hand-plotted as character grids, baked to canvases
 - `js/audio.js` — all sound synthesized at runtime (WebAudio), zero audio files,
   including formant speech synthesis for the corner secret
+- `js/music.js` — the generative score, also synthesized, keyed per floor
 - `js/game.js` — engine, AI, waves, bosses, weapons, economy, lighting, HUD
 - `serve.js` — 30-line static server
+- `docs/` — an Obsidian vault documenting every system in detail; open the
+  folder as a vault and start at `00 START HERE`
 
 `window.MEAT` is exposed in the console for poking at the guts
 (`MEAT.giveWeapon('omega')`, `MEAT.spawnBoss(2)`, `MEAT.triggerModagaz()`, `MEAT.S` …).

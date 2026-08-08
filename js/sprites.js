@@ -243,6 +243,62 @@ SPR.pedestal = SPRITE([
   '...oooooooooooooo...'
 ], { u: '#7a7268', U: '#4e4841' });
 
+/* ---------- PACI, the shopkeeper. 22x27, drawn at 3.6x — the head is
+   deliberately small for the body so he reads as ENORMOUS next to Damjan
+   rather than just tall. Two frames: settled, and the breath at the top
+   of the loop. ---------- */
+const PACI_PAL = { A: '#c8bba2', a: '#8a7f6c', G: '#5e4a34' };
+const PACI_BODY = [
+  '........oooooo........',
+  '.......ohhhhhho.......',
+  '......ohhhhhhhho......',
+  '......oHhhhhhhHo......',
+  '......osssssssso......',
+  '......osepsspeso......',
+  '......osssssssso......',
+  '......ossmmmmsso......',
+  '.......oSSSSSSo.......',
+  '....oooooooooooooo....'
+];
+SPR.paci = SPRITE(PACI_BODY.concat([
+  '..ooAAAAAAAAAAAAAAoo..',
+  '.osAAAAAAAAAAAAAAAAso.',
+  '.osAAAAyAAAAAAyAAAAso.',
+  '.osAAAAAAAAAAAAAAAAso.',
+  'oSsAAAAAAAAAAAAAAAAsSo',
+  'oSsAAAAAAAAAAAAAAAAsSo',
+  '.osAAAAAAAAAAAAAAAAso.',
+  '.osAAAAyAAAAAAyAAAAso.',
+  '.osAAAAAAAAAAAAAAAAso.',
+  '..oaaaaaaaaaaaaaaaao..',
+  '..oaaaaGGGGGGGGaaaao..',
+  '..oaaaaaaaaaaaaaaaao..',
+  '...oaaaaaaaaaaaaaao...',
+  '....oooooo..oooooo....',
+  '....onnnno..onnnno....',
+  '....otttto..otttto....',
+  '...ottttto..ottttto...'
+]), PACI_PAL);
+SPR.paci2 = SPRITE(PACI_BODY.concat([
+  '..ooAAAAAAAAAAAAAAoo..',
+  '.osAAAAAAAAAAAAAAAAso.',
+  '.osAAAAyAAAAAAyAAAAso.',
+  'oSsAAAAAAAAAAAAAAAAsSo',
+  'oSsAAAAAAAAAAAAAAAAsSo',
+  '.osAAAAAAAAAAAAAAAAso.',
+  '.osAAAAAAAAAAAAAAAAso.',
+  '.osAAAAyAAAAAAyAAAAso.',
+  '.osAAAAAAAAAAAAAAAAso.',
+  '..oaaaaaaaaaaaaaaaao..',
+  '..oaaaaGGGGGGGGaaaao..',
+  '..oaaaaaaaaaaaaaaaao..',
+  '...oaaaaaaaaaaaaaao...',
+  '....oooooo..oooooo....',
+  '....onnnno..onnnno....',
+  '....otttto..otttto....',
+  '...ottttto..ottttto...'
+]), PACI_PAL);
+
 /* the mark in the corner. it is not for you. */
 SPR.sigil = SPRITE([
   '..oo......oo..',

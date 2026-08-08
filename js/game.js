@@ -137,6 +137,41 @@ const ROOMS = [
     wall: ['#6a3835', '#3e2020', '#84463f'], fog: 'rgba(90,0,10,0.16)', dark: 0.82 }
 ];
 
+/* Past the four hand-built floors the building keeps going. Names, palettes and
+   arena size are generated from the floor index, so there is no bottom — the
+   descent just keeps widening and getting darker. */
+const DEEP_NAMES = ['THE RENDERING', 'THE COLD ROOM', 'THE LONG TABLE', 'THE UNDERCUT',
+                    'THE SALT LINE', 'THE GRINDER', 'THE LAST AISLE', 'THE FLOOR BELOW'];
+const DEEP_SUBS = ['it is still going down', 'nobody built this part',
+                   'the walls are further apart here', 'you have stopped counting',
+                   'something is keeping the lights off', 'it knows the way you walk',
+                   'there was never a bottom', 'deeper than the plans allow'];
+function roomDef(idx) {
+  if (idx < ROOMS.length) return ROOMS[idx];
+  const d = idx - ROOMS.length;
+  const h = (200 + d * 47) % 360;
+  const hs = (off, s, l) => 'hsl(' + (((h + off) % 360 + 360) % 360) + ',' + s + '%,' + l + '%)';
+  const cyc = Math.floor(d / DEEP_NAMES.length);
+  return {
+    name: DEEP_NAMES[d % DEEP_NAMES.length] + (cyc ? ' ' + roman(cyc + 1) : ''),
+    sub: 'floor ' + String(idx + 1).padStart(2, '0') + ' // ' + DEEP_SUBS[d % DEEP_SUBS.length],
+    aw: Math.min(1560, 1140 + d * 36), ah: Math.min(1080, 790 + d * 26),
+    floor: [hs(0, 17, 20), hs(9, 19, 17), hs(-9, 15, 14)],
+    grout: hs(0, 26, 8),
+    wall: [hs(7, 19, 31), hs(0, 17, 17), hs(13, 22, 41)],
+    fog: 'hsla(' + h + ',72%,32%,0.16)',
+    dark: Math.min(0.88, 0.82 + d * 0.008)
+  };
+}
+/* PACI's back room. Not a floor — it never appears in the descent count. */
+const SHOP_ROOM = {
+  name: "PACI'S", sub: 'the back room // he was expecting you',
+  aw: 440, ah: 330, floor: ['#3a3040', '#322838', '#2a2030'], grout: '#191320',
+  wall: ['#5a4a64', '#332a3c', '#75608a'], fog: 'rgba(70,25,95,0.09)', dark: 0.52
+};
+function curRoom() { return S.inShop ? SHOP_ROOM : roomDef(S.room); }
+const SHOP_EVERY = 3;      // one back room per three bosses put down
+
 /* Individual hits land much harder than they used to. Balanced back by a slower
    contact rate, longer i-frames and better healing — spikier, not just meaner. */
 const ETYPE = {
@@ -267,6 +302,8 @@ function freshState() {
     goro: false, goroHits: 0, goroT: 0, vacuum: 0,
     xp: 0, level: 1, xpNext: 65, upgPts: 0, upg: { spd: 0, dmg: 0, def: 0 },
     scarLv: 1, lvlChoices: null, wupg: {}, glusec: 0, armorySel: 0,
+    layout: 'scatter',
+    bossKills: 0, shopDue: false, shopsSeen: 0, inShop: false, shopStash: null, paci: null,
     score: 0, combo: 1, comboT: 0, kills: 0, streak: 0,
     flash: 0, flashCol: '#fff', hitstop: 0, slow: 0, redness: 0, modT: 0,
     jump: 0, jumpSpr: null, muzzle: null, beamHit: null,
@@ -313,20 +350,24 @@ function ST() {
 }
 
 /* ---------- per-weapon upgrades, bought with coins ---------- */
+const SPLIT_COST = 100;    // flat, one rank, identical on every gun
 const WTRACKS = [
   { id: 'rate',  name: 'CYCLE',  col: '#f5c518', max: 5, d: r => '+' + (r * 10) + '% fire rate' },
-  { id: 'split', name: 'SPLIT',  col: '#7fd0ff', max: 3, d: r => r ? (r * 2 + 1) + '-way fan' : 'single shot' },
+  { id: 'split', name: 'SPLIT',  col: '#7fd0ff', max: 1, d: r => r ? '3-way fan' : 'single shot' },
   { id: 'pow',   name: 'POWER',  col: '#ff6a72', max: 5, d: r => '+' + (r * 15) + '% damage' }
 ];
 function wup(id) {
   if (!S.wupg[id]) S.wupg[id] = { rate: 0, split: 0, pow: 0 };
   return S.wupg[id];
 }
-/* Better guns cost more to improve, and each rank costs more than the last. */
+/* The beam is bought, not built — nothing in the armory touches it. */
+function wupgradable(id) { return !WEP[id].beam; }
+/* Better guns cost more to improve, and each rank costs more than the last —
+   except SPLIT, which is one flat purchase at the same price on every weapon. */
 function wupCost(id, track, rank) {
+  if (track === 'split') return SPLIT_COST;
   const tier = 1 + (WEP[id].price || 120) / 190;
-  const base = track === 'split' ? 34 : 20;
-  return Math.round((base + rank * 24) * tier);
+  return Math.round((20 + rank * 24) * tier);
 }
 
 const SCAR_COLS = ['#ffe9a8', '#7fd0ff', '#8fff9a', '#ff7fe0', '#ffb03a',
@@ -392,7 +433,7 @@ function magMax() { return S.god ? 999 : curW().mag; }
    ROOM BUILD
    ============================================================ */
 function buildRoom(idx) {
-  const R = ROOMS[Math.min(idx, ROOMS.length - 1)];
+  const R = roomDef(idx);
   const rng = mulberry32(1337 + idx * 977 + Math.floor(Math.random() * 99999));
   S.aw = R.aw; S.ah = R.ah;
   const T = 24;
@@ -402,22 +443,89 @@ function buildRoom(idx) {
   ];
   S.deco = [];
 
-  const n = 7 + idx * 2;
-  for (let i = 0; i < n; i++) {
-    for (let tries = 0; tries < 30; tries++) {
-      const w = rng() < 0.4 ? 24 : rndi(30, 76), h = rng() < 0.4 ? 24 : rndi(26, 70);
-      const x = T + 22 + rng() * (R.aw - 2 * T - 44 - w);
-      const y = T + 22 + rng() * (R.ah - 2 * T - 44 - h);
-      if (Math.hypot(x + w / 2 - R.aw / 2, y + h / 2 - R.ah / 2) < 92) continue;
-      let bad = false;
-      for (let j = 4; j < S.walls.length; j++) {
-        const o = S.walls[j];
-        if (x < o.x + o.w + 40 && x + w + 40 > o.x && y < o.y + o.h + 40 && y + h + 40 > o.y) { bad = true; break; }
-      }
-      if (bad) continue;
-      S.walls.push({ x: Math.round(x), y: Math.round(y), w, h, obs: 1, kind: rng() < 0.35 ? 'vat' : 'crate' });
-      break;
+  /* ---- layout ----
+     One scatter pass every time made every floor read the same: a field of
+     boxes at random. Each floor now picks an archetype, so the arena you
+     fight in has a shape you can learn and use for cover. The middle is
+     always left open — that is where you land and where bosses arrive.
+     `gap` is the breathing room enforced around each block; deliberate
+     layouts sit tighter than scatter, but never below ~18px, which is three
+     times the player's radius. */
+  const M = T + 22;
+  function place(x, y, w, h, kind, gap) {
+    x = Math.round(x); y = Math.round(y); w = Math.round(w); h = Math.round(h);
+    const g = gap === undefined ? 40 : gap;
+    if (x < M || y < M || x + w > R.aw - M || y + h > R.ah - M) return false;
+    if (Math.hypot(x + w / 2 - R.aw / 2, y + h / 2 - R.ah / 2) < 92) return false;
+    // You land on the south pad and leave through the north door. Neither is
+    // allowed to have a crate standing in it — the margin alone doesn't cover
+    // it, and a deliberate layout will happily drop a slab on your head.
+    if (x < R.aw / 2 + 36 && x + w > R.aw / 2 - 36 && y + h > R.ah - 100) return false;
+    if (x < R.aw / 2 + 42 && x + w > R.aw / 2 - 42 && y < 80) return false;
+    for (let j = 4; j < S.walls.length; j++) {
+      const o = S.walls[j];
+      if (x < o.x + o.w + g && x + w + g > o.x && y < o.y + o.h + g && y + h + g > o.y) return false;
     }
+    S.walls.push({ x, y, w, h, obs: 1, kind: kind || (rng() < 0.35 ? 'vat' : 'crate') });
+    return true;
+  }
+  function scatter(count, gap) {
+    for (let i = 0; i < count; i++) {
+      for (let tries = 0; tries < 30; tries++) {
+        const w = rng() < 0.4 ? 24 : rndi(30, 76), h = rng() < 0.4 ? 24 : rndi(26, 70);
+        if (place(M + rng() * (R.aw - 2 * M - w), M + rng() * (R.ah - 2 * M - h), w, h, null, gap)) break;
+      }
+    }
+  }
+
+  const n = 7 + idx * 2;
+  const LAYOUTS = ['scatter', 'pillars', 'corridors', 'bunkers', 'ring'];
+  const layout = LAYOUTS[Math.floor(rng() * LAYOUTS.length)];
+  S.layout = layout;
+
+  if (layout === 'pillars') {
+    // a hall of columns. lots of cover, no sightlines, easy to get flanked.
+    const cols = 4 + Math.floor(rng() * 3), rows = 3 + Math.floor(rng() * 3);
+    const x0 = M + 34, y0 = M + 34;
+    const dx = (R.aw - 2 * (M + 34)) / (cols - 1), dy = (R.ah - 2 * (M + 34)) / (rows - 1);
+    for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+      if (rng() < 0.16) continue;                       // missing columns, so it isn't a lattice
+      const s = rng() < 0.28 ? 32 : 24;
+      place(x0 + i * dx - s / 2, y0 + j * dy - s / 2, s, s, 'vat', 20);
+    }
+  } else if (layout === 'corridors') {
+    // long walls cutting lanes across the room. good for kiting, bad for panic.
+    const bars = 4 + Math.floor(rng() * 4);
+    for (let i = 0; i < bars; i++) {
+      const vert = rng() < 0.5, len = rndi(120, 230), th = rng() < 0.5 ? 16 : 22;
+      const w = vert ? th : len, h = vert ? len : th;
+      for (let tries = 0; tries < 20; tries++)
+        if (place(M + rng() * (R.aw - 2 * M - w), M + rng() * (R.ah - 2 * M - h), w, h, 'crate', 32)) break;
+    }
+    scatter(Math.max(2, n - 5), 40);
+  } else if (layout === 'bunkers') {
+    // a few slabs big enough to lose a boss behind
+    const blocks = 3 + Math.floor(rng() * 3);
+    for (let i = 0; i < blocks; i++) {
+      const w = rndi(88, 150), h = rndi(80, 130);
+      for (let tries = 0; tries < 24; tries++)
+        if (place(M + rng() * (R.aw - 2 * M - w), M + rng() * (R.ah - 2 * M - h), w, h, 'vat', 46)) break;
+    }
+    scatter(Math.max(3, n - 4), 40);
+  } else if (layout === 'ring') {
+    // a broken ring around the arena centre — gaps are the only way in or out
+    const rad = Math.min(R.aw, R.ah) * (0.26 + rng() * 0.07);
+    const segs = 9 + Math.floor(rng() * 4);
+    for (let i = 0; i < segs; i++) {
+      if (rng() < 0.28) continue;                       // the doorways
+      const a = i / segs * TAU;
+      const flat = Math.abs(Math.cos(a)) > 0.5;
+      const w = flat ? 22 : 56, h = flat ? 56 : 22;
+      place(R.aw / 2 + Math.cos(a) * rad - w / 2, R.ah / 2 + Math.sin(a) * rad - h / 2, w, h, 'crate', 18);
+    }
+    scatter(Math.max(3, n - 5), 40);
+  } else {
+    scatter(n, 40);
   }
 
   for (let i = 0; i < 26 + idx * 8; i++)
@@ -441,23 +549,119 @@ function buildRoom(idx) {
   S.shops = [];
 }
 
-/* Shops need the player's inventory, so they're placed after the player exists. */
-function populateShops() {
-  S.shops = [];
-  const unowned = BUYABLE.filter(id => S.p.owned.indexOf(id) < 0);
-  const offer = [];
-  if (unowned.length) offer.push(unowned[0]);                       // always the next rung
-  const rest = unowned.slice(1);
-  while (offer.length < 3 && rest.length) offer.push(rest.splice(Math.floor(Math.random() * rest.length), 1)[0]);
+/* ============================================================
+   PACI'S BACK ROOM
 
-  for (const id of offer) {
-    const p = freeSpot(150);
-    S.shops.push({ x: p.x, y: p.y, id, price: WEP[id].price, cards: 0, bought: false, bob: rnd(0, TAU) });
-  }
-  if (S.p.owned.indexOf('omega') < 0) {
-    const p = freeSpot(190);
-    S.shops.push({ x: p.x, y: p.y, id: 'omega', price: 0, cards: OMEGA_CARDS, bought: false, bob: rnd(0, TAU) });
-  }
+   Guns are not lying around the abattoir any more. Every third boss you
+   put down, the way out leads sideways instead of down, into a small
+   purple room with a very large man in it and three pedestals of whatever
+   he happens to be holding. Buy, or don't, then walk back out the bottom
+   and the wave picks up where it left off.
+   ============================================================ */
+function shopStock() {
+  const pool = BUYABLE.filter(id => S.p.owned.indexOf(id) < 0);
+  if (S.p.owned.indexOf('omega') < 0) pool.push('omega');
+  const offer = [];
+  while (offer.length < 3 && pool.length) offer.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  offer.sort((a, b) => WORDER.indexOf(a) - WORDER.indexOf(b));
+  return offer;
+}
+
+function enterShop() {
+  if (S.pending || S.fadeDir) return;
+  S.fadeDir = 1;
+  S.waveState = 'shop';        // stop the wave clock now, not when the fade lands
+  S.pending = () => {
+    // stash the arena whole — the run is mid-floor and has to come back to it
+    S.shopStash = {
+      aw: S.aw, ah: S.ah, walls: S.walls, deco: S.deco, layout: S.layout,
+      floorCan, floorCtx, decalCan, decalCtx,
+      door: S.door, secret: S.secret, corner: S.corner,
+      px: S.p.x, py: S.p.y
+    };
+    const R = SHOP_ROOM, T = 24;
+    S.inShop = true;
+    S.waveState = 'shop';
+    S.aw = R.aw; S.ah = R.ah;
+    S.walls = [
+      { x: 0, y: 0, w: R.aw, h: T }, { x: 0, y: R.ah - T, w: R.aw, h: T },
+      { x: 0, y: 0, w: T, h: R.ah }, { x: R.aw - T, y: 0, w: T, h: R.ah }
+    ];
+    S.deco = [];
+    S.secret = null; S.corner = null;
+    S.en.length = 0; S.bul.length = 0; S.eb.length = 0; S.cracks.length = 0;
+    S.nades.length = 0; S.part.length = 0; S.gibs.length = 0; S.rings.length = 0;
+    S.props.length = 0; S.peels.length = 0;
+    S.boss = null; S.vacuum = 0;
+    /* The wave-end vacuum deliberately never pulls in permanent drops — a boss's
+       grocery has to be walked to. The shop opens on a timer, not on your say-so,
+       so wiping the drop list here would eat the item you just earned. Carry the
+       permanent ones through and lay them out on the way to PACI's door. */
+    const carried = S.drops.filter(d => d.kind === 'item' || d.kind === 'god');
+    S.drops.length = 0;
+    // the way back out is south, not north — nothing here goes deeper
+    S.door = { x: R.aw / 2 - 24, y: R.ah - T - 4, w: 48, h: T + 4, open: true, glow: 1, exit: true };
+    bakeFloor(R, mulberry32(4242 + S.shopsSeen * 131));
+    S.shopsSeen++;
+
+    S.paci = { x: R.aw / 2, y: 104, bob: 0, blink: rnd(2, 5), line: 0 };
+    S.shops = shopStock().map((id, i, arr) => ({
+      x: R.aw / 2 + (i - (arr.length - 1) / 2) * 96, y: 196, id,
+      price: id === 'omega' ? 0 : WEP[id].price,
+      cards: id === 'omega' ? OMEGA_CARDS : 0,
+      bought: false, bob: rnd(0, TAU)
+    }));
+
+    S.p.x = R.aw / 2; S.p.y = R.ah - 86; S.p.vx = S.p.vy = 0;
+    S.p.reT = 0;
+    carried.forEach((d, i) => {
+      d.x = R.aw / 2 + (i - (carried.length - 1) / 2) * 32;
+      d.y = R.ah - 58;                   // between where you land and the way out
+      d.vx = d.vy = 0;
+      S.drops.push(d);
+    });
+    for (const id of S.p.owned) S.p.mags[id] = WEP[id].mag;
+    S.cam.cx = S.p.x; S.cam.cy = S.p.y;
+
+    msg('PACI', S.shops.length ? 'HELLO TRAVELER, WELCOME TO MY SHOP'
+                               : 'HELLO TRAVELER. YOU HAVE BOUGHT ME OUT.', 4.5);
+    A.doorOpen(); A.bigpickup();
+    A.setDread(0.1);
+    if (A.music) { A.music.setBoss(false); A.music.setIntensity(0.1); }
+    persist();
+  };
+}
+
+function exitShop() {
+  if (S.pending || S.fadeDir) return;
+  S.fadeDir = 1;
+  S.pending = () => {
+    const st = S.shopStash;
+    // and back the other way, if you walked out without picking them up
+    const carried = S.drops.filter(d => d.kind === 'item' || d.kind === 'god');
+    S.drops.length = 0;
+    S.inShop = false; S.paci = null; S.shops = [];
+    S.aw = st.aw; S.ah = st.ah; S.walls = st.walls; S.deco = st.deco; S.layout = st.layout;
+    floorCan = st.floorCan; floorCtx = st.floorCtx;
+    decalCan = st.decalCan; decalCtx = st.decalCtx;
+    S.door = st.door; S.secret = st.secret; S.corner = st.corner;
+    S.p.x = st.px; S.p.y = st.py; S.p.vx = S.p.vy = 0;
+    S.cam.cx = S.p.x; S.cam.cy = S.p.y;
+    carried.forEach((d, i) => {
+      d.x = st.px + (i - (carried.length - 1) / 2) * 32;
+      d.y = st.py + 26;
+      d.vx = d.vy = 0;
+      S.drops.push(d);
+    });
+    S.shopStash = null;
+    // drop back into the post-wave pause so updateWaves resumes normally —
+    // or, if the floor's tenth wave is already done, into the open door.
+    S.waveState = 'clear'; S.waveT = 1.4;
+    A.setDread(clamp(S.wave / 10 * 0.6 + S.room * 0.2, 0, 1));
+    if (A.music) A.music.setIntensity(clamp(0.12 + (S.wave / 10) * 0.72 + S.room * 0.16, 0, 1));
+    A.doorOpen();
+    msg('BACK TO IT', S.wave >= 10 ? 'the door north is still open.' : 'he watched you leave.', 2.4);
+  };
 }
 
 function bakeFloor(R, rng) {
@@ -847,14 +1051,24 @@ function killEnemy(e, ang) {
     if (A.music) { A.music.setBoss(false); A.duck(0.8, 2.2); }
     S.slow = 0.9; punch(0.09);
     S.flash = 0.7; S.flashCol = '#ff2b2b';
-    dropPickup(e.x, e.y, 'item', e.def.item);
-    for (let i = 0; i < 5; i++) {                       // 5 coins a boss, exactly
+    /* Groceries stop at level two. Bosses repeat forever, so once a shelf is
+       full the same boss pays out in metal instead of a third banana. */
+    const key = e.def.item;
+    const capped = (S.items[key] | 0) >= 2;
+    if (!capped) dropPickup(e.x, e.y, 'item', key);
+    const coins = capped ? 12 : 5;                      // 5 coins a boss, 12 once it has nothing left to give
+    for (let i = 0; i < coins; i++) {
       const a = rnd(0, TAU);
       S.drops.push({ x: e.x, y: e.y, kind: 'coin', t: 0, life: 40, bob: rnd(0, TAU), vx: Math.cos(a) * 70, vy: Math.sin(a) * 70 });
     }
-    if (Math.random() < 0.05) dropPickup(e.x + 8, e.y, 'card');
+    if (Math.random() < (capped ? 0.45 : 0.05)) dropPickup(e.x + 8, e.y, 'card');
     dropPickup(e.x - 10, e.y, 'nade');
-    msg(e.name + ' IS MEAT', 'it dropped something edible.', 3);
+
+    /* Every third boss, the next door leads sideways instead of onward. */
+    S.bossKills++;
+    if (S.bossKills % SHOP_EVERY === 0) S.shopDue = true;
+    msg(e.name + ' IS MEAT', capped ? 'it had nothing left you did not have.' : 'it dropped something edible.', 3);
+    if (S.shopDue) float(e.x, e.y - 30, 'A DOOR OPENS SIDEWAYS', '#c05cff', true);
     A.roar();
   } else {
     const r = Math.random();
@@ -988,7 +1202,11 @@ function updateWaves(dt) {
     const cap = Math.min(78, Math.round(19 + S.wave * 1.4 + S.room * 7.5 + (S.evo | 0) * 2 +
                                         Math.max(0, S.p.owned.length - 1) * 1.5 +
                                         Math.max(0, S.level - 1) * 0.8));
-    if (S.spawnT <= 0 && S.queue.length && S.en.length < cap) {
+    /* Cracks take 0.75s to hatch but batches fire every 0.15s, so counting only
+       what is already breathing lets a deep floor put five batches in the air
+       before the cap notices — floor 14 was landing 159 against a cap of 78.
+       Count what is on its way as well. */
+    if (S.spawnT <= 0 && S.queue.length && S.en.length + S.cracks.length < cap) {
       S.spawnT = Math.max(0.15, 0.85 - S.wave * 0.05 - S.room * 0.09);
       const batch = 1 + Math.floor(S.wave / 4) + S.room + (Math.random() < 0.4 ? 1 : 0);
       for (let i = 0; i < batch && S.queue.length; i++) {
@@ -1017,7 +1235,14 @@ function updateWaves(dt) {
     }
   } else if (S.waveState === 'clear') {
     S.waveT -= dt;
-    if (S.waveT <= 0 && S.wave < 10) startWave(S.wave + 1);
+    // waveT stays negative until something else changes state, so anything
+    // already mid-transition has to hold this branch off or it fires again
+    // on the very next frame.
+    if (S.waveT <= 0 && !S.fadeDir && !S.pending) {
+      // a shop owed by the boss you just killed comes before anything else
+      if (S.shopDue) { S.shopDue = false; enterShop(); }
+      else if (S.wave < 10) startWave(S.wave + 1);
+    }
   }
 
   for (let i = S.cracks.length - 1; i >= 0; i--) {
@@ -1493,7 +1718,10 @@ function update(rdt) {
 
   if (S.door.open) {
     S.door.glow = Math.min(1, S.door.glow + dt);
-    if (p.x > S.door.x - 6 && p.x < S.door.x + S.door.w + 6 && p.y < S.door.y + S.door.h + 12) nextRoom();
+    const inX = p.x > S.door.x - 6 && p.x < S.door.x + S.door.w + 6;
+    // the shop's door is on the south wall and goes back, not down
+    if (S.door.exit) { if (inX && p.y > S.door.y - 12) exitShop(); }
+    else if (inX && p.y < S.door.y + S.door.h + 12) nextRoom();
   }
 
   updateWaves(dt);
@@ -1771,12 +1999,11 @@ function startRun() {
   S.mode = 'play';
   buildRoom(0);
   S.p = makePlayer();
-  populateShops();
   S.cam.cx = S.p.x; S.cam.cy = S.p.y;
   A.init();
   A.setDread(0.2);
   if (A.music) { A.music.setFloor(0); A.music.setBoss(false); A.music.setIntensity(0.15); A.music.start(); }
-  msg(ROOMS[0].name, ROOMS[0].sub, 3.4);
+  msg(roomDef(0).name, roomDef(0).sub, 3.4);
   setTimeout(() => { if (S.mode === 'play' && S.wave === 0) startWave(1); }, 2200);
   setTimeout(() => { if (S.mode === 'play') msg('', 'something breathes inside the north wall.', 4); }, 6200);
 }
@@ -1787,7 +2014,7 @@ function nextRoom() {
   const nr = S.room + 1;
   S.pending = () => {
     S.room = nr;
-    const R = ROOMS[Math.min(nr, ROOMS.length - 1)];
+    const R = roomDef(nr);
     buildRoom(nr);
     S.en.length = 0; S.bul.length = 0; S.eb.length = 0; S.drops.length = 0;
     S.peels.length = 0; S.gibs.length = 0; S.part.length = 0; S.cracks.length = 0;
@@ -1798,7 +2025,6 @@ function nextRoom() {
     S.p.nades = Math.min(6, S.p.nades + 2);
     S.p.reT = 0;
     for (const id of S.p.owned) S.p.mags[id] = WEP[id].mag;
-    populateShops();
     S.score += 2500 * nr;
     S.cam.cx = S.p.x; S.cam.cy = S.p.y;
     // A new floor reforges the base rifle.
@@ -1818,7 +2044,7 @@ function nextRoom() {
    ============================================================ */
 function drawWorld() {
   const c = S.cam;
-  const R = ROOMS[Math.min(S.room, ROOMS.length - 1)];
+  const R = curRoom();
   const hw = W / (2 * c.z), hh = H / (2 * c.z);
   const vl = c.cx - hw, vt = c.cy - hh, vr = c.cx + hw, vb = c.cy + hh;
 
@@ -1848,6 +2074,7 @@ function drawWorld() {
     ctx.globalAlpha = 1;
   }
 
+  drawPaci();
   drawShops();
 
   for (const d of S.drops) {
@@ -1961,6 +2188,37 @@ function drawWorld() {
   ctx.restore();
 }
 
+/* PACI. Drawn at 3.6x against Damjan's 1x — he is meant to be absurd. */
+function drawPaci() {
+  const q = S.paci;
+  if (!q) return;
+  const breath = Math.sin(S.t * 1.4);
+  const spr = breath > 0 ? SPR.paci2 : SPR.paci;
+  const y = q.y + breath * 1.6;
+
+  ctx.fillStyle = 'rgba(0,0,0,0.42)';
+  ctx.beginPath(); ctx.ellipse(q.x, q.y + 50, 46, 12, 0, 0, TAU); ctx.fill();
+  ctx.globalAlpha = 0.10 + Math.sin(S.t * 2) * 0.035;
+  ctx.fillStyle = '#c05cff';
+  ctx.beginPath(); ctx.arc(q.x, q.y, 82, 0, TAU); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  drawSpr(ctx, spr, q.x, y, 3.6);
+
+  const line = S.shops.length ? 'HELLO TRAVELER, WELCOME TO MY SHOP'
+                              : 'NOTHING LEFT. COME BACK WHEN I RESTOCK.';
+  ctx.font = '8px ' + GAME_FONT; ctx.textAlign = 'center';
+  const tw = ctx.measureText(line).width;
+  ctx.fillStyle = 'rgba(10,4,16,0.82)';
+  ctx.fillRect(q.x - tw / 2 - 6, q.y - 74, tw + 12, 22);
+  ctx.fillStyle = 'rgba(176,92,255,0.55)';
+  ctx.fillRect(q.x - tw / 2 - 6, q.y - 74, tw + 12, 1);
+  ctx.fillRect(q.x - tw / 2 - 6, q.y - 53, tw + 12, 1);
+  ctx.fillStyle = '#e8c8ff'; ctx.fillText('PACI', q.x, q.y - 65);
+  ctx.fillStyle = '#c8a8e0'; ctx.fillText(line, q.x, q.y - 57);
+  ctx.textAlign = 'left';
+}
+
 function drawShops() {
   for (const sh of S.shops) {
     const w = WEP[sh.id];
@@ -2018,7 +2276,18 @@ function drawWalls(R, vl, vt, vr, vb) {
 
 function drawDoor() {
   const d = S.door;
-  if (d.open) {
+  if (d.open && d.exit) {
+    // the shop's way out: south wall, purple, spills its light upward
+    const g = ctx.createLinearGradient(0, d.y + d.h, 0, d.y - 26);
+    g.addColorStop(0, 'rgba(176,92,255,0.85)'); g.addColorStop(1, 'rgba(176,92,255,0)');
+    ctx.fillStyle = g; ctx.fillRect(d.x, d.y - 26, d.w, d.h + 26);
+    ctx.fillStyle = '#0e0614'; ctx.fillRect(d.x + 3, d.y + 2, d.w - 6, d.h - 2);
+    ctx.fillStyle = 'rgba(210,150,255,' + (0.5 + Math.sin(S.t * 4) * 0.3) + ')';
+    ctx.fillRect(d.x + 3, d.y + 2, d.w - 6, 2);
+    ctx.font = '8px ' + GAME_FONT; ctx.textAlign = 'center';
+    ctx.fillStyle = '#d8a8ff'; ctx.fillText('BACK', d.x + d.w / 2, d.y - 8);
+    ctx.textAlign = 'left';
+  } else if (d.open) {
     const g = ctx.createLinearGradient(0, d.y, 0, d.y + d.h + 26);
     g.addColorStop(0, 'rgba(255,60,70,0.85)'); g.addColorStop(1, 'rgba(255,60,70,0)');
     ctx.fillStyle = g; ctx.fillRect(d.x, d.y, d.w, d.h + 26);
@@ -2329,7 +2598,7 @@ function drawEnemy(e) {
 
 /* ---------- lighting ---------- */
 function drawLight() {
-  const R = ROOMS[Math.min(S.room, ROOMS.length - 1)];
+  const R = curRoom();
   lctx.globalCompositeOperation = 'source-over';
   lctx.fillStyle = 'rgba(4,2,6,' + (S.god ? 0.55 : R.dark) + ')';
   lctx.fillRect(0, 0, W, H);
@@ -2372,6 +2641,7 @@ function drawLight() {
   for (const g2 of S.nades) if (g2.fuse < 0.45) blob(g2.x, g2.y, 30, 0.6);
   for (const d of S.drops) if (d.kind === 'item' || d.kind === 'god' || d.kind === 'card') blob(d.x, d.y, 46, 0.9);
   for (const sh of S.shops) if (!sh.bought) blob(sh.x, sh.y - 12, 52, 0.85);
+  if (S.paci) blob(S.paci.x, S.paci.y, 120, 0.95);
   if (S.corner && (S.corner.found || S.corner.pulse > 0.15)) blob(S.corner.x, S.corner.y, 40, S.corner.found ? 0.8 : S.corner.pulse * 0.7);
   if (S.door.open) blob(S.door.x + S.door.w / 2, S.door.y + S.door.h, 70, 0.9);
   for (const e of S.en) blob(e.x, e.y, e.boss ? 40 : 15, 0.42);
@@ -2426,22 +2696,27 @@ function post() {
   }
 
   /* GLUSEC — three seconds of the base rifle being reforged. The text cycles
-     hue continuously and each line lags the other so they never match. */
+     hue continuously and each line lags the other so they never match.
+     It sits low: a new floor also fires msg() and the item banner, and all
+     three used to stack on the middle of the screen. */
   if (S.glusec > 0) {
     const a = clamp(S.glusec / 0.6, 0, 1);
     const h1 = (S.t * 210) % 360, h2 = (h1 + 140) % 360;
     const c1 = 'hsl(' + h1 + ',95%,66%)', c2 = 'hsl(' + h2 + ',95%,70%)';
-    ctx.fillStyle = 'rgba(6,3,10,' + (a * 0.45) + ')';
-    ctx.fillRect(0, H / 2 - 46, W, 62);
+    /* 197..227 is the only clear strip down here: the pickup banner ends at
+       H/2+61 and the grocery shelf starts around H-42. */
+    const gy0 = 197;
+    ctx.fillStyle = 'rgba(6,3,10,' + (a * 0.6) + ')';
+    ctx.fillRect(0, gy0, W, 30);
     ctx.fillStyle = c1; ctx.globalAlpha = a * 0.8;
-    ctx.fillRect(0, H / 2 - 46, W, 1); ctx.fillRect(0, H / 2 + 15, W, 1);
+    ctx.fillRect(0, gy0, W, 1); ctx.fillRect(0, gy0 + 29, W, 1);
     ctx.globalAlpha = 1;
-    htxt('THE POWER OF GLUSEC COMPELS YOU', W / 2, H / 2 - 22, c1, 'center', 17,
+    htxt('THE POWER OF GLUSEC COMPELS YOU', W / 2, gy0 + 13, c1, 'center', 13.5,
          { weight: '700', alpha: a, glow: c2, glowSize: 30, track: 0.14 });
-    htxt('YOUR BASE GUN IS UPGRADED', W / 2, H / 2 - 4, c2, 'center', 11,
-         { weight: '700', alpha: a, glow: c1, glowSize: 22, track: 0.26 });
-    htxt(scarName() + '   +' + Math.round((ST().scarMul - 1) * 100) + '% DAMAGE',
-         W / 2, H / 2 + 10, scarCol(), 'center', 8, { alpha: a, track: 0.16 });
+    htxt('YOUR BASE GUN IS UPGRADED', W / 2, gy0 + 24, c2, 'center', 8.5,
+         { weight: '700', alpha: a, glow: c1, glowSize: 20, track: 0.24 });
+    htxt(scarName() + '  +' + Math.round((ST().scarMul - 1) * 100) + '%',
+         W - 8, gy0 + 24, scarCol(), 'right', 7.5, { alpha: a, track: 0.10 });
   }
 
   /* GOROMANIA — two seconds, as fast as the screen will go */
@@ -2476,7 +2751,7 @@ function uiWipe() { octx.clearRect(0, 0, ov.width, ov.height); }
 
 function drawHUD() {
   const p = S.p, st = ST(), w = curW();
-  const R = ROOMS[Math.min(S.room, ROOMS.length - 1)];
+  const R = curRoom();
 
   const hw = 96;
   ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(6, 6, hw + 2, 8);
@@ -2565,11 +2840,16 @@ function drawHUD() {
 
   /* wave / room */
   txt(R.name, W / 2, 12, '#8e7a68', 'center');
-  txt(S.waveState === 'idle' ? 'PREPARING' : 'WAVE ' + S.wave + '/10', W / 2, 22,
-      BOSS_WAVES[S.wave] !== undefined ? '#ff3b46' : '#c0ac96', 'center');
-  for (let i = 1; i <= 10; i++) {
-    ctx.fillStyle = i < S.wave ? '#8a2a2e' : i === S.wave ? '#ff3b46' : 'rgba(255,255,255,0.12)';
-    ctx.fillRect(W / 2 - 30 + (i - 1) * 6, 26, 4, 2);
+  if (S.inShop) {
+    txt('SPEND SOMETHING', W / 2, 22, '#c8a8e0', 'center');
+    txt('leave through the door at the bottom', W / 2, 32, 'rgba(160,130,190,0.75)', 'center', 7);
+  } else {
+    txt(S.waveState === 'idle' ? 'PREPARING' : 'WAVE ' + S.wave + '/10', W / 2, 22,
+        BOSS_WAVES[S.wave] !== undefined ? '#ff3b46' : '#c0ac96', 'center');
+    for (let i = 1; i <= 10; i++) {
+      ctx.fillStyle = i < S.wave ? '#8a2a2e' : i === S.wave ? '#ff3b46' : 'rgba(255,255,255,0.12)';
+      ctx.fillRect(W / 2 - 30 + (i - 1) * 6, 26, 4, 2);
+    }
   }
 
   txt(String(S.score).padStart(7, '0'), W - 6, 12, '#d8c49a', 'right');
@@ -2658,6 +2938,11 @@ function drawMinimap() {
     ctx.fillRect(gx(sh.x) - 1.5, gy(sh.y) - 1.5, 3, 3);
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.fillRect(gx(sh.x) - 0.5, gy(sh.y) - 0.5, 1, 1);
+  }
+  // the very large man
+  if (S.paci) {
+    ctx.fillStyle = '#c05cff';
+    ctx.fillRect(gx(S.paci.x) - 3, gy(S.paci.y) - 3, 6, 6);
   }
 
   // loose loot (secrets are not on here)
@@ -2980,6 +3265,18 @@ function drawArmory() {
          (u.split ? (u.split * 2 + 1) + '-way' : '1-way'), 52, y + 19, 'rgba(140,122,108,0.9)', 'left', 6.5,
          { track: 0.03, noShadow: true });
 
+    /* The OMEGA BEAM sits in the list so you can see it, but it takes no
+       upgrades — it is already the ceiling. */
+    if (!wupgradable(id)) {
+      const bx = 154, bw = 100 * 3 + 8;
+      ctx.fillStyle = 'rgba(18,12,22,0.9)'; ctx.fillRect(bx, y, bw, rh);
+      ctx.fillStyle = w.col; ctx.globalAlpha = 0.30;
+      ctx.fillRect(bx, y, bw, 1); ctx.fillRect(bx, y + rh - 1, bw, 1);
+      ctx.globalAlpha = 1;
+      htxt('CANNOT BE IMPROVED', bx + bw / 2, y + 14, 'rgba(150,110,190,0.9)', 'center', 9, { track: 0.24 });
+      return;
+    }
+
     WTRACKS.forEach((tr, j) => {
       const bx = 154 + j * 104, bw = 100, bh = rh, by = y;
       const rank = u[tr.id] | 0;
@@ -3042,7 +3339,7 @@ function drawArmory() {
     });
   });
 
-  htxt(footer || 'CYCLE fire rate  ·  SPLIT extra shots  ·  POWER damage  —  bought with run coins, kept for the run',
+  htxt(footer || 'CYCLE fire rate  ·  SPLIT one flat ' + SPLIT_COST + '-coin fan  ·  POWER damage  —  bought with run coins, kept for the run',
        W / 2, H - 30, footer ? '#e2cba2' : 'rgba(126,112,100,0.8)', 'center', 7.5, { track: 0.08 });
   uiBtn(W / 2 - 48, H - 22, 96, 17, 'BACK', '#e8b25a', () => { S.mode = 'pause'; });
   crosshair();
@@ -3246,9 +3543,11 @@ requestAnimationFrame(frame);
 
 // dev hook
 window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantItem, grantGod, breakSecret,
-                giveWeapon, explode, triggerModagaz, triggerGoromania, populateShops,
+                giveWeapon, explode, triggerModagaz, triggerGoromania,
                 evolve, resetEvolution, canEvolve, EVO_COST, OMEGA_CARDS,
                 gainXP, openLevelUp, takeUpgrade, UPGRADES, scarName, scarCol, ST,
-                ITEMS, BOSSES, WEP, WORDER, COSMETICS, frame, nextRoom };
+                ITEMS, BOSSES, WEP, WORDER, COSMETICS, frame, nextRoom,
+                enterShop, exitShop, shopStock, roomDef, curRoom, buildRoom,
+                wup, wupCost, wupgradable, WTRACKS, SPLIT_COST, SHOP_EVERY, diff, killEnemy };
 
 })();
