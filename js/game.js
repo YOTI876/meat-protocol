@@ -19,30 +19,44 @@ const lctx = lcan.getContext('2d');
 
 /* ---------- crisp UI text (drawn on the high-res overlay) ----------
    Coordinates are in game space (480x270) and scaled up, so layout code stays
-   identical to the pixel canvas — only the rasterisation is sharper. */
-const UI_FONT = '"Oswald", "Arial Narrow", "Segoe UI Semibold", "Segoe UI", system-ui, sans-serif';
+   identical to the pixel canvas — only the rasterisation is sharper. One
+   typeface for the whole game (see js/font.js): the pixel look comes from the
+   letterforms, the legibility comes from rasterising them at device
+   resolution instead of at 480x270 and upscaling. */
+const UI_FONT = GAME_FONT;
+const CAP_H = 0.63;         // Pixelify Sans cap height in em — used to centre on a point
 function htxt(s, x, y, col, align, size, opts) {
-  const o = opts || {}, k = uiScale;
+  const o = opts || {}, k = uiScale, sz = size || 9;
+  // o.mid: treat y as the vertical centre of the cap box rather than the
+  // baseline. Canvas' own 'middle' baseline sits low because it splits the em
+  // box including descenders; centring on caps is what reads as centred.
+  const by = o.mid ? y + sz * CAP_H / 2 : y;
+  // Canvas puts letter-spacing after the final glyph as well, so the measured
+  // run is one gap wider than the ink and centred text lands half a gap left.
+  // Give it back, or every centred label sits fractionally off.
+  const trk = (o.track === undefined ? 0.04 : o.track) * sz;
+  const al = align || 'left';
+  if (al === 'center') x += trk / 2; else if (al === 'right') x += trk;
   octx.save();
-  octx.font = (o.weight || '600') + ' ' + ((size || 9) * k) + 'px ' + UI_FONT;
-  octx.textAlign = align || 'left';
+  octx.font = (o.weight || '600') + ' ' + (sz * k) + 'px ' + UI_FONT;
+  octx.textAlign = al;
   octx.textBaseline = 'alphabetic';
-  if (octx.letterSpacing !== undefined) octx.letterSpacing = ((o.track === undefined ? 0.06 : o.track) * (size || 9) * k) + 'px';
+  if (octx.letterSpacing !== undefined) octx.letterSpacing = (trk * k) + 'px';
   if (o.glow) { octx.shadowColor = o.glow; octx.shadowBlur = (o.glowSize || 10) * k * 0.5; }
   if (o.alpha !== undefined) octx.globalAlpha = o.alpha;
   if (!o.noShadow) {
     octx.fillStyle = 'rgba(0,0,0,0.9)';
-    octx.fillText(s, x * k + k * 0.9, y * k + k * 0.9);
+    octx.fillText(s, x * k + k * 0.9, by * k + k * 0.9);
   }
   octx.fillStyle = col;
-  octx.fillText(s, x * k, y * k);
+  octx.fillText(s, x * k, by * k);
   octx.restore();
 }
 function htxtWidth(s, size, track) {
   const k = uiScale;
   octx.save();
   octx.font = '600 ' + ((size || 9) * k) + 'px ' + UI_FONT;
-  if (octx.letterSpacing !== undefined) octx.letterSpacing = ((track === undefined ? 0.06 : track) * (size || 9) * k) + 'px';
+  if (octx.letterSpacing !== undefined) octx.letterSpacing = ((track === undefined ? 0.04 : track) * (size || 9) * k) + 'px';
   const w = octx.measureText(s).width / k;
   octx.restore();
   return w;
@@ -126,10 +140,10 @@ const ROOMS = [
 /* Individual hits land much harder than they used to. Balanced back by a slower
    contact rate, longer i-frames and better healing — spikier, not just meaner. */
 const ETYPE = {
-  crawler:  { spr: SPR.crawler,  hp: 26,  spd: 54, dmg: 16, r: 6, score: 10, gib: '#8e6666', name: 'CRAWLER' },
-  shrieker: { spr: SPR.shrieker, hp: 38,  spd: 33, dmg: 20, r: 6, score: 20, gib: '#68785a', name: 'SHRIEKER' },
-  stalker:  { spr: SPR.stalker,  hp: 32,  spd: 84, dmg: 23, r: 6, score: 26, gib: '#a8a294', name: 'STALKER' },
-  bloater:  { spr: SPR.bloater,  hp: 105, spd: 25, dmg: 32, r: 9, score: 40, gib: '#8a3540', name: 'BLOATER' }
+  crawler:  { bank: SPR.anim.crawler,  hp: 26,  spd: 54, dmg: 16, r: 6, score: 10, gib: '#8b6161', name: 'CRAWLER' },
+  shrieker: { bank: SPR.anim.shrieker, hp: 38,  spd: 33, dmg: 20, r: 6, score: 20, gib: '#6b8a52', name: 'SHRIEKER' },
+  stalker:  { bank: SPR.anim.stalker,  hp: 32,  spd: 84, dmg: 23, r: 6, score: 26, gib: '#9a927e', name: 'STALKER' },
+  bloater:  { bank: SPR.anim.bloater,  hp: 105, spd: 25, dmg: 32, r: 9, score: 40, gib: '#9c4049', name: 'BLOATER' }
 };
 const CONTACT_CD = 0.78;   // was 0.70 — bigger bites, taken less often
 const OMEGA_CARDS = 50;    // the beam is the long game now
@@ -138,11 +152,11 @@ const EVO_COST = ev => 100 * Math.pow(2, ev);   // 100, 200, 400, 800 ...
 const BOSSES = [
   // addT/addN: how often each boss calls for help, and how much. Every boss
   // summons now, but the cap in updateBoss keeps the arena from silting up.
-  { key: 'butcher', name: 'THE BUTCHER',      spr: SPR.bossA, tint: null,                     hp: 850,  spd: 40, r: 15, item: 'banana',  pat: 'charge',  addT: 6.5, addN: 3, adds: ['crawler'],                        cry: 'IT REMEMBERS YOUR NAME' },
-  { key: 'mother',  name: 'MOTHER OF MELONS', spr: SPR.bossB, tint: null,                     hp: 1100, spd: 26, r: 15, item: 'melon',   pat: 'spawner', addT: 4.2, addN: 4, adds: ['crawler', 'crawler', 'shrieker'], cry: 'SHE IS FULL OF CHILDREN' },
-  { key: 'pitcher', name: 'THE PITCHER',      spr: SPR.bossA, tint: 'rgba(224,40,50,0.55)',   hp: 1450, spd: 46, r: 15, item: 'coolade', pat: 'blink',   addT: 7.0, addN: 3, adds: ['stalker', 'crawler'],            cry: 'IT CAME THROUGH THE WALL' },
-  { key: 'hog',     name: 'THE HOGFATHER',    spr: SPR.bossB, tint: 'rgba(255,130,142,0.55)', hp: 1850, spd: 32, r: 15, item: 'glock',   pat: 'burst',   addT: 6.0, addN: 4, adds: ['crawler', 'shrieker', 'bloater'], cry: 'HE IS CARRYING SOMETHING' },
-  { key: 'courier', name: 'THE COURIER',      spr: SPR.bossA, tint: 'rgba(90,200,255,0.5)',   hp: 2400, spd: 62, r: 15, item: 'bike',    pat: 'circle',  addT: 6.8, addN: 4, adds: ['stalker', 'stalker', 'crawler'],  cry: 'IT HAS BEEN CIRCLING FOR HOURS' }
+  { key: 'butcher', name: 'THE BUTCHER',      bank: SPR.anim.bossA, tint: null,                     hp: 850,  spd: 40, r: 15, item: 'banana',  pat: 'charge',  addT: 6.5, addN: 3, adds: ['crawler'],                        cry: 'IT REMEMBERS YOUR NAME' },
+  { key: 'mother',  name: 'MOTHER OF MELONS', bank: SPR.anim.bossB, tint: null,                     hp: 1100, spd: 26, r: 15, item: 'melon',   pat: 'spawner', addT: 4.2, addN: 4, adds: ['crawler', 'crawler', 'shrieker'], cry: 'SHE IS FULL OF CHILDREN' },
+  { key: 'pitcher', name: 'THE PITCHER',      bank: SPR.anim.bossA, tint: 'rgba(224,40,50,0.55)',   hp: 1450, spd: 46, r: 15, item: 'coolade', pat: 'blink',   addT: 7.0, addN: 3, adds: ['stalker', 'crawler'],            cry: 'IT CAME THROUGH THE WALL' },
+  { key: 'hog',     name: 'THE HOGFATHER',    bank: SPR.anim.bossB, tint: 'rgba(255,130,142,0.55)', hp: 1850, spd: 32, r: 15, item: 'glock',   pat: 'burst',   addT: 6.0, addN: 4, adds: ['crawler', 'shrieker', 'bloater'], cry: 'HE IS CARRYING SOMETHING' },
+  { key: 'courier', name: 'THE COURIER',      bank: SPR.anim.bossA, tint: 'rgba(90,200,255,0.5)',   hp: 2400, spd: 62, r: 15, item: 'bike',    pat: 'circle',  addT: 6.8, addN: 4, adds: ['stalker', 'stalker', 'crawler'],  cry: 'IT HAS BEEN CIRCLING FOR HOURS' }
 ];
 const BOSS_WAVES = { 3: 0, 5: 1, 7: 2, 9: 3, 10: 4 };
 
@@ -506,7 +520,9 @@ function spawnEnemy(type, x, y) {
   const waveK = 1 + S.wave * 0.045;
   const hp = d.hp * D.hp * waveK;
   const e = {
-    type, x, y, vx: 0, vy: 0, r: d.r, spr: d.spr,
+    type, x, y, vx: 0, vy: 0, r: d.r, bank: d.bank, spr: d.bank.walk[0],
+    // random phase so a spawned batch doesn't march in lockstep
+    anim: rnd(0, 4), poseT: 0,
     hp, max: hp,
     spd: d.spd * D.spd * rnd(0.9, 1.12),
     dmg: d.dmg * D.dmg * (1 + S.wave * 0.03),
@@ -524,7 +540,8 @@ function spawnBoss(idx) {
   const hp = B.hp * D.hp * 1.35;
   const b = {
     type: 'boss', def: B, name: B.name, x: S.aw / 2, y: 90, vx: 0, vy: 0,
-    r: B.r, spr: B.spr, tint: B.tint,
+    r: B.r, bank: B.bank, spr: B.bank.walk[0], tint: B.tint,
+    anim: 0, poseT: 0,
     hp, max: hp, spd: B.spd * (1 + S.room * 0.06) * (1 + (S.evo | 0) * 0.04),
     dmg: 26 * D.dmg, score: 500,
     gib: '#8a3540', hit: 0, phase: 'idle', pt: 1.2, wob: 0, bob: 0, sq: 0, orbit: rnd(0, TAU),
@@ -1319,6 +1336,11 @@ function update(rdt) {
     e.hit = Math.max(0, e.hit - dt);
     e.sq = Math.max(0, e.sq - dt * 3);
     e.bob += dt * 6;
+    /* The walk cycle is stepped by how fast the thing is actually travelling,
+       so a stalker sprints and a bloater lumbers off the same code. poseT is
+       the wind-up frame; the AI sets it, the draw reads it. */
+    e.anim += dt * (1.7 + Math.hypot(e.vx, e.vy) * (e.boss ? 0.022 : 0.05));
+    e.poseT = Math.max(0, e.poseT - dt);
     // twitching: they don't hold still, and it isn't the animation
     e.twitch -= dt;
     if (e.twitch <= 0) {
@@ -1489,8 +1511,11 @@ function updateEnemy(e, dt) {
     if (d < 96) { tx *= -1; ty *= -1; }
     else if (d < 130) { const t2 = tx; tx = -ty; ty = t2; }
     e.fireT -= dt;
+    // it gapes before it screams — the wide maw is the warning
+    if (e.fireT < 0.5 && d < 220) e.poseT = Math.max(e.poseT, 0.1);
     if (e.fireT <= 0 && d < 220) {
       e.fireT = rnd(1.8, 2.8);
+      e.poseT = 0.34;
       A.screech();
       const a = Math.atan2(dy, dx);
       for (let k = -1; k <= 1; k++)
@@ -1498,6 +1523,7 @@ function updateEnemy(e, dt) {
     }
   } else if (e.type === 'stalker') {
     e.blinkT -= dt;
+    if (e.blinkT < 0.4 && d > 40) e.poseT = Math.max(e.poseT, 0.1);   // coils first
     if (e.blinkT <= 0 && d > 40) {
       e.blinkT = rnd(2.4, 4);
       part(e.x, e.y, '#cfc7b0', 14, 100, 0.4);
@@ -1507,7 +1533,9 @@ function updateEnemy(e, dt) {
       A.screech();
     }
   } else if (e.type === 'crawler') {
-    if (Math.random() < dt * 0.5 && d < 120) { e.vx += tx * 90; e.vy += ty * 90; }
+    if (Math.random() < dt * 0.5 && d < 120) { e.vx += tx * 90; e.vy += ty * 90; e.poseT = 0.22; }
+  } else if (e.type === 'bloater') {
+    if (d < e.r + 18) e.poseT = Math.max(e.poseT, 0.1);               // swells before it lands on you
   }
 
   const wob = Math.sin(e.wob) * 0.28;
@@ -1539,6 +1567,7 @@ function updateBoss(b, dt) {
   b.spawnT -= dt;
   if (b.spawnT <= 0 && S.en.length < addCap) {
     b.spawnT = D2.addT * rnd(0.85, 1.15);
+    b.poseT = 0.6;                          // bossB splits open to let them out
     const cnt = Math.min(D2.addN + Math.floor(S.room * 0.5), addCap - S.en.length);
     for (let i = 0; i < cnt; i++) {
       const q = freeSpot(90);
@@ -1556,6 +1585,7 @@ function updateBoss(b, dt) {
       b.vx *= 0.85; b.vy *= 0.85;
       b.chargeDir = lerp(b.chargeDir, Math.atan2(dy, dx), dt * 3);
       if (Math.random() < dt * 20) part(b.x, b.y, '#ff2b2b', 2, 40, 0.3);
+      b.poseT = 0.2;                        // reared up, holding the tell
       if (b.pt <= 0) { b.phase = 'charge'; b.pt = 1.0; A.roar(); shake(7); }
     } else if (b.phase === 'charge') {
       b.vx = Math.cos(b.chargeDir) * b.spd * 5.2;
@@ -1578,6 +1608,7 @@ function updateBoss(b, dt) {
     b.vy = lerp(b.vy, dy / d * b.spd, 1 - Math.pow(0.1, dt));
     if (b.pt <= 0) {
       b.pt = rnd(2.6, 3.6);
+      b.poseT = 0.5;
       const off = Math.random() * TAU, n = 12 + S.room * 4;
       for (let i = 0; i < n; i++) { const a = off + i / n * TAU; S.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 100, vy: Math.sin(a) * 100, r: 3, dmg: b.dmg * 0.5, life: 3, col: '#8fdd4a' }); }
       ring(b.x, b.y, 60, '#8fdd4a', 0.35, 2);
@@ -1588,6 +1619,7 @@ function updateBoss(b, dt) {
     b.vy = lerp(b.vy, dy / d * b.spd * 0.6, 1 - Math.pow(0.1, dt));
     if (b.pt <= 0) {
       b.pt = rnd(2.0, 3.0);
+      b.poseT = 0.4;
       part(b.x, b.y, '#e8f0ff', 28, 140, 0.55);
       const a = Math.random() * TAU, rr = rnd(55, 90);
       b.x = clamp(p.x + Math.cos(a) * rr, 40, S.aw - 40);
@@ -1612,6 +1644,7 @@ function updateBoss(b, dt) {
       b.vx *= 0.8; b.vy *= 0.8;
       b.chargeDir = lerp(b.chargeDir, Math.atan2(dy, dx), dt * 5);
       if (Math.random() < dt * 24) part(b.x, b.y, '#5ac8ff', 2, 50, 0.3);
+      b.poseT = 0.2;
       if (b.pt <= 0) { b.phase = 'charge'; b.pt = 0.65; A.ram(); shake(6); }
     } else {
       b.vx = Math.cos(b.chargeDir) * b.spd * 4.6;
@@ -1916,11 +1949,11 @@ function drawWorld() {
   drawDoor();
   drawSecret();
 
-  ctx.font = '8px "Courier New", monospace';
+  ctx.font = '8px ' + GAME_FONT;
   ctx.textAlign = 'center';
   for (const f of S.floats) {
     ctx.globalAlpha = clamp(f.life * 1.6, 0, 1);
-    ctx.font = (f.big ? 11 : 8) + 'px "Courier New", monospace';
+    ctx.font = (f.big ? 11 : 8) + 'px ' + GAME_FONT;
     ctx.fillStyle = '#000'; ctx.fillText(f.text, f.x + 1, f.y + 1);
     ctx.fillStyle = f.col; ctx.fillText(f.text, f.x, f.y);
   }
@@ -1939,7 +1972,7 @@ function drawShops() {
     ctx.beginPath(); ctx.arc(sh.x, sh.y - 14 + by, 16, 0, TAU); ctx.fill();
     ctx.globalAlpha = 1;
     drawSpr(ctx, w.spr, sh.x, sh.y - 14 + by, 1.15, false, 1);
-    ctx.font = '7px "Courier New", monospace'; ctx.textAlign = 'center';
+    ctx.font = '7px ' + GAME_FONT; ctx.textAlign = 'center';
     const cost = sh.cards ? sh.cards + ' CARDS' : sh.price + '';
     const ok = sh.cards ? S.cards >= sh.cards : S.coins >= sh.price;
     ctx.fillStyle = '#000'; ctx.fillText(cost, sh.x + 1, sh.y + 17);
@@ -1992,7 +2025,7 @@ function drawDoor() {
     ctx.fillStyle = '#12060a'; ctx.fillRect(d.x + 3, d.y, d.w - 6, d.h - 2);
     ctx.fillStyle = 'rgba(255,110,120,' + (0.5 + Math.sin(S.t * 4) * 0.3) + ')';
     ctx.fillRect(d.x + 3, d.y + d.h - 4, d.w - 6, 2);
-    ctx.font = '8px "Courier New", monospace'; ctx.textAlign = 'center';
+    ctx.font = '8px ' + GAME_FONT; ctx.textAlign = 'center';
     ctx.fillStyle = '#ff8a90'; ctx.fillText('DOWN', d.x + d.w / 2, d.y + d.h + 16);
     ctx.textAlign = 'left';
   } else {
@@ -2193,7 +2226,7 @@ function drawPlayer(p) {
   // shop prompt
   if (S.prompt) {
     const q = S.prompt;
-    ctx.font = '7px "Courier New", monospace'; ctx.textAlign = 'center';
+    ctx.font = '7px ' + GAME_FONT; ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(q.x - 44, q.y - 42, 88, 17);
     ctx.fillStyle = q.w.col; ctx.fillText(q.w.name, q.x, q.y - 34);
     ctx.fillStyle = q.ok ? '#9fe08a' : '#ff5a62';
@@ -2202,22 +2235,34 @@ function drawPlayer(p) {
   }
 }
 
+/* Which frame of the bank is showing: the wind-up pose if the AI has flagged
+   one, otherwise the walk cycle at whatever phase this creature is on. */
+function enemySpr(e) {
+  if (!e.bank) return e.spr;
+  if (e.poseT > 0) return e.bank.pose;
+  return e.bank.walk[Math.floor(e.anim) % e.bank.walk.length];
+}
+
 function drawEnemy(e) {
   const bob = Math.sin(e.bob) * (e.boss ? 1.6 : 1);
   const sc = e.boss ? 1.7 : 1;
+  const spr = enemySpr(e);
+  const lift = e.boss ? 8 : 0;
 
   // afterimages — you see where it was before you see where it is
   if (e.trail && e.trail.length) {
     for (let i = 0; i < e.trail.length; i++) {
       const tr = e.trail[i];
       ctx.globalAlpha = (i / e.trail.length) * (e.boss ? 0.20 : 0.14);
-      drawSpr(ctx, e.spr, tr.x, tr.y + bob - (e.boss ? 8 : 0), sc, e.flip, 1, 'rgba(0,0,0,0.85)');
+      drawSpr(ctx, spr, tr.x, tr.y + bob - lift, sc, e.flip, 1, 'rgba(0,0,0,0.85)');
     }
     ctx.globalAlpha = 1;
   }
 
+  // shadow tightens as the body rises, which is what sells the bob as weight
+  const shk = 1 - bob * 0.05;
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
-  ctx.beginPath(); ctx.ellipse(e.x, e.y + (e.boss ? 20 : 8), e.boss ? 16 : 6, e.boss ? 6 : 3, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(e.x, e.y + (e.boss ? 20 : 8), (e.boss ? 16 : 6) * shk, (e.boss ? 6 : 3) * shk, 0, 0, TAU); ctx.fill();
 
   // bosses drag a writhing dark aura around with them
   if (e.boss) {
@@ -2242,21 +2287,29 @@ function drawEnemy(e) {
   if (e.hit > 0) tint = 'rgba(255,255,255,0.85)';
   else if (e.burnT > 0) tint = 'rgba(255,120,40,0.45)';
   else if (e.stun > 0) tint = 'rgba(247,220,85,0.4)';
+  else if (e.poseT > 0) tint = 'rgba(255,90,90,0.32)';   // lit up while winding up
 
+  /* Breathing and lean. The sprite frames carry the gait; these two carry the
+     weight — nothing in here is ever perfectly still or perfectly upright. */
+  const breath = 1 + Math.sin(e.bob * 0.5) * (e.boss ? 0.035 : 0.05);
+  const lean = clamp(e.vx * 0.0012, -0.13, 0.13);
   ctx.save();
-  ctx.translate(e.x + (e.twx || 0), e.y + (e.twy || 0) + bob - (e.boss ? 8 : 0));
-  ctx.scale(1 + e.sq * 0.3, 1 - e.sq * 0.25);   // squash on impact
-  drawSpr(ctx, e.spr, 0, 0, sc, e.flip, 1, tint);
+  ctx.translate(e.x + (e.twx || 0), e.y + (e.twy || 0) + bob - lift);
+  ctx.rotate(lean);
+  ctx.scale((1 + e.sq * 0.3) / breath, (1 - e.sq * 0.25) * breath);   // squash on impact
+  drawSpr(ctx, spr, 0, 0, sc, e.flip, 1, tint);
   ctx.restore();
 
-  // eyes burn through the dark
+  // eyes burn through the dark — anchored off the art, not guessed
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
+  const eye = e.bank ? e.bank.eye : { y: -3, sep: 2.6 };
   const eg = e.boss ? 2.2 : 1;
-  const ey = e.y + (e.twy || 0) + bob - (e.boss ? 14 : 3) * (e.boss ? 1 : 1);
+  const ey = e.y + (e.twy || 0) + bob - lift + eye.y * sc;
   const ex = e.x + (e.twx || 0);
-  const sep = e.boss ? 8 : 2.6;
-  ctx.fillStyle = e.boss ? 'rgba(255,40,40,0.85)' : 'rgba(255,50,50,0.6)';
+  const sep = eye.sep * sc;
+  const glow = e.poseT > 0 ? 1 : (e.boss ? 0.85 : 0.6);
+  ctx.fillStyle = 'rgba(255,' + (e.poseT > 0 ? 90 : 45) + ',45,' + glow + ')';
   ctx.fillRect(ex - sep - eg / 2, ey, eg, eg);
   ctx.fillRect(ex + sep - eg / 2, ey, eg, eg);
   ctx.restore();
@@ -2269,7 +2322,7 @@ function drawEnemy(e) {
     ctx.restore();
   }
   if (e.stun > 0) {
-    ctx.font = '8px "Courier New", monospace'; ctx.textAlign = 'center';
+    ctx.font = '8px ' + GAME_FONT; ctx.textAlign = 'center';
     ctx.fillStyle = '#f7dc55'; ctx.fillText('~', e.x, e.y - 14 + Math.sin(S.t * 10)); ctx.textAlign = 'left';
   }
 }
@@ -2368,7 +2421,7 @@ function post() {
   if (S.jump > 0 && S.jumpSpr) {
     ctx.globalAlpha = clamp(S.jump * 2.2, 0, 1);
     ctx.fillStyle = '#12000a'; ctx.fillRect(0, 0, W, H);
-    drawSpr(ctx, S.jumpSpr.spr, W / 2 + rnd(-4, 4), H / 2 + rnd(-4, 4), 10, false, 1, 'rgba(180,10,20,0.5)');
+    drawSpr(ctx, S.jumpSpr.bank.walk[0], W / 2 + rnd(-4, 4), H / 2 + rnd(-4, 4), 10, false, 1, 'rgba(180,10,20,0.5)');
     ctx.globalAlpha = 1;
   }
 
@@ -2408,14 +2461,18 @@ function post() {
   }
 }
 
-/* ---------- HUD ---------- */
+/* ---------- HUD ----------
+   The HUD used to rasterise on the 480x270 canvas and get upscaled with the
+   world, which is what made small numbers mushy. It goes on the overlay now,
+   same as the menus — one typeface, one sharpness, everywhere. The cost is
+   that modal screens have to wipe the overlay before they draw (see uiWipe),
+   because a pixel-canvas backdrop no longer covers this text. */
 function txt(s, x, y, col, align, size) {
-  ctx.font = (size || 8) + 'px "Courier New", monospace';
-  ctx.textAlign = align || 'left';
-  ctx.fillStyle = 'rgba(0,0,0,0.85)'; ctx.fillText(s, x + 1, y + 1);
-  ctx.fillStyle = col; ctx.fillText(s, x, y);
-  ctx.textAlign = 'left';
+  htxt(s, x, y, col, align, size || 8, { weight: '500' });
 }
+/* Screens that paint over the world clear the overlay first, so the HUD
+   underneath them doesn't bleed through. */
+function uiWipe() { octx.clearRect(0, 0, ov.width, ov.height); }
 
 function drawHUD() {
   const p = S.p, st = ST(), w = curW();
@@ -2436,27 +2493,35 @@ function drawHUD() {
     ctx.fillRect(7 + i * 6, 17, 4, 3);
   }
 
-  // wallet
-  drawSpr(ctx, SPR.coin, 11, 30, 0.9);
-  txt(String(S.coins), 18, 33, '#f5c518');
-  drawSpr(ctx, SPR.card, 48, 30, 0.62);
-  txt(S.cards + '/' + OMEGA_CARDS, 55, 33, S.cards >= OMEGA_CARDS ? '#ff5a62' : '#b3a888');
-  drawSpr(ctx, SPR.grenade, 100, 30, 0.9);
-  txt(String(p.nades), 107, 33, '#9fc98a');
-  if (S.evo) txt('EVO ' + S.evo, 130, 33, '#ff5a62');
-  if (S.goro) txt('GOROMANIA', 130, 43, '#b028ff', 'left', 7);
+  /* wallet — flowed rather than sat on fixed columns. The typeface is
+     proportional and these numbers grow, so a five-figure coin count used to
+     run straight under the card icon. */
+  let wx = 11;
+  const purse = (spr, sc, val, col) => {
+    drawSpr(ctx, spr, wx, 30, sc);
+    txt(val, wx + 7, 33, col);
+    wx += 7 + htxtWidth(val, 8) + 11;
+  };
+  purse(SPR.coin, 0.9, String(S.coins), '#f5c518');
+  purse(SPR.card, 0.62, S.cards + '/' + OMEGA_CARDS, S.cards >= OMEGA_CARDS ? '#ff5a62' : '#b3a888');
+  purse(SPR.grenade, 0.9, String(p.nades), '#9fc98a');
+  if (S.evo) txt('EVO ' + S.evo, wx, 33, '#ff5a62');
+  if (S.goro) txt('GOROMANIA', 11, 43, '#b028ff', 'left', 7);
 
   // XP bar + level
   const xw = 96, xf = clamp(S.xp / S.xpNext, 0, 1);
   ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(6, 22, xw + 2, 4);
   ctx.fillStyle = '#4d8f52'; ctx.fillRect(7, 23, xw * xf, 2);
   ctx.fillStyle = 'rgba(190,255,190,0.35)'; ctx.fillRect(7, 23, xw * xf, 1);
-  txt('LV' + S.level, xw + 12, 26, '#9fe08a', 'left', 7);
-  if (S.upgPts > 0) txt('+' + S.upgPts, xw + 34, 26, Math.sin(S.t * 8) > 0 ? '#ffffff' : '#9fe08a', 'left', 7);
+  const lvs = 'LV' + S.level;
+  txt(lvs, xw + 12, 26, '#9fe08a', 'left', 7);
+  if (S.upgPts > 0) txt('+' + S.upgPts, xw + 15 + htxtWidth(lvs, 7), 26, Math.sin(S.t * 8) > 0 ? '#ffffff' : '#9fe08a', 'left', 7);
 
   /* ammo + reload */
   const mag = Math.ceil(p.mags[w.id] || 0);
-  if (S.god) txt('∞ AMMO', 8, H - 22, 'hsl(' + ((S.t * 240) % 360) + ',90%,65%)');
+  // U+221E is outside the embedded latin subset — spelling it out keeps god
+  // mode in the same typeface as everything else instead of falling back.
+  if (S.god) txt('INFINITE AMMO', 8, H - 22, 'hsl(' + ((S.t * 240) % 360) + ',90%,65%)');
   else if (p.reT > 0) {
     const prog = 1 - p.reT / p.reMax;
     txt('RELOADING', 8, H - 22, '#c8a04a');
@@ -2464,10 +2529,16 @@ function drawHUD() {
     ctx.fillStyle = '#c8a04a'; ctx.fillRect(8, H - 19, 62 * prog, 3);
     if (prog > 0.9) { ctx.fillStyle = '#fff'; ctx.fillRect(8, H - 19, 62, 3); }
   } else {
+    /* Pips, not a string of '|' and '.'. That bar only ever held a steady
+       width because Courier was monospaced; in a proportional face it would
+       breathe in and out as rounds swapped between the two glyphs. */
     const bars = Math.min(30, w.mag);
-    let s = '';
-    for (let i = 0; i < bars; i++) s += i < mag / w.mag * bars ? '|' : '.';
-    txt(s, 8, H - 24, mag / w.mag <= 0.2 ? '#ff3b3b' : w.col, 'left', 7);
+    const filled = Math.ceil(mag / w.mag * bars);
+    const low = mag / w.mag <= 0.2;
+    for (let i = 0; i < bars; i++) {
+      ctx.fillStyle = i < filled ? (low ? '#ff3b3b' : w.col) : 'rgba(255,255,255,0.15)';
+      ctx.fillRect(8 + i * 3, H - 29, 2, 5);
+    }
     txt(mag + '/' + w.mag, 8, H - 16, '#7b6a58');
   }
   if (w.spin && p.spin > 0) {
@@ -2634,20 +2705,34 @@ function drawMinimap() {
   ctx.lineTo(px + 0.5 + Math.cos(S.p.ang) * 5, py + 0.5 + Math.sin(S.p.ang) * 5); ctx.stroke();
 }
 
+/* The OS cursor is hidden (body{cursor:none}), so this is the only pointer
+   there is — every screen that can be clicked has to draw it, and it has to
+   survive whatever it is sitting on top of. Hence the dark backing. */
 function crosshair() {
   const mx = mouse.x | 0, my = mouse.y | 0;
-  const sp = S.mode === 'play' ? 3 + S.p.recoil * 5 : 3;
+  const play = S.mode === 'play';
+  const sp = play ? 3 + S.p.recoil * 5 : 3;
+  const arms = [[mx - sp - 3, my, 3, 1], [mx + sp, my, 3, 1],
+                [mx, my - sp - 3, 1, 3], [mx, my + sp, 1, 3]];
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  for (const a of arms) ctx.fillRect(a[0] - 1, a[1] - 1, a[2] + 2, a[3] + 2);
   ctx.fillStyle = S.god ? 'hsl(' + ((S.t * 300) % 360) + ',95%,65%)' : '#ff3b46';
-  ctx.fillRect(mx - sp - 3, my, 3, 1); ctx.fillRect(mx + sp, my, 3, 1);
-  ctx.fillRect(mx, my - sp - 3, 1, 3); ctx.fillRect(mx, my + sp, 1, 3);
-  ctx.fillStyle = 'rgba(255,255,255,0.75)'; ctx.fillRect(mx, my, 1, 1);
+  for (const a of arms) ctx.fillRect(a[0], a[1], a[2], a[3]);
+  // On menus it is a pointer rather than a sight, so give it a solid centre
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillRect(mx - 1, my - 1, 3, 3);
+  ctx.fillStyle = play ? 'rgba(255,255,255,0.75)' : '#fff6ee';
+  ctx.fillRect(mx, my, 1, 1);
+  if (!play) { ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(mx - 1, my, 3, 1); ctx.fillRect(mx, my - 1, 1, 3); }
 }
 
 /* ---------- screens ---------- */
 /* Buttons animate toward their hover state instead of snapping, and dim when
-   they can't be used. Frame is drawn on the pixel canvas, label on the overlay. */
+   they can't be used. Frame is drawn on the pixel canvas, label on the overlay.
+   One label, centred in the box, and nothing underneath it — anything a button
+   used to whisper in a subtitle now lives on the screen that owns it. */
 const hoverT = {};
-function uiBtn(x, y, w, h, label, col, fn, sub, disabled) {
+function uiBtn(x, y, w, h, label, col, fn, disabled) {
   const hot = !disabled && mouse.x > x && mouse.x < x + w && mouse.y > y && mouse.y < y + h;
   const k = label + x;
   hoverT[k] = clamp((hoverT[k] || 0) + (hot ? 0.22 : -0.18), 0, 1);
@@ -2684,10 +2769,12 @@ function uiBtn(x, y, w, h, label, col, fn, sub, disabled) {
     ctx.globalAlpha = 1;
   }
 
-  const ty = y + h / 2 + (sub ? 0 : 3) - off;
-  htxt(label, x + w / 2, ty, disabled ? 'rgba(120,104,98,0.75)' : (t > 0.4 ? '#fff6ee' : col),
-       'center', 10, { glow: t > 0.15 && !disabled ? col : null, glowSize: 14 * t, track: 0.10 });
-  if (sub) htxt(sub, x + w / 2, y + h - 4 - off, disabled ? 'rgba(96,82,78,0.7)' : 'rgba(168,146,132,' + (0.6 + t * 0.4) + ')', 'center', 6.5, { track: 0.08, noShadow: true });
+  // Step the size down rather than let a long label spill past the frame, so
+  // a big EVOLVE count can never break the button.
+  let ls = 10;
+  while (ls > 6.5 && htxtWidth(label, ls, 0.10) > w - 10) ls -= 0.5;
+  htxt(label, x + w / 2, y + h / 2 - off, disabled ? 'rgba(120,104,98,0.75)' : (t > 0.4 ? '#fff6ee' : col),
+       'center', ls, { mid: true, glow: t > 0.15 && !disabled ? col : null, glowSize: 14 * t, track: 0.10 });
   S.ui.push({ x, y, w, h, fn: disabled ? function () { A.denied(); } : fn });
 }
 
@@ -2735,18 +2822,17 @@ function drawTitle() {
   updateParticles(1 / 60);
 
   const evoCost = EVO_COST(S.evo | 0);
-  uiBtn(W / 2 - 150, 150, 96, 22, 'PLAY', '#e8b25a', () => startRun(), 'enter');
-  uiBtn(W / 2 - 48, 150, 96, 22, 'COSMETICS', '#b558ff', () => { S.cosReturn = 'title'; S.mode = 'cos'; }, 'vault ' + S.vault);
-  uiBtn(W / 2 + 54, 150, 96, 22, 'EVOLVE ' + (S.evo | 0), '#ff4a54', () => evolve(),
-        canEvolve() ? 'costs ' + evoCost : 'need ' + evoCost + ' coins', !canEvolve());
+  uiBtn(W / 2 - 150, 150, 96, 22, 'PLAY', '#e8b25a', () => startRun());
+  uiBtn(W / 2 - 48, 150, 96, 22, 'COSMETICS', '#b558ff', () => { S.cosReturn = 'title'; S.mode = 'cos'; });
+  uiBtn(W / 2 + 54, 150, 96, 22, 'EVOLVE ' + (S.evo | 0), '#ff4a54', () => evolve(), !canEvolve());
   if (S.evo | 0)
-    uiBtn(W / 2 - 48, 176, 96, 16, 'RESET EVOLUTION', '#7fe08a', () => resetEvolution(), 'back to normal');
+    uiBtn(W / 2 - 48, 176, 96, 16, 'RESET EVO', '#7fe08a', () => resetEvolution());
 
   statRow([
     { spr: SPR.coin, v: String(S.coins), col: '#f5c518' },
     { spr: SPR.card, v: S.cards + '/' + OMEGA_CARDS, sc: 0.6, col: '#d8b8b8' },
     { v: 'VAULT ' + S.vault, col: '#9d8a7a' },
-    { v: 'EVO ' + (S.evo | 0), col: (S.evo | 0) ? '#ff6a72' : '#6b5a4e' }
+    { v: 'EVO ' + (S.evo | 0) + ' / NEXT ' + evoCost, col: canEvolve() ? '#ff6a72' : '#6b5a4e' }
   ], (S.evo | 0) ? 204 : 190);
 
   const sv = loadSave();
@@ -2756,6 +2842,8 @@ function drawTitle() {
        (sv.goro ? '   ·   GOROMANIA' : ''), W / 2, y0, '#6d5c4e', 'center', 7.5, { track: 0.12 });
   htxt('WASD move · MOUSE aim · LMB fire · RMB frag · WHEEL swap · R reload · E buy',
        W / 2, y0 + 13, '#7e6d5f', 'center', 7.5, { track: 0.06 });
+  htxt('ENTER play · C cosmetics · B armory · ESC pause · M mute',
+       W / 2, y0 + 23, '#6b5c50', 'center', 7.5, { track: 0.06 });
   htxt('one thing is hidden on floor 1.  one in every corner.  one behind a door that is shut.',
        W / 2, H - 8, 'rgba(126,86,86,0.55)', 'center', 7, { track: 0.10, noShadow: true });
   post();
@@ -2816,13 +2904,14 @@ function drawCosmetics() {
     } });
   });
 
-  uiBtn(W / 2 - 48, H - 26, 96, 18, 'BACK', '#e8b25a', () => { S.mode = S.cosReturn || 'title'; }, 'esc');
+  uiBtn(W / 2 - 48, H - 26, 96, 18, 'BACK', '#e8b25a', () => { S.mode = S.cosReturn || 'title'; });
+  htxt('ESC back', W / 2, H - 4, 'rgba(120,106,94,0.65)', 'center', 7, { track: 0.10, noShadow: true });
   post();
   crosshair();
 }
 
 function drawDead() {
-  S.ui = [];
+  S.ui = []; uiWipe();
   ctx.fillStyle = 'rgba(10,0,4,' + clamp(S.deadT * 0.7, 0, 0.9) + ')';
   ctx.fillRect(0, 0, W, H);
   if (S.deadT > 0.4) {
@@ -2838,24 +2927,26 @@ function drawDead() {
       { v: 'KILLS ' + S.kills, col: '#9d8a7a' }
     ], 128);
     const sv = loadSave();
+    const evoCost = EVO_COST(S.evo | 0);
     htxt('guns ' + S.p.owned.length + '/7  ·  items ' + Object.keys(S.items).length + '/5' +
-         (S.god ? '  ·  THE EYE' : '') + '  ·  best ' + (sv.best || 0),
+         (S.god ? '  ·  THE EYE' : '') + '  ·  best ' + (sv.best || 0) +
+         '  ·  EVO ' + (S.evo | 0) + ' / NEXT ' + evoCost,
          W / 2, 142, '#5f5044', 'center', 7, { track: 0.10 });
 
     if (S.deadT > 1.0) {
-      const evoCost = EVO_COST(S.evo | 0);
-      uiBtn(W / 2 - 150, 156, 96, 22, 'RETRY', '#e8b25a', () => startRun(), 'R');
-      uiBtn(W / 2 - 48, 156, 96, 22, 'COSMETICS', '#b558ff', () => { S.cosReturn = 'dead'; S.mode = 'cos'; }, 'C');
-      uiBtn(W / 2 + 54, 156, 96, 22, 'EVOLVE ' + (S.evo | 0), '#ff4a54', () => evolve(),
-            canEvolve() ? 'costs ' + evoCost : 'need ' + evoCost, !canEvolve());
-      if (S.evo | 0) uiBtn(W / 2 - 150, 182, 96, 18, 'RESET EVO', '#7fe08a', () => resetEvolution(), 'back to normal');
+      uiBtn(W / 2 - 150, 156, 96, 22, 'RETRY', '#e8b25a', () => startRun());
+      uiBtn(W / 2 - 48, 156, 96, 22, 'COSMETICS', '#b558ff', () => { S.cosReturn = 'dead'; S.mode = 'cos'; });
+      uiBtn(W / 2 + 54, 156, 96, 22, 'EVOLVE ' + (S.evo | 0), '#ff4a54', () => evolve(), !canEvolve());
+      if (S.evo | 0) uiBtn(W / 2 - 150, 182, 96, 18, 'RESET EVO', '#7fe08a', () => resetEvolution());
       uiBtn(W / 2 + 54, 182, 96, 18, 'TITLE', '#8b7a68', () => { S.mode = 'title'; });
+      htxt('R retry · C cosmetics', W / 2, 208, 'rgba(120,106,94,0.6)', 'center', 7, { track: 0.10, noShadow: true });
     }
   }
+  crosshair();
 }
 
 function drawArmory() {
-  S.ui = [];
+  S.ui = []; uiWipe();
   ctx.fillStyle = 'rgba(5,4,7,0.90)'; ctx.fillRect(0, 0, W, H);
   const bg = ctx.createRadialGradient(W / 2, 18, 6, W / 2, 18, 200);
   bg.addColorStop(0, 'rgba(200,150,30,0.13)'); bg.addColorStop(1, 'rgba(200,150,30,0)');
@@ -2918,12 +3009,13 @@ function drawArmory() {
     });
   });
 
-  uiBtn(W / 2 - 48, H - 22, 96, 17, 'BACK', '#e8b25a', () => { S.mode = 'pause'; }, 'esc');
-  htxt('upgrades are bought with run coins and last the run', W / 2, H - 27, 'rgba(120,106,94,0.65)', 'center', 6.5, { track: 0.10, noShadow: true });
+  uiBtn(W / 2 - 48, H - 22, 96, 17, 'BACK', '#e8b25a', () => { S.mode = 'pause'; });
+  htxt('upgrades are bought with run coins and last the run  ·  ESC back', W / 2, H - 27, 'rgba(120,106,94,0.65)', 'center', 6.5, { track: 0.10, noShadow: true });
+  crosshair();
 }
 
 function drawLevelUp() {
-  S.ui = [];
+  S.ui = []; uiWipe();
   ctx.fillStyle = 'rgba(4,6,4,0.86)'; ctx.fillRect(0, 0, W, H);
   const bg = ctx.createRadialGradient(W / 2, H / 2, 6, W / 2, H / 2, 190);
   bg.addColorStop(0, 'rgba(30,140,60,0.18)'); bg.addColorStop(1, 'rgba(30,140,60,0)');
@@ -2967,53 +3059,76 @@ function drawLevelUp() {
   });
 
   htxt('kills feed the meter. it does not stop climbing.', W / 2, H - 16, 'rgba(120,132,116,0.6)', 'center', 7.5, { track: 0.14 });
+  crosshair();
+}
+
+/* A ruled section heading, so the two lists read as two lists. */
+function sectionRule(label, y) {
+  htxt(label, 30, y, '#9d8a7a', 'left', 9, { track: 0.26 });
+  const lw = htxtWidth(label, 9, 0.26);
+  ctx.fillStyle = 'rgba(157,138,122,0.26)';
+  ctx.fillRect(30 + lw + 8, y - 3, W - 60 - lw - 8, 1);
 }
 
 function drawPause() {
-  S.ui = [];
-  ctx.fillStyle = 'rgba(5,3,8,0.84)'; ctx.fillRect(0, 0, W, H);
-  htxt('PAUSED', W / 2, 26, '#e8d2a4', 'center', 22, { weight: '700', glow: '#4a2a10', glowSize: 16, track: 0.24 });
-  htxt('ESC resume  ·  M mute  ·  WHEEL / 1-7 swap gun  ·  E buy at pedestals',
-       W / 2, 38, '#8b7a68', 'center', 7.5, { track: 0.08 });
-  uiBtn(W - 112, 14, 96, 18, 'COSMETICS', '#b558ff', () => { S.cosReturn = 'pause'; S.mode = 'cos'; }, 'C');
-  uiBtn(W - 214, 14, 96, 18, 'ARMORY', '#f0c65a', () => { S.mode = 'armory'; }, 'B  ·  ' + S.coins + ' coins');
-  if (S.evo | 0) uiBtn(16, 14, 96, 18, 'RESET EVO', '#7fe08a', () => resetEvolution(), 'evo ' + S.evo);
+  S.ui = []; uiWipe();
+  ctx.fillStyle = 'rgba(5,3,8,0.88)'; ctx.fillRect(0, 0, W, H);
+  const bg = ctx.createRadialGradient(W / 2, 16, 6, W / 2, 16, 200);
+  bg.addColorStop(0, 'rgba(150,24,32,0.13)'); bg.addColorStop(1, 'rgba(150,24,32,0)');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
-  let y = 62;
-  htxt('GROCERIES', 30, y, '#9d8a7a', 'left', 9, { track: 0.26 });
-  ctx.fillStyle = 'rgba(157,138,122,0.3)'; ctx.fillRect(30, y + 3, W - 60, 1);
-  y += 14;
+  htxt('PAUSED', W / 2, 26, '#e8d2a4', 'center', 20, { weight: '700', glow: '#4a2a10', glowSize: 16, track: 0.24 });
+
+  /* Buttons live in a centred row under the title. Cornering them put the wide
+     ones straight through PAUSED, and the keyboard hints they used to sit
+     beside are on the title screen where you actually read them. */
+  const btns = [['ARMORY', '#f0c65a', () => { S.mode = 'armory'; }],
+                ['COSMETICS', '#b558ff', () => { S.cosReturn = 'pause'; S.mode = 'cos'; }]];
+  if (S.evo | 0) btns.push(['RESET EVO', '#7fe08a', () => resetEvolution()]);
+  const bw = 96, gap = 8, rowW = btns.length * bw + (btns.length - 1) * gap;
+  btns.forEach((b, i) => uiBtn(W / 2 - rowW / 2 + i * (bw + gap), 40, bw, 18, b[0], b[1], b[2]));
+
+  let y = 76;
+  sectionRule('GROCERIES', y);
+  y += 13;
   let any = false;
   for (const k of ['banana', 'melon', 'coolade', 'glock', 'bike']) {
     const lv = S.items[k] | 0; if (!lv) continue; any = true;
+    const nm = ITEMS[k].n[Math.min(lv - 1, 1)];
     drawSpr(ctx, ITEMS[k].spr, 38, y - 2, 0.9);
-    htxt(ITEMS[k].n[Math.min(lv - 1, 1)], 50, y + 1, ITEMS[k].col, 'left', 8, { track: 0.06 });
-    htxt(ITEMS[k].d[Math.min(lv - 1, 1)], 50 + htxtWidth(ITEMS[k].n[Math.min(lv - 1, 1)], 8) + 6, y + 1,
+    htxt(nm, 50, y + 1, ITEMS[k].col, 'left', 8, { track: 0.06 });
+    htxt(ITEMS[k].d[Math.min(lv - 1, 1)], 50 + htxtWidth(nm, 8, 0.06) + 6, y + 1,
          'rgba(140,120,106,0.85)', 'left', 7, { track: 0.03, noShadow: true });
     y += 12;
   }
   if (S.god) { drawSpr(ctx, SPR.eye, 38, y - 2, 0.8); htxt('THE THIRD EYE — you cannot die', 50, y + 1, '#ff5b5b', 'left', 8); y += 12; any = true; }
   if (!any) { htxt('empty. go kill something with a name.', 38, y + 1, '#5f5044', 'left', 7.5); y += 12; }
 
-  y += 8;
-  htxt('ARSENAL', 30, y, '#9d8a7a', 'left', 9, { track: 0.26 });
-  ctx.fillStyle = 'rgba(157,138,122,0.3)'; ctx.fillRect(30, y + 3, W - 60, 1);
+  /* Arsenal in two columns: seven guns stacked in one column ran into the
+     footer once you owned them all. */
+  y += 10;
+  sectionRule('ARSENAL', y);
   y += 13;
-  for (const id of WORDER) {
+  const colX = [30, 250], colW = 200, half = Math.ceil(WORDER.length / 2);
+  WORDER.forEach((id, i) => {
     const w = WEP[id], has = S.p.owned.indexOf(id) >= 0;
-    drawSpr(ctx, w.spr, 44, y - 1, 0.9, false, has ? 1 : 0.2);
-    htxt(w.name, 62, y + 2, has ? w.col : '#4a3f36', 'left', 8, { track: 0.06 });
-    htxt(has ? w.tag : (w.cards ? w.cards + ' cards' : w.price + ' coins'), 168, y + 2,
-         has ? 'rgba(130,112,100,0.9)' : '#6b5a4e', 'left', 7, { track: 0.03, noShadow: true });
-    y += 11;
-  }
+    const cx = colX[Math.floor(i / half)], ry = y + (i % half) * 12;
+    drawSpr(ctx, w.spr, cx + 12, ry - 1, 0.9, false, has ? 1 : 0.22);
+    htxt(id === 'scar' ? scarName() : w.name, cx + 28, ry + 2,
+         has ? (id === 'scar' ? scarCol() : w.col) : '#4a3f36', 'left', 8, { track: 0.06 });
+    htxt(has ? 'OWNED' : (w.cards ? w.cards + ' cards' : w.price + ' coins'),
+         cx + colW - 4, ry + 2, has ? 'rgba(126,150,112,0.85)' : '#6b5a4e', 'right', 7,
+         { track: 0.04, noShadow: true });
+  });
+
   statRow([
     { spr: SPR.coin, v: String(S.coins), col: '#f5c518' },
     { spr: SPR.card, v: S.cards + '/' + OMEGA_CARDS, sc: 0.6, col: '#d8b8b8' },
     { v: 'VAULT ' + S.vault, col: '#9d8a7a' },
     { v: 'EVO ' + (S.evo | 0), col: (S.evo | 0) ? '#ff6a72' : '#6b5a4e' }
-  ], H - 10);
-  if (S.goro) htxt('GOROMANIA  +25% DMG', W - 30, H - 22, '#b558ff', 'right', 7.5, { track: 0.14 });
+  ], H - 12);
+  if (S.goro) htxt('GOROMANIA  +25% DMG', W - 30, H - 24, '#b558ff', 'right', 7.5, { track: 0.14 });
+  crosshair();
 }
 
 /* ============================================================

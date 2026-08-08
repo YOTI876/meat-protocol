@@ -101,6 +101,9 @@ wall. Consider what you have never once thought to shoot at.
 ## Files
 
 - `index.html` — shell
+- `js/font.js` — the typeface (Pixelify Sans, latin subset) embedded as a data
+  URI so it loads identically over `http` and `file://`. Every string in the
+  game — HUD, menus and world labels — resolves through it. See `OFL.txt`.
 - `js/sprites.js` — every sprite, hand-plotted as character grids, baked to canvases
 - `js/audio.js` — all sound synthesized at runtime (WebAudio), zero audio files,
   including formant speech synthesis for the corner secret

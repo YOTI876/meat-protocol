@@ -261,131 +261,174 @@ SPR.sigil = SPRITE([
   '..oo......oo..'
 ], { x: '#b028ff' });
 
-/* ---------- ENEMIES ---------- */
-SPR.crawler = SPRITE([
-  '.....oooo.....',
-  '...ooffffoo...',
-  '..offffffffo..',
-  '..offxffxffo..',
-  '..offffffffo..',
-  '..ofkkkkkkfo..',
-  '...offffffo...',
-  '..ofFFFFFFfo..',
-  '.oFfFFFFFFfFo.',
-  '.oFFFFFFFFFFo.',
-  '..oFFFFFFFFo..',
-  '..oFF....FFo..',
-  '..oFo....oFo..',
-  '..ooo....ooo..'
-]);
+/* ============================================================
+   ENEMIES & BOSSES — animated banks.
 
-SPR.shrieker = SPRITE([
-  '....oooooo....',
-  '..ooccccccoo..',
-  '..occcccccco..',
-  '..occxccxcco..',
-  '..occcccccco..',
-  '..ocCkkkkCco..',
-  '..ocCkkkkCco..',
-  '..ocCkkkkCco..',
-  '..occcccccco..',
-  '.occcccccccco.',
-  '.oCCccccccCCo.',
-  '..occcccccco..',
-  '..oCCcccccCo..',
-  '..oCo....oCo..',
-  '..oCo....oCo..',
-  '..ooo....ooo..'
-], { c: '#8fae72', C: '#546b45', k: '#20100f' });
+   Each creature is one body plus a short tail of rows that actually
+   move, so a four-frame cycle costs a body and four tails instead of
+   four whole sprites. Every bank exposes:
+     walk[]  the loop, stepped by how fast the thing is travelling
+     pose    the frame it holds while winding up to do something
 
-SPR.stalker = SPRITE([
-  '.....oooo.....',
-  '....ouuuuo....',
-  '...ouuuuuuo...',
-  '...ouxuuxuo...',
-  '...ouuuuuuo...',
-  '....oUUUUo....',
-  '..oouuuuuuoo..',
-  '.ouuuuuuuuuuo.',
-  '.ouUuuuuuuUuo.',
-  '.ouUuuuuuuUuo.',
-  '..ouuuuuuuuo..',
-  '..oUUuuuuUUo..',
-  '...ouu..uuo...',
-  '...ouu..uuo...',
-  '...oUo..oUo...',
-  '...ooo..ooo...'
-], { u: '#cfc7b0', U: '#8e8878', x: '#ff2020' });
+   That second one is the point: the pose is a tell. A shrieker gapes
+   before it screams, a stalker coils before it blinks, a boss rears
+   before it charges. You can read the attack off the sprite now.
+   ============================================================ */
+function FRAMES(pal, body, tails) { return tails.map(t => SPRITE(body.concat(t), pal)); }
+/* eye = where the glow sits, in sprite pixels from the sprite's centre. It
+   lives with the art because only the art knows where the sockets are. */
+function BANK(pal, body, tails, pose, eye) {
+  return { walk: FRAMES(pal, body, tails), pose: SPRITE(body.concat(pose), pal),
+           eye: eye || { y: -3, sep: 2.6 } };
+}
+SPR.anim = {};
 
-SPR.bloater = SPRITE([
-  '......oooooo......',
-  '....oovvvvvvoo....',
-  '...ovvvvvvvvvvo...',
-  '..ovvxvvvvvvxvvo..',
-  '..ovvvvvvvvvvvvo..',
-  '.ovvvvkkkkkkvvvvo.',
-  '.ovvvkvkvkvkvvvvo.',
-  '.ovvvvvvvvvvvvvvo.',
-  'ovvvvvvvvvvvvvvvvo',
-  'ovvvVVvvvvvvVVvvvo',
-  'ovvvvvvvvvvvvvvvvo',
-  '.ovvvvvvvvvvvvvvo.',
-  '.oVVvvvvvvvvvvVVo.',
-  '..oVVVVVVVVVVVVo..',
-  '...oVVo....oVVo...',
-  '...oooo....oooo...'
-]);
+/* ---------- CRAWLER 16x14 — low, skinless, four spindly legs ---------- */
+{
+  const pal = { L: '#d9a9a9', f: '#bb8b8b', F: '#8b6161', E: '#553a3c', k: '#2f1719', x: '#ff5252' };
+  const body = [
+    '.....oooooo.....',
+    '...ooLLLLLLoo...',
+    '..oLLffffffLLo..',
+    '.oLLffffffffLLo.',
+    '.oLffxffffxffLo.',
+    '.offfffffffffFo.',
+    '.oFkLLLLLLLLkFo.',
+    '.oFkkkkkkkkkkFo.',
+    '.oFLkLkLkLkLkFo.'
+  ];
+  SPR.anim.crawler = BANK(pal, body, [
+    ['..oFFffffffFFo..', '..oFEFffffFEFo..', '.oEo.oFFFFo.oEo.', '.oEo..oEEo..oEo.', '..o....oo....o..'],
+    ['..oFFffffffFFo..', '.oFEFFffffFFEFo.', 'oEo..oFFFFo..oEo', 'oEo...oEEo...oEo', 'oo.....oo.....oo'],
+    ['..oFFffffffFFo..', '..oFEFffffFEFo..', '..oEooFFFFooEo..', '..oEo.oEEo.oEo..', '...o...oo...o...'],
+    ['..oFFffffffFFo..', '.oFEFFffffFFEFo.', 'oEo...oFFo...oEo', 'oEo..oEEEEo..oEo', 'oo....o..o....oo']
+  ], // coiled to spring
+    ['..oFFffffffFFo..', '..oFFFffffFFFo..', '..oEEoFFFFoEEo..', '...oEoEEEEoEo...', '....o.o..o.o....'], { y: -2.5, sep: 2.5 });
+}
 
-/* ---------- BOSSES 24x22 ---------- */
-SPR.bossA = SPRITE([   // hulking, apron, sunken head
-  '.........oooooo.........',
-  '.......oovvvvvvoo.......',
-  '......ovvvvvvvvvvo......',
-  '.....ovvvvvvvvvvvvo.....',
-  '.....ovvxxvvvvxxvvo.....',
-  '.....ovvvvvvvvvvvvo.....',
-  '.....ovkkkkkkkkkkvo.....',
-  '.....ovkukukukukuvo.....',
-  '.....ovvvvvvvvvvvvo.....',
-  '..oooovvvvvvvvvvvvoooo..',
-  '.ovvvvvvvvvvvvvvvvvvvvo.',
-  'ovvvvvvuuuuuuuuvvvvvvvvo',
-  'ovvvvvuuuuuuuuuuvvvvvvvo',
-  'ovvvvvuuuuuuuuuuvvvvvvvo',
-  '.ovvvvuuuuuuuuuuvvvvvvo.',
-  '.ovvvvuuuuuuuuuuvvvvvvo.',
-  '..ovvvuuuuuuuuuuvvvvvo..',
-  '..ovvvvuuuuuuuuvvvvvvo..',
-  '...ovvvvvvvvvvvvvvvvo...',
-  '...oVVVVVVo..oVVVVVVo...',
-  '...oVVVVVo....oVVVVVo...',
-  '...ooooooo....ooooooo...'
-]);
+/* ---------- SHRIEKER 16x18 — bloated, gaping vertical maw ---------- */
+{
+  const pal = { L: '#c4dda6', c: '#9dbd7e', C: '#6b8a52', D: '#42582f', k: '#1d1010', x: '#ff3b3b' };
+  const body = [
+    '....oooooooo....',
+    '..ooLLccccLLoo..',
+    '.oLLccccccccLLo.',
+    '.oLccccccccccLo.',
+    '.oLccxccccxccLo.',
+    '.occcccccccccco.',
+    '.occcccccccccco.',
+    '.oCccccccccccCo.',
+    '.oCccccccccccCo.',
+    '.occcccccccccco.'
+  ];
+  SPR.anim.shrieker = BANK(pal, body, [
+    ['.oCcccckkccccCo.', '.oCcccckkccccCo.', '.occcccckccccco.', '.oCccccccccccCo.', '..oCDDccccDDCo..', '...oCo....oCo...', '...oCo....oCo...', '...ooo....ooo...'],
+    ['.oCccckkkkcccCo.', '.oCcckkkkkkccCo.', '.occcckkkkcccco.', '.oCccccccccccCo.', '..oCDDccccDDCo..', '..oCo......oCo..', '..oCo......oCo..', '..ooo......ooo..'],
+    ['.oCcccckkccccCo.', '.oCcccckkccccCo.', '.occcccckccccco.', '.oCccccccccccCo.', '..oCDDccccDDCo..', '....oCCCCCCo....', '....oCccccCo....', '....oooooooo....'],
+    ['.oCccckkkkcccCo.', '.oCcckkkkkkccCo.', '.occcckkkkcccco.', '.oCccccccccccCo.', '..oCDDccccDDCo..', '..oCo......oCo..', '..oCo......oCo..', '..ooo......ooo..']
+  ], // the scream
+    ['.oCkkkkkkkkkkCo.', '.ockkkkkkkkkkco.', '.ockkkkkkkkkkco.', '.oCckkkkkkkkcCo.', '..oCDDccccDDCo..', '...oCo....oCo...', '...oCo....oCo...', '...ooo....ooo...'], { y: -4.5, sep: 2.5 });
+}
 
-SPR.bossB = SPRITE([   // bloated many-eyed sac
-  '........oooooooo........',
-  '......ooccccccccoo......',
-  '....ooccccccccccccoo....',
-  '...occcccccccccccccco...',
-  '..occcccccccccccccccco..',
-  '..occxxccccxxccccxxcco..',
-  '..occcccccccccccccccco..',
-  '.occcccccccccccccccccco.',
-  '.occcxxcccccccccxxcccco.',
-  'occcccccccccccccccccccco',
-  'occcCCccccccccccccCCccco',
-  'occcccccccckkcccccccccco',
-  'occccccccckkkkccccccccco',
-  'occccccccckkkkccccccccco',
-  '.occccccccckkccccccccco.',
-  '.occcccccccccccccccccco.',
-  '..occcccccccccccccccco..',
-  '..occcCCccccccccCCccco..',
-  '...occcccccccccccccco...',
-  '....oCCCo......oCCCo....',
-  '....oCCCo......oCCCo....',
-  '....ooooo......ooooo....'
-], { c: '#8fae6a', C: '#4d6b38', k: '#170f12', x: '#ff3b3b' });
+/* ---------- STALKER 14x18 — tall, gaunt, long stride ---------- */
+{
+  const pal = { L: '#f0e9d4', u: '#d5cdb6', U: '#9a927e', E: '#5f5847', k: '#241d18', x: '#ff2020' };
+  const body = [
+    '.....oooo.....',
+    '...ooLLLLoo...',
+    '..oLLuuuuLLo..',
+    '..oLuuuuuuLo..',
+    '..oLuxuuxuLo..',
+    '..oUukkkkuUo..',
+    '...oUuuuuUo...',
+    '....oUUUUo....',
+    '..ooLuuuuLoo..',
+    '.oLuuuuuuuuLo.'
+  ];
+  SPR.anim.stalker = BANK(pal, body, [
+    ['.oUuuuuuuuuUo.', '.oUuEuuuuEuUo.', '..oUuuuuuuUo..', '..oEUuuuuUEo..', '..oUUo..oUUo..', '..ouuo..ouuo..', '..oUo....oUo..', '..ooo....ooo..'],
+    ['.oUuuuuuuuuUo.', '.oUuEuuuuEuUo.', '..oUuuuuuuUo..', '.oEUuuuuuuUEo.', '.oUUo....oUUo.', 'oUUo......oUUo', 'oUo........oUo', 'ooo........ooo'],
+    ['.oUuuuuuuuuUo.', '.oUuEuuuuEuUo.', '..oUuuuuuuUo..', '..oEUuuuuUEo..', '...oUUUUUUo...', '...ouuuuuuo...', '....oUUUUo....', '....oooooo....'],
+    ['.oUuuuuuuuuUo.', '.oUuEuuuuEuUo.', '..oUuuuuuuUo..', '.oEUuuuuuuUEo.', 'oUUo......oUUo', '.oUUo....oUUo.', '..oUo....oUo..', '..ooo....ooo..']
+  ], // coiled, about to blink
+    ['.oUuuuuuuuuUo.', '.oUEEuuuuEEUo.', '..oUEuuuuEUo..', '..oEEuuuuEEo..', '...oUUUUUUo...', '...oEEuuEEo...', '...oUo..oUo...', '...ooo..ooo...'], { y: -4.5, sep: 1.5 });
+}
+
+/* ---------- BLOATER 20x18 — a pulsing sack with ribs showing ---------- */
+{
+  const pal = { L: '#c46a6e', v: '#9c4049', V: '#5e2229', D: '#3a141a', u: '#ded8c6', k: '#200e12', x: '#ff3b3b' };
+  const body = [
+    '.......oooooo.......',
+    '.....ooLLvvLLoo.....',
+    '...ooLvvvvvvvvLoo...',
+    '..oLvvvvvvvvvvvvLo..',
+    '..oLvvxvvvvvvxvvLo..',
+    '.oLvvvvvvvvvvvvvvLo.',
+    '.oLvvkkkkkkkkkkvvLo.',
+    '.ovvvkvkvkvkvkvvvvo.',
+    '.ovvvvvvvvvvvvvvvvo.',
+    'ovvvvvvvvvvvvvvvvvvo'
+  ];
+  SPR.anim.bloater = BANK(pal, body, [
+    ['ovvuvvuvvuuvvuvvuvvo', 'ovvvvvvvvvvvvvvvvvvo', 'ovvuvvuvvuuvvuvvuvvo', '.ovvvvvvvvvvvvvvvvo.', '.oVvvvvvvvvvvvvvvVo.', '..oVVvvvvvvvvvvVVo..', '...oVVo......oVVo...', '...ooo........ooo...'],
+    ['ovvuvvuvvuuvvuvvuvvo', 'ovvvvvvvvvvvvvvvvvvo', 'ovvuvvuvvuuvvuvvuvvo', 'ovvvvvvvvvvvvvvvvvvo', '.oVvvvvvvvvvvvvvvVo.', '..oVVvvvvvvvvvvVVo..', '..oVVo........oVVo..', '..ooo..........ooo..'],
+    ['ovvuvvuvvuuvvuvvuvvo', 'ovvvvvvvvvvvvvvvvvvo', 'ovvuvvuvvuuvvuvvuvvo', '.ovvvvvvvvvvvvvvvvo.', '.oVvvvvvvvvvvvvvvVo.', '..oVVvvvvvvvvvvVVo..', '....oVVo....oVVo....', '....ooo......ooo....'],
+    ['ovvuvvuvvuuvvuvvuvvo', 'ovvvvvvvvvvvvvvvvvvo', 'ovvuvvuvvuuvvuvvuvvo', 'ovvvvvvvvvvvvvvvvvvo', '.oVvvvvvvvvvvvvvvVo.', '..oVVvvvvvvvvvvVVo..', '..oVVo........oVVo..', '..ooo..........ooo..']
+  ], // swollen, about to burst forward
+    ['ovvuvvuvvuuvvuvvuvvo', 'ovvvvvvvvvvvvvvvvvvo', 'ovvuuuuuuuuuuuuuuvvo', 'ovvvvvvvvvvvvvvvvvvo', 'oVvvvvvvvvvvvvvvvVo.', '.oVVvvvvvvvvvvvvVVo.', '..oVVo........oVVo..', '..ooo..........ooo..'], { y: -4.5, sep: 3.5 });
+}
+
+/* ---------- BOSS A 26x24 — hulking, apron, sunken head ---------- */
+{
+  const pal = { L: '#b8555c', v: '#8f3944', V: '#54202a', D: '#33121a', u: '#ded8c6', U: '#a9a291', k: '#1c0d12', x: '#ff3b3b' };
+  const body = [
+    '..........oooooo..........',
+    '........ooLLvvLLoo........',
+    '.......oLvvvvvvvvLo.......',
+    '......oLvvvvvvvvvvLo......',
+    '......oLvvxvvvvxvvLo......',
+    '......oLvvvvvvvvvvLo......',
+    '......oLvkkkkkkkkvLo......',
+    '......oLvkukukukuvLo......',
+    '......oLvvvvvvvvvvLo......',
+    '....oooLvvvvvvvvvvLooo....'
+  ];
+  SPR.anim.bossA = BANK(pal, body, [
+    ['..oLvvvvvvvvvvvvvvvvvvLo..', '.oLvvvvvvvvvvvvvvvvvvvvLo.', 'oLvvvvvvvvvvvvvvvvvvvvvvLo', 'ovvvvvuuuuuuuuuuuuuuvvvvvo', 'ovvvvuuuuuuuuuuuuuuuuvvvvo', 'ovvvvuuuuuuuuuuuuuuuuvvvvo', '.ovvvuuuuuuuuuuuuuuuuvvvo.', '.ovvvuuuuuuuuuuuuuuuuvvvo.', '..ovvuuuuuuuuuuuuuuuuvvo..', '..ovvvuuuuuuuuuuuuuuvvvo..', '...ovvvvvvvvvvvvvvvvvvo...', '...oVVVVVo......oVVVVVo...', '....oVVVo........oVVVo....', '....ooooo........ooooo....'],
+    ['..oLvvvvvvvvvvvvvvvvvvLo..', '.oLvvvvvvvvvvvvvvvvvvvvLo.', 'oLvvvvvvvvvvvvvvvvvvvvvvLo', 'ovvvvvuuuuuuuuuuuuuuvvvvvo', 'ovvvvuuuuuuuuuuuuuuuuvvvvo', '.ovvvuuuuuuuuuuuuuuuuvvvo.', '.ovvvuuuuuuuuuuuuuuuuvvvo.', '..ovvuuuuuuuuuuuuuuuuvvo..', '..ovvuuuuuuuuuuuuuuuuvvo..', '..ovvvuuuuuuuuuuuuuuvvvo..', '...ovvvvvvvvvvvvvvvvvvo...', '..oVVVVVo........oVVVVVo..', '..oVVVo............oVVVo..', '..ooooo............ooooo..']
+  ], // rears up before it commits
+    ['ooLvvvvvvvvvvvvvvvvvvvvLoo', 'oLLvvvvvvvvvvvvvvvvvvvvLLo', 'oLvvvvvvvvvvvvvvvvvvvvvvLo', 'ovvvvvuuuuuuuuuuuuuuvvvvvo', 'ovvvvuuuuuuuuuuuuuuuuvvvvo', 'ovvvvuuuuuuuuuuuuuuuuvvvvo', 'ovvvvuuuuuuuuuuuuuuuuvvvvo', '.ovvvuuuuuuuuuuuuuuuuvvvo.', '.ovvvuuuuuuuuuuuuuuuuvvvo.', '..ovvvuuuuuuuuuuuuuuvvvo..', '...ovvvvvvvvvvvvvvvvvvo...', '...oVVVVVVVVVVVVVVVVVVo...', '....oVVVVVVVVVVVVVVVVo....', '....oooooooooooooooooo....'], { y: -7.5, sep: 2.5 });
+}
+
+/* ---------- BOSS B 26x24 — bloated many-eyed sac ---------- */
+{
+  const pal = { L: '#b6cf8c', c: '#8fae6a', C: '#4d6b38', D: '#2c3f20', u: '#ded8c6', k: '#170f12', x: '#ff3b3b' };
+  const body = [
+    '........oooooooooo........',
+    '......ooLLccccccLLoo......',
+    '....ooLLccccccccccLLoo....',
+    '...oLLccccccccccccccLLo...',
+    '..oLccccccccccccccccccLo..',
+    '..oLccxxccccccccccxxccLo..',
+    '..oLccccccccccccccccccLo..',
+    '.oLccccccccccccccccccccLo.',
+    '.oLcccxxcccccccccxxccccLo.',
+    '.oLccccccccccccccccccccLo.'
+  ];
+  SPR.anim.bossB = BANK(pal, body, [
+    ['oLccccccccccccccccccccccLo', 'occcccCCcccccccccCCcccccco', 'occccccccccckkccccccccccco', 'occcccccccckkkkcccccccccco', 'occcccccccckkkkcccccccccco', 'occccccccccckkccccccccccco', 'occcccccccccccccccccccccco', 'occccCCccccccccccccCCcccco', '.occcccccccccccccccccccco.', '.occcccccccccccccccccccco.', '..occcccccccccccccccccco..', '...oCCCCo........oCCCCo...', '....oCCo..........oCCo....', '....oooo..........oooo....'],
+    ['oLccccccccccccccccccccccLo', 'occcccCCcccccccccCCcccccco', 'occcccccccccccccccccccccco', 'occccccccccckkccccccccccco', 'occccccccccckkccccccccccco', 'occcccccccccccccccccccccco', 'occcccccccccccccccccccccco', 'occccCCccccccccccccCCcccco', '.occcccccccccccccccccccco.', '..occcccccccccccccccccco..', '..occcccccccccccccccccco..', '..oCCCCo..........oCCCCo..', '..oCCo..............oCCo..', '..oooo..............oooo..']
+  ], // splits open to spawn
+    ['oLccccccccccccccccccccccLo', 'occcccCCcccccccccCCcccccco', 'occcccccccckkkkcccccccccco', 'occccccccckkkkkkccccccccco', 'occcccccckkkkkkkkcccccccco', 'occcccccckkkkkkkkcccccccco', 'occccccccckkkkkkccccccccco', 'occccCCcccckkkkccccCCcccco', '.occcccccccckkcccccccccco.', '.occcccccccccccccccccccco.', '..occcccccccccccccccccco..', '...oCCCCo........oCCCCo...', '....oCCo..........oCCo....', '....oooo..........oooo....'], { y: -6.5, sep: 6.0 });
+}
+
+/* Back-compat aliases: the title screen and the jumpscare want one still frame. */
+SPR.crawler  = SPR.anim.crawler.walk[0];
+SPR.shrieker = SPR.anim.shrieker.walk[0];
+SPR.stalker  = SPR.anim.stalker.walk[0];
+SPR.bloater  = SPR.anim.bloater.walk[0];
+SPR.bossA    = SPR.anim.bossA.walk[0];
+SPR.bossB    = SPR.anim.bossB.walk[0];
 
 /* ---------- LOOT (the joke arsenal) ---------- */
 SPR.banana = SPRITE([
