@@ -2711,9 +2711,13 @@ function drawMinimap() {
 function crosshair() {
   const mx = mouse.x | 0, my = mouse.y | 0;
   const play = S.mode === 'play';
-  const sp = play ? 3 + S.p.recoil * 5 : 3;
-  const arms = [[mx - sp - 3, my, 3, 1], [mx + sp, my, 3, 1],
-                [mx, my - sp - 3, 1, 3], [mx, my + sp, 1, 3]];
+  /* The centre pixel spans [mx, mx+1), so the thing to be symmetrical about is
+     mx + 0.5, not mx. Measuring the near arms from mx alone left them a pixel
+     further out than the far ones. Rounded, too, so a fractional recoil spread
+     can't land an arm on a half pixel and smear it. */
+  const g = Math.round(play ? 3 + S.p.recoil * 5 : 3), len = 3;
+  const arms = [[mx - g - len, my, len, 1], [mx + g + 1, my, len, 1],
+                [mx, my - g - len, 1, len], [mx, my + g + 1, 1, len]];
   ctx.fillStyle = 'rgba(0,0,0,0.7)';
   for (const a of arms) ctx.fillRect(a[0] - 1, a[1] - 1, a[2] + 2, a[3] + 2);
   ctx.fillStyle = S.god ? 'hsl(' + ((S.t * 300) % 360) + ',95%,65%)' : '#ff3b46';
@@ -2952,53 +2956,82 @@ function drawArmory() {
   bg.addColorStop(0, 'rgba(200,150,30,0.13)'); bg.addColorStop(1, 'rgba(200,150,30,0)');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
-  htxt('ARMORY', W / 2, 22, '#f0c65a', 'center', 20, { weight: '700', glow: '#6a4a10', glowSize: 18, track: 0.24 });
-  drawSpr(ctx, SPR.coin, W / 2 - 34, 31, 1);
-  htxt(String(S.coins), W / 2 - 26, 34, '#f5c518', 'left', 9, { track: 0.08 });
+  // Title and wallet share the top line, which buys the rows 12px of height.
+  htxt('ARMORY', 30, 25, '#f0c65a', 'left', 18, { weight: '700', glow: '#6a4a10', glowSize: 16, track: 0.24 });
+  const cs = String(S.coins);
+  htxt(cs, W - 30, 25, '#f5c518', 'right', 11, { track: 0.08 });
+  drawSpr(ctx, SPR.coin, W - 34 - htxtWidth(cs, 11, 0.08) - 5, 21, 1);
+
+  /* What a track actually does used to be crushed into 6px type inside the
+     box, underneath the rank pips. It lives in the footer now, where there is
+     room to show the rank you are buying and what it gets you. */
+  let footer = null;
 
   const owned = S.p.owned;
   owned.forEach((id, i) => {
     const w = WEP[id], u = wup(id);
-    const y = 44 + i * 29, rh = 25;
-    ctx.fillStyle = 'rgba(13,10,14,0.8)'; ctx.fillRect(16, y, W - 32, rh);
+    const y = 40 + i * 28, rh = 22;
+    ctx.fillStyle = 'rgba(13,10,14,0.78)'; ctx.fillRect(16, y, W - 32, rh);
     ctx.fillStyle = w.col; ctx.globalAlpha = 0.75; ctx.fillRect(16, y, 2, rh); ctx.globalAlpha = 1;
-    drawSpr(ctx, w.spr, 34, y + 12, 0.95, false, 1, id === 'scar' && S.scarLv > 1 ? scarCol() : null);
-    htxt(id === 'scar' ? scarName() : w.name, 52, y + 11,
+    drawSpr(ctx, w.spr, 34, y + 11, 0.95, false, 1, id === 'scar' && S.scarLv > 1 ? scarCol() : null);
+    htxt(id === 'scar' ? scarName() : w.name, 52, y + 10,
          id === 'scar' ? scarCol() : w.col, 'left', 8.5, { track: 0.06 });
     htxt(w.beam ? 'beam' : Math.round(1 / (w.rate * (1 - u.rate * 0.10))) + '/s  ·  ' +
-         (u.split ? (u.split * 2 + 1) + '-way' : '1-way'), 52, y + 20, 'rgba(140,122,108,0.9)', 'left', 6.5,
+         (u.split ? (u.split * 2 + 1) + '-way' : '1-way'), 52, y + 19, 'rgba(140,122,108,0.9)', 'left', 6.5,
          { track: 0.03, noShadow: true });
 
     WTRACKS.forEach((tr, j) => {
-      const bx = 160 + j * 104, bw = 98, bh = 19, by = y + 3;
+      const bx = 154 + j * 104, bw = 100, bh = rh, by = y;
       const rank = u[tr.id] | 0;
       const maxed = rank >= tr.max;
       const cost = wupCost(id, tr.id, rank);
       const afford = S.coins >= cost;
-      const hot = !maxed && afford && mouse.x > bx && mouse.x < bx + bw && mouse.y > by && mouse.y < by + bh;
+      const over = mouse.x > bx && mouse.x < bx + bw && mouse.y > by && mouse.y < by + bh;
+      const canBuy = !maxed && afford;
       const key = 'arm' + id + tr.id;
-      hoverT[key] = clamp((hoverT[key] || 0) + (hot ? 0.22 : -0.18), 0, 1);
+      hoverT[key] = clamp((hoverT[key] || 0) + (over && canBuy ? 0.22 : -0.18), 0, 1);
       const t = hoverT[key];
 
-      ctx.fillStyle = maxed ? 'rgba(24,22,18,0.9)' : 'rgba(' + Math.round(10 + t * 40) + ',9,12,0.9)';
+      if (over) {
+        footer = maxed
+          ? tr.name + '  ·  rank ' + rank + '/' + tr.max + '  ·  ' + tr.d(rank) + '  ·  fully upgraded'
+          : tr.name + '  ·  rank ' + rank + '/' + tr.max + '  ·  ' + tr.d(rank) + '   →   ' +
+            tr.d(rank + 1) + '  ·  ' + cost + (afford ? ' coins' : ' coins (short ' + (cost - S.coins) + ')');
+      }
+
+      ctx.fillStyle = maxed ? 'rgba(26,24,19,0.92)' : 'rgba(' + Math.round(11 + t * 42) + ',10,13,0.92)';
       ctx.fillRect(bx, by, bw, bh);
-      ctx.fillStyle = maxed ? 'rgba(120,110,80,0.5)' : tr.col;
-      ctx.globalAlpha = maxed ? 0.5 : (afford ? 0.45 + t * 0.55 : 0.2);
+      ctx.fillStyle = maxed ? 'rgba(150,138,100,0.55)' : tr.col;
+      ctx.globalAlpha = maxed ? 0.55 : (afford ? 0.45 + t * 0.55 : 0.22);
       ctx.fillRect(bx, by, bw, 1); ctx.fillRect(bx, by + bh - 1, bw, 1);
       ctx.globalAlpha = 1;
 
-      htxt(tr.name, bx + 5, by + 8, maxed ? '#8b8168' : afford ? (t > 0.4 ? '#fff' : tr.col) : '#7a5c58',
-           'left', 7.5, { track: 0.10, glow: t > 0.2 ? tr.col : null, glowSize: 10 * t });
-      for (let k = 0; k < tr.max; k++) {
-        ctx.fillStyle = k < rank ? tr.col : 'rgba(90,80,74,0.45)';
-        ctx.fillRect(bx + 5 + k * 6, by + 11, 4, 3);
-      }
-      if (maxed) htxt('MAX', bx + bw - 5, by + 14, '#8b8168', 'right', 7.5, { track: 0.10 });
+      htxt(tr.name, bx + 6, by + 9, maxed ? '#a89a72' : afford ? (t > 0.4 ? '#fff' : tr.col) : '#8a6a64',
+           'left', 8, { track: 0.10, glow: t > 0.2 ? tr.col : null, glowSize: 10 * t });
+      if (maxed) htxt('MAX', bx + bw - 6, by + 9, '#a89a72', 'right', 7.5, { track: 0.10 });
       else {
-        htxt(String(cost), bx + bw - 5, by + 14, afford ? '#f5c518' : '#96605e', 'right', 8, { track: 0.06 });
-        drawSpr(ctx, SPR.coin, bx + bw - 9 - htxtWidth(String(cost), 8), by + 11, 0.62);
+        htxt(String(cost), bx + bw - 6, by + 9, afford ? '#f5c518' : '#96605e', 'right', 8, { track: 0.06 });
+        drawSpr(ctx, SPR.coin, bx + bw - 10 - htxtWidth(String(cost), 8, 0.06) - 3, by + 6, 0.62);
       }
-      htxt(tr.d(rank), bx + 5, by + 17, 'rgba(132,118,106,0.75)', 'left', 6, { track: 0.02, noShadow: true });
+
+      /* Pips get their own line and enough contrast to read: filled ones carry
+         the track colour with a lit top edge, empty ones are outlined sockets
+         rather than a smudge that disappears into the panel. */
+      const PW = 8, PH = 5, PITCH = 11;
+      for (let k = 0; k < tr.max; k++) {
+        const px = bx + 6 + k * PITCH, py = by + 13;
+        if (k < rank) {
+          ctx.fillStyle = tr.col; ctx.fillRect(px, py, PW, PH);
+          ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(px, py, PW, 1);
+        } else {
+          ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(px, py, PW, PH);
+          ctx.fillStyle = 'rgba(255,255,255,0.22)';
+          ctx.fillRect(px, py, PW, 1); ctx.fillRect(px, py + PH - 1, PW, 1);
+          ctx.fillRect(px, py, 1, PH); ctx.fillRect(px + PW - 1, py, 1, PH);
+        }
+      }
+      htxt(rank + '/' + tr.max, bx + bw - 6, by + 18, maxed ? '#a89a72' : 'rgba(160,146,132,0.9)',
+           'right', 7, { track: 0.06, noShadow: true });
 
       if (!maxed) S.ui.push({ x: bx, y: by, w: bw, h: bh, fn: () => {
         if (S.coins < cost) { A.denied(); return; }
@@ -3009,8 +3042,9 @@ function drawArmory() {
     });
   });
 
+  htxt(footer || 'CYCLE fire rate  ·  SPLIT extra shots  ·  POWER damage  —  bought with run coins, kept for the run',
+       W / 2, H - 30, footer ? '#e2cba2' : 'rgba(126,112,100,0.8)', 'center', 7.5, { track: 0.08 });
   uiBtn(W / 2 - 48, H - 22, 96, 17, 'BACK', '#e8b25a', () => { S.mode = 'pause'; });
-  htxt('upgrades are bought with run coins and last the run  ·  ESC back', W / 2, H - 27, 'rgba(120,106,94,0.65)', 'center', 6.5, { track: 0.10, noShadow: true });
   crosshair();
 }
 
