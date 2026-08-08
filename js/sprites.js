@@ -50,6 +50,7 @@ SPR.body = SPRITE([
   '.ojjjjjjjjjjjjo.',
   '.ojjjjbbbbjjjjo.',
   '.ojjjjjjjjjjjjo.',
+  '.ojjjjjjjjjjjjo.',
   '.oJJJJJJJJJJJJo.'
 ]);
 /* 4-frame walk cycle: passing -> wide stride -> crossed -> wider stride.
@@ -196,6 +197,32 @@ SPR.card = SPRITE([
   'ouUUUUUUuo',
   '.oooooooo.'
 ], { u: '#e8dfc8', U: '#b3a888', x: '#c0202a', p: '#141018' });
+
+SPR.shield = SPRITE([
+  '..oooooo..',
+  '.obbbbbbo.',
+  'obbwwwwbbo',
+  'obwwwwwwbo',
+  'obwwwwwwbo',
+  'obbwwwwbbo',
+  '.obbwwbbo.',
+  '..obbbbo..',
+  '...obbo...',
+  '....oo....'
+], { b: '#3f92d6', w: '#c6e8ff' });
+
+SPR.nova = SPRITE([
+  '....xx....',
+  '..x.xx.x..',
+  '...xxxx...',
+  '.xxxXXxxx.',
+  'xxXXXXXXxx',
+  'xxXXXXXXxx',
+  '.xxxXXxxx.',
+  '...xxxx...',
+  '..x.xx.x..',
+  '....xx....'
+], { x: '#ff8a2b', X: '#fff0a8' });
 
 SPR.pedestal = SPRITE([
   '......oooooooo......',

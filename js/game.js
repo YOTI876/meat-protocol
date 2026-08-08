@@ -133,11 +133,13 @@ const OMEGA_CARDS = 18;    // the beam is the one thing that got dearer
 const EVO_COST = ev => 100 * Math.pow(2, ev);   // 100, 200, 400, 800 ...
 
 const BOSSES = [
-  { key: 'butcher', name: 'THE BUTCHER',      spr: SPR.bossA, tint: null,                     hp: 850,  spd: 40, r: 15, item: 'banana',  pat: 'charge',  cry: 'IT REMEMBERS YOUR NAME' },
-  { key: 'mother',  name: 'MOTHER OF MELONS', spr: SPR.bossB, tint: null,                     hp: 1100, spd: 26, r: 15, item: 'melon',   pat: 'spawner', cry: 'SHE IS FULL OF CHILDREN' },
-  { key: 'pitcher', name: 'THE PITCHER',      spr: SPR.bossA, tint: 'rgba(224,40,50,0.55)',   hp: 1450, spd: 46, r: 15, item: 'coolade', pat: 'blink',   cry: 'IT CAME THROUGH THE WALL' },
-  { key: 'hog',     name: 'THE HOGFATHER',    spr: SPR.bossB, tint: 'rgba(255,130,142,0.55)', hp: 1850, spd: 32, r: 15, item: 'glock',   pat: 'burst',   cry: 'HE IS CARRYING SOMETHING' },
-  { key: 'courier', name: 'THE COURIER',      spr: SPR.bossA, tint: 'rgba(90,200,255,0.5)',   hp: 2400, spd: 62, r: 15, item: 'bike',    pat: 'circle',  cry: 'IT HAS BEEN CIRCLING FOR HOURS' }
+  // addT/addN: how often each boss calls for help, and how much. Every boss
+  // summons now, but the cap in updateBoss keeps the arena from silting up.
+  { key: 'butcher', name: 'THE BUTCHER',      spr: SPR.bossA, tint: null,                     hp: 850,  spd: 40, r: 15, item: 'banana',  pat: 'charge',  addT: 6.5, addN: 3, adds: ['crawler'],                        cry: 'IT REMEMBERS YOUR NAME' },
+  { key: 'mother',  name: 'MOTHER OF MELONS', spr: SPR.bossB, tint: null,                     hp: 1100, spd: 26, r: 15, item: 'melon',   pat: 'spawner', addT: 4.2, addN: 4, adds: ['crawler', 'crawler', 'shrieker'], cry: 'SHE IS FULL OF CHILDREN' },
+  { key: 'pitcher', name: 'THE PITCHER',      spr: SPR.bossA, tint: 'rgba(224,40,50,0.55)',   hp: 1450, spd: 46, r: 15, item: 'coolade', pat: 'blink',   addT: 7.0, addN: 3, adds: ['stalker', 'crawler'],            cry: 'IT CAME THROUGH THE WALL' },
+  { key: 'hog',     name: 'THE HOGFATHER',    spr: SPR.bossB, tint: 'rgba(255,130,142,0.55)', hp: 1850, spd: 32, r: 15, item: 'glock',   pat: 'burst',   addT: 6.0, addN: 4, adds: ['crawler', 'shrieker', 'bloater'], cry: 'HE IS CARRYING SOMETHING' },
+  { key: 'courier', name: 'THE COURIER',      spr: SPR.bossA, tint: 'rgba(90,200,255,0.5)',   hp: 2400, spd: 62, r: 15, item: 'bike',    pat: 'circle',  addT: 6.8, addN: 4, adds: ['stalker', 'stalker', 'crawler'],  cry: 'IT HAS BEEN CIRCLING FOR HOURS' }
 ];
 const BOSS_WAVES = { 3: 0, 5: 1, 7: 2, 9: 3, 10: 4 };
 
@@ -245,7 +247,7 @@ function freshState() {
     items: {}, god: false,
     coins: sv.coins || 0, cards: sv.cards || 0, vault: sv.vault || 0,
     evo: sv.evo || 0, modagazFound: sv.modagaz || 0,
-    goro: false, goroHits: 0, goroT: 0,
+    goro: false, goroHits: 0, goroT: 0, vacuum: 0,
     score: 0, combo: 1, comboT: 0, kills: 0, streak: 0,
     flash: 0, flashCol: '#fff', hitstop: 0, slow: 0, redness: 0, modT: 0,
     jump: 0, jumpSpr: null, muzzle: null, beamHit: null,
@@ -282,7 +284,7 @@ function diff() {
   const ev = S.evo | 0;
   return {
     hp: (1 + S.room * 0.95) * (1 + ev * 0.38),
-    dmg: (1 + S.room * 0.62) * (1 + ev * 0.26),
+    dmg: (1 + S.room * 0.62) * (1 + ev * 0.26) * 0.95,   // a flat 5% off the top
     spd: (1 + S.room * 0.08) * (1 + ev * 0.05),
     score: (1 + S.room * 0.7) * (1 + ev * 0.5)
   };
@@ -414,7 +416,7 @@ function makePlayer() {
     nades: 3, nadeCd: 0,
     dash: 0, dashCd: 0, iframe: 0, walkT: 0, stepPhase: 0, flip: false,
     peelT: 0, hurtFlash: 0, kick: 0,
-    glockT: 0, glockSide: 1, ramHit: []
+    glockT: 0, glockSide: 1, ramHit: [], tempShield: 0
   };
 }
 
@@ -741,16 +743,18 @@ function killEnemy(e, ang) {
   } else {
     const r = Math.random();
     if (r < 0.008) dropPickup(e.x, e.y, 'card');        // cards: genuinely rare
-    else if (r < 0.168) dropPickup(e.x, e.y, 'coin');   // coins: reasonably common
-    else if (r < 0.228) dropPickup(e.x, e.y, 'ammo');
-    else if (r < 0.288) dropPickup(e.x, e.y, 'med');
-    else if (r < 0.328) dropPickup(e.x, e.y, 'nade');
+    else if (r < 0.021) dropPickup(e.x, e.y, 'nova');   // the rarer of the two new ones
+    else if (r < 0.061) dropPickup(e.x, e.y, 'shield');
+    else if (r < 0.221) dropPickup(e.x, e.y, 'coin');   // coins: reasonably common
+    else if (r < 0.281) dropPickup(e.x, e.y, 'ammo');
+    else if (r < 0.341) dropPickup(e.x, e.y, 'med');
+    else if (r < 0.381) dropPickup(e.x, e.y, 'nade');
   }
 }
 
 function hurtPlayer(dmg, sx, sy) {
   const p = S.p;
-  if (S.god || p.iframe > 0 || S.mode !== 'play') return;
+  if (S.god || p.iframe > 0 || p.tempShield > 0 || S.mode !== 'play') return;
   if (p.shield > 0) {
     p.shield--; p.shieldT = ST().shieldCd; p.iframe = 0.45;
     part(p.x, p.y, '#63b04a', 16, 130, 0.5);
@@ -835,7 +839,9 @@ function startWave(n) {
     // Head count, not a spend budget — a budget buys fewer/tougher enemies as it
     // grows, which is backwards. This grows quadratically across a floor and is
     // multiplied again for every floor down and every evolution.
-    const count = Math.round((5 + n * 2.2 + n * n * 0.22) * (1 + S.room * 0.5) * (1 + (S.evo | 0) * 0.12));
+    // Every gun you own is another mouth the floor sends to meet it.
+    const armed = 1 + Math.max(0, S.p.owned.length - 1) * 0.10;
+    const count = Math.round((7 + n * 2.8 + n * n * 0.26) * (1 + S.room * 0.55) * (1 + (S.evo | 0) * 0.12) * armed);
     // Weights shift toward the nastier things as the wave and floor climb.
     const pool = [['crawler', 10]];
     if (n >= 2 || S.room > 0) pool.push(['shrieker', 3 + n * 0.4 + S.room]);
@@ -857,7 +863,8 @@ function updateWaves(dt) {
   if (S.waveState === 'fight') {
     S.spawnT -= dt;
     // How many can be breathing at once, how fast they arrive, how many per crack
-    const cap = Math.min(64, Math.round(16 + S.wave * 1.2 + S.room * 7 + (S.evo | 0) * 2));
+    const cap = Math.min(72, Math.round(19 + S.wave * 1.4 + S.room * 7.5 + (S.evo | 0) * 2 +
+                                        Math.max(0, S.p.owned.length - 1) * 1.5));
     if (S.spawnT <= 0 && S.queue.length && S.en.length < cap) {
       S.spawnT = Math.max(0.15, 0.85 - S.wave * 0.05 - S.room * 0.09);
       const batch = 1 + Math.floor(S.wave / 4) + S.room + (Math.random() < 0.4 ? 1 : 0);
@@ -869,6 +876,8 @@ function updateWaves(dt) {
     }
     if (!S.queue.length && !S.en.length && !S.cracks.length) {
       S.waveState = 'clear'; S.waveT = 3.0;
+      S.vacuum = 2.6;                 // sweep the floor clean
+      A.pickup();
       const heal = S.wave === 10 ? 60 : 10;
       S.p.hp = Math.min(ST().maxhp, S.p.hp + heal);
       S.p.nades = Math.min(6, S.p.nades + 1);
@@ -1039,6 +1048,8 @@ function update(rdt) {
   p.kick = Math.max(0, p.kick - dt * 26);
   p.iframe = Math.max(0, p.iframe - dt);
   p.hurtFlash = Math.max(0, p.hurtFlash - dt);
+  p.tempShield = Math.max(0, p.tempShield - dt);
+  S.vacuum = Math.max(0, S.vacuum - dt);
 
   if (st.shieldMax > 0 && p.shield < st.shieldMax) {
     p.shieldT -= dt;
@@ -1245,12 +1256,44 @@ function update(rdt) {
     if (d.life <= 0) { S.drops.splice(i, 1); continue; }
     const dd = Math.hypot(d.x - p.x, d.y - p.y);
     const perm = d.kind === 'item' || d.kind === 'god';
-    if (dd < 40 && !perm) { d.x += (p.x - d.x) * dt * 6; d.y += (p.y - d.y) * dt * 6; }
+    // End of a wave: the floor gives up everything it was holding.
+    if (S.vacuum > 0 && !perm) {
+      d.life = Math.max(d.life, 2);
+      const a = Math.atan2(p.y - d.y, p.x - d.x);
+      const sp = 150 + (1 - clamp(dd / 400, 0, 1)) * 260;
+      d.x += Math.cos(a) * sp * dt; d.y += Math.sin(a) * sp * dt;
+      d.vx = d.vy = 0;
+      if (Math.random() < dt * 12) part(d.x, d.y, '#ffe9a8', 1, 20, 0.3);
+    }
+    else if (dd < 40 && !perm) { d.x += (p.x - d.x) * dt * 6; d.y += (p.y - d.y) * dt * 6; }
     if (dd < 12) {
       if (d.kind === 'ammo') { p.mags[curW().id] = curW().mag; p.reT = 0; float(p.x, p.y - 16, 'AMMO', '#f2d14a'); A.pickup(); }
       else if (d.kind === 'med') { p.hp = Math.min(ST().maxhp, p.hp + 32); float(p.x, p.y - 16, '+32 HP', '#ff6b6b'); A.pickup(); }
       else if (d.kind === 'nade') { p.nades = Math.min(6, p.nades + 1); float(p.x, p.y - 16, '+1 FRAG', '#7aa35e'); A.pickup(); }
       else if (d.kind === 'coin') { S.coins++; S.vault++; float(p.x, p.y - 16, '+1', '#f5c518'); A.coin(); }
+      else if (d.kind === 'shield') {
+        p.tempShield = Math.max(p.tempShield, 2.0);
+        float(p.x, p.y - 18, 'AEGIS', '#7fd0ff', true);
+        ring(p.x, p.y, 30, '#7fd0ff', 0.4, 2);
+        part(p.x, p.y, '#c6e8ff', 22, 130, 0.6);
+        A.bigpickup();
+      }
+      else if (d.kind === 'nova') {
+        const st2 = ST(), N = 26;
+        for (let k = 0; k < N; k++) {
+          const a = k / N * TAU + Math.random() * 0.1;
+          S.bul.push({
+            x: p.x, y: p.y, vx: Math.cos(a) * 400, vy: Math.sin(a) * 400,
+            dmg: 90 * st2.dmgMul, pierce: 2 + st2.pierce, hitIds: [], life: 1.5,
+            col: '#ffb03a', size: 3, knock: 180, pin: 0, burn: 12, bounce: 0, god: S.god
+          });
+        }
+        float(p.x, p.y - 18, 'NOVA', '#ffb03a', true);
+        ring(p.x, p.y, 64, '#ffb03a', 0.4, 2);
+        part(p.x, p.y, '#fff0a8', 40, 200, 0.7, 2);
+        shake(9); punch(0.05); S.flash = 0.45; S.flashCol = '#ffcf8a';
+        A.boom();
+      }
       else if (d.kind === 'card') {
         S.cards++;
         float(p.x, p.y - 18, 'CARD ' + S.cards + '/' + OMEGA_CARDS, '#c0202a', true);
@@ -1364,11 +1407,18 @@ function updateBoss(b, dt) {
   b.pt -= dt; b.flip = dx < 0;
   const pat = b.def.pat;
 
+  // Every boss summons, but only up to a ceiling that scales with the floor —
+  // so it stays a fight rather than an avalanche.
+  const D2 = b.def;
+  const addCap = Math.min(30, 14 + S.room * 4 + (S.evo | 0) * 2);
   b.spawnT -= dt;
-  if (b.spawnT <= 0 && S.en.length < 22) {
-    b.spawnT = pat === 'spawner' ? 5.0 : 8.5;
-    const cnt = pat === 'spawner' ? 3 + S.room : 2;
-    for (let i = 0; i < cnt; i++) { const q = freeSpot(90); S.cracks.push({ x: q.x, y: q.y, t: 0.6, type: pat === 'spawner' ? 'crawler' : pick(['crawler', 'shrieker']) }); }
+  if (b.spawnT <= 0 && S.en.length < addCap) {
+    b.spawnT = D2.addT * rnd(0.85, 1.15);
+    const cnt = Math.min(D2.addN + Math.floor(S.room * 0.5), addCap - S.en.length);
+    for (let i = 0; i < cnt; i++) {
+      const q = freeSpot(90);
+      S.cracks.push({ x: q.x, y: q.y, t: 0.6, type: pick(D2.adds) });
+    }
     A.screech(true);
   }
 
@@ -1639,10 +1689,12 @@ function drawWorld() {
   for (const d of S.drops) {
     const by = Math.sin(d.bob) * 2;
     const spr = d.kind === 'ammo' ? SPR.ammo : d.kind === 'med' ? SPR.medkit : d.kind === 'god' ? SPR.eye
-      : d.kind === 'coin' ? SPR.coin : d.kind === 'card' ? SPR.card : d.kind === 'nade' ? SPR.grenade : ITEMS[d.key].spr;
+      : d.kind === 'coin' ? SPR.coin : d.kind === 'card' ? SPR.card : d.kind === 'nade' ? SPR.grenade
+      : d.kind === 'shield' ? SPR.shield : d.kind === 'nova' ? SPR.nova : ITEMS[d.key].spr;
     const sc = (d.kind === 'item' || d.kind === 'god') ? 1.6 : d.kind === 'card' ? 1.1 : 1;
     const col = d.kind === 'god' ? '#ff2b2b' : d.kind === 'item' ? ITEMS[d.key].col
-      : d.kind === 'coin' ? '#f5c518' : d.kind === 'card' ? '#c0202a' : '#ffffff';
+      : d.kind === 'coin' ? '#f5c518' : d.kind === 'card' ? '#c0202a'
+      : d.kind === 'shield' ? '#7fd0ff' : d.kind === 'nova' ? '#ffb03a' : '#ffffff';
     ctx.globalAlpha = 0.16 + Math.sin(S.t * 5 + d.bob) * 0.07;
     ctx.fillStyle = col;
     ctx.beginPath(); ctx.arc(d.x, d.y + 6, 12 * sc, 0, TAU); ctx.fill();
@@ -1860,7 +1912,7 @@ function drawPlayer(p) {
   const px = p.x + kx, py = p.y + ky;
 
   ctx.fillStyle = 'rgba(0,0,0,0.42)';
-  ctx.beginPath(); ctx.ellipse(p.x, p.y + 10, 7, 3, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(p.x, p.y + 9, 7, 3, 0, 0, TAU); ctx.fill();
 
   if (p.dash > 0) drawSpr(ctx, bodySprite(), px - p.vx * 0.03, py - p.vy * 0.03 - 6 + bob, 1, p.flip, 0.3);
 
@@ -1872,7 +1924,10 @@ function drawPlayer(p) {
   ctx.rotate(lean);                                   // exaggerated run lean
   const sq = 1 + Math.sin(p.walkT * Math.PI) * 0.05;
   ctx.scale(1 / sq, sq);
-  drawSpr(ctx, legSprite(p.walkT > 0 ? frame : 0), 0, 7 + bob * 0.4, 1, p.flip, alpha, tint);
+  // Body is 16 tall centred at -5 (bottom edge +3); legs are 5 tall and must be
+  // centred at +5.5 so their top edge meets it. Any more and you see daylight
+  // through his waist.
+  drawSpr(ctx, legSprite(p.walkT > 0 ? frame : 0), 0, 5.5 + bob * 0.4, 1, p.flip, alpha, tint);
   drawSpr(ctx, bodySprite(), 0, -5 + bob, 1, p.flip, alpha, tint);
   ctx.restore();
 
@@ -1983,6 +2038,24 @@ function drawPlayer(p) {
     for (let i = 0; i < p.shield; i++) {
       const a = S.t * 1.7 + i / p.shield * TAU;
       drawSpr(ctx, SPR.melon, p.x + Math.cos(a) * 15, p.y + Math.sin(a) * 7, 0.45, false, 0.9);
+    }
+  }
+
+  // AEGIS bubble from the shield pickup
+  if (p.tempShield > 0) {
+    const k = clamp(p.tempShield / 2, 0, 1);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = 'rgba(127,208,255,' + (0.35 + k * 0.4) + ')';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 15 + Math.sin(S.t * 12) * 1.2, 0, TAU); ctx.stroke();
+    ctx.globalAlpha = 0.12 + k * 0.10;
+    ctx.fillStyle = '#7fd0ff';
+    ctx.beginPath(); ctx.arc(p.x, p.y, 15, 0, TAU); ctx.fill();
+    ctx.restore();
+    if (Math.random() < 0.4) {
+      const a = Math.random() * TAU;
+      part(p.x + Math.cos(a) * 15, p.y + Math.sin(a) * 15, '#c6e8ff', 1, 16, 0.35);
     }
   }
 
@@ -2135,7 +2208,7 @@ let grainCans = [];
     for (let i = 0; i < img.data.length; i += 4) {
       const v = Math.random() < 0.5 ? 0 : 255;
       img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-      img.data[i + 3] = Math.random() < 0.045 ? 11 : 0;   // barely there now
+      img.data[i + 3] = Math.random() < 0.054 ? 13 : 0;   // +20% over the last pass
     }
     g.putImageData(img, 0, 0);
     grainCans.push(c);
@@ -2271,6 +2344,9 @@ function drawHUD() {
   txt(String(S.score).padStart(7, '0'), W - 6, 12, '#d8c49a', 'right');
   if (S.combo > 1) txt('x' + S.combo, W - 6, 22, 'hsl(' + (40 + S.combo * 6) + ',90%,60%)', 'right');
 
+  drawMinimap();
+  if (S.vacuum > 0) htxt('COLLECTING', W / 2, 68, 'rgba(245,197,24,' + clamp(S.vacuum, 0, 1) + ')', 'center', 8, { track: 0.3 });
+
   const ks = ['banana', 'melon', 'coolade', 'glock', 'bike'];
   let ix = W - 12;
   for (let i = ks.length - 1; i >= 0; i--) {
@@ -2314,6 +2390,87 @@ function drawHUD() {
   }
 
   crosshair();
+}
+
+/* Minimap. Shows layout, loot and threats — deliberately NOT the three secrets,
+   which stay findable only by looking. */
+function drawMinimap() {
+  const MW = 78, MH = 54;
+  const mx = W - MW - 6, my = 30;
+  const sx = MW / S.aw, sy = MH / S.ah;
+  const gx = x => mx + x * sx, gy = y => my + y * sy;
+
+  ctx.fillStyle = 'rgba(6,4,8,0.72)';
+  ctx.fillRect(mx - 1, my - 1, MW + 2, MH + 2);
+  ctx.fillStyle = 'rgba(150,120,100,0.35)';
+  ctx.fillRect(mx - 1, my - 1, MW + 2, 1); ctx.fillRect(mx - 1, my + MH, MW + 2, 1);
+  ctx.fillRect(mx - 1, my - 1, 1, MH + 2); ctx.fillRect(mx + MW, my - 1, 1, MH + 2);
+
+  // interior obstacles only (index 0-3 are the border walls)
+  ctx.fillStyle = 'rgba(120,100,92,0.32)';
+  for (let i = 4; i < S.walls.length; i++) {
+    const w = S.walls[i];
+    ctx.fillRect(gx(w.x), gy(w.y), Math.max(1, w.w * sx), Math.max(1, w.h * sy));
+  }
+
+  // the way down
+  if (S.door.open) {
+    ctx.fillStyle = Math.sin(S.t * 6) > 0 ? '#ff6a72' : '#8a1018';
+    ctx.fillRect(gx(S.door.x) - 1, my, Math.max(3, S.door.w * sx), 2);
+  }
+
+  // weapon pedestals
+  for (const sh of S.shops) {
+    if (sh.bought) continue;
+    ctx.fillStyle = WEP[sh.id].col;
+    ctx.fillRect(gx(sh.x) - 1.5, gy(sh.y) - 1.5, 3, 3);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.fillRect(gx(sh.x) - 0.5, gy(sh.y) - 0.5, 1, 1);
+  }
+
+  // loose loot (secrets are not on here)
+  for (const d of S.drops) {
+    if (d.kind === 'god') continue;
+    const c = d.kind === 'item' ? ITEMS[d.key].col
+      : d.kind === 'coin' ? '#f5c518' : d.kind === 'card' ? '#e04a54'
+      : d.kind === 'med' ? '#ff6b6b' : d.kind === 'ammo' ? '#f2d14a'
+      : d.kind === 'nade' ? '#7aa35e' : d.kind === 'shield' ? '#7fd0ff'
+      : d.kind === 'nova' ? '#ffb03a' : '#ffffff';
+    const big = d.kind === 'item';
+    ctx.fillStyle = c;
+    if (big) {
+      ctx.globalAlpha = 0.5 + Math.sin(S.t * 6) * 0.3;
+      ctx.fillRect(gx(d.x) - 2, gy(d.y) - 2, 4, 4);
+      ctx.globalAlpha = 1;
+    } else ctx.fillRect(gx(d.x) - 1, gy(d.y) - 1, 2, 2);
+  }
+
+  // threats
+  for (const e of S.en) {
+    if (e.boss) continue;
+    ctx.fillStyle = '#ff3b46';
+    ctx.fillRect(gx(e.x) - 1, gy(e.y) - 1, 2, 2);
+  }
+  if (S.boss) {
+    const r = 3.2 + Math.sin(S.t * 5) * 0.8;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'rgba(255,64,190,0.35)';
+    ctx.beginPath(); ctx.arc(gx(S.boss.x), gy(S.boss.y), r + 2.5, 0, TAU); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#ff40be';
+    ctx.beginPath(); ctx.arc(gx(S.boss.x), gy(S.boss.y), r, 0, TAU); ctx.fill();
+  }
+
+  // you
+  const px = gx(S.p.x), py = gy(S.p.y);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(px - 1, py - 1, 3, 3);
+  ctx.fillStyle = '#63d06a';
+  ctx.fillRect(px - 0.5, py - 0.5, 2, 2);
+  ctx.strokeStyle = 'rgba(99,208,106,0.55)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(px + 0.5, py + 0.5);
+  ctx.lineTo(px + 0.5 + Math.cos(S.p.ang) * 5, py + 0.5 + Math.sin(S.p.ang) * 5); ctx.stroke();
 }
 
 function crosshair() {
@@ -2408,7 +2565,7 @@ function drawTitle() {
   htxt('a Damjan situation', W / 2, 66, '#7d6a5c', 'center', 8, { track: 0.30 });
 
   drawSpr(ctx, bodySprite(), W / 2, 104, 2.2);
-  drawSpr(ctx, legSprite(0), W / 2, 128, 2.2);
+  drawSpr(ctx, legSprite(0), W / 2, 127.1, 2.2);   // 2.2 * (16/2 + 5/2) below the body centre
   drawSprRot(ctx, SPR.scar, W / 2 + 4, 112, 0.15, 2, 2, 3, false);
   if (cosDef(equippedCos()).fx === 'fire' && Math.random() < 0.8)
     part(W / 2 + rnd(-10, 10), 88, pick(['#ff8a20', '#ffd05a']), 1, 30, 0.5);
