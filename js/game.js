@@ -452,6 +452,7 @@ function spawnBoss(idx) {
   };
   S.en.push(b); S.boss = b;
   A.roar();
+  if (A.music) { A.music.setBoss(true); A.duck(0.7, 1.4); }
   S.jump = 0.42; S.jumpSpr = B;
   shake(11); punch(0.05);
   msg(B.name, B.cry, 3.2);
@@ -676,7 +677,7 @@ function explode(x, y, r, dmg, col) {
   blood(x, y, r * 0.6, 'rgba(24,12,8,0.4)');
   shake(14); punch(0.075); S.hitstop = Math.max(S.hitstop, 0.07);
   S.flash = Math.max(S.flash, 0.35); S.flashCol = '#ffcf8a';
-  A.boom();
+  A.boom(); A.duck(0.35, 0.5);
   for (const e of S.en) {
     if (e.dead) continue;
     const d = Math.hypot(e.x - x, e.y - y);
@@ -729,6 +730,7 @@ function killEnemy(e, ang) {
   const bossKill = !!e.boss;
   if (bossKill) {
     S.boss = null;
+    if (A.music) { A.music.setBoss(false); A.duck(0.8, 2.2); }
     S.slow = 0.9; punch(0.09);
     S.flash = 0.7; S.flashCol = '#ff2b2b';
     dropPickup(e.x, e.y, 'item', e.def.item);
@@ -774,6 +776,7 @@ function hurtPlayer(dmg, sx, sy) {
   if (p.hp <= 0) {
     p.hp = 0; S.mode = 'dead'; S.deadT = 0;
     A.death(); A.setDread(1);
+    if (A.music) A.music.stop(0.6);
     gib(p.x, p.y, '#c9926a', 30); blood(p.x, p.y, 22);
     persist();
   }
@@ -857,6 +860,8 @@ function startWave(n) {
   }
   A.wave();
   A.setDread(clamp(n / 10 * 0.6 + S.room * 0.2, 0, 1));
+  // The score climbs across the floor and jumps a step for each floor down.
+  if (A.music) A.music.setIntensity(clamp(0.12 + (n / 10) * 0.72 + S.room * 0.16, 0, 1));
 }
 
 function updateWaves(dt) {
@@ -1617,6 +1622,7 @@ function startRun() {
   S.cam.cx = S.p.x; S.cam.cy = S.p.y;
   A.init();
   A.setDread(0.2);
+  if (A.music) { A.music.setFloor(0); A.music.setBoss(false); A.music.setIntensity(0.15); A.music.start(); }
   msg(ROOMS[0].name, ROOMS[0].sub, 3.4);
   setTimeout(() => { if (S.mode === 'play' && S.wave === 0) startWave(1); }, 2200);
   setTimeout(() => { if (S.mode === 'play') msg('', 'something breathes inside the north wall.', 4); }, 6200);
@@ -1644,6 +1650,7 @@ function nextRoom() {
     S.cam.cx = S.p.x; S.cam.cy = S.p.y;
     msg(R.name, R.sub, 4);
     A.setDread(0.5 + nr * 0.15);
+    if (A.music) { A.music.setFloor(nr); A.music.setBoss(false); A.music.setIntensity(0.2 + nr * 0.16); }
     persist();
     setTimeout(() => { if (S.mode === 'play' && S.wave === 0) startWave(1); }, 2600);
   };
@@ -2805,6 +2812,7 @@ const boot = document.getElementById('boot');
 function wake() {
   boot.classList.add('hidden');
   A.init();
+  if (A.music && S.mode === 'title') A.music.menu();   // sparse pad+arp on the title
   removeEventListener('click', wake);
   removeEventListener('keydown', wake);
 }

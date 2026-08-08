@@ -3,7 +3,7 @@
    ============================================================ */
 const A = (() => {
   let ac = null, master = null, droneGain = null, droneNodes = [], on = false, muted = false;
-  let noise = null;
+  let noise = null, musicBus = null;
 
   function makeNoise() {
     const len = ac.sampleRate * 2;
@@ -22,6 +22,12 @@ const A = (() => {
     noise = makeNoise();
     on = true;
     startDrone();
+    // The score gets its own bus under master, so muting and SFX ducking
+    // both still apply to it.
+    musicBus = ac.createGain();
+    musicBus.gain.value = 0.85;
+    musicBus.connect(master);
+    if (typeof MUSIC !== 'undefined') MUSIC.attach(ac, musicBus);
   }
 
   const now = () => ac.currentTime;
@@ -64,7 +70,7 @@ const A = (() => {
     droneGain = ac.createGain();
     droneGain.gain.value = 0.0;
     droneGain.connect(master);
-    droneGain.gain.linearRampToValueAtTime(0.16, now() + 4);
+    droneGain.gain.linearRampToValueAtTime(0.07, now() + 4);   // sits under the score now
 
     [36.7, 55, 73.4].forEach((f, i) => {
       const o = ac.createOscillator();
@@ -92,7 +98,7 @@ const A = (() => {
 
   function setDread(v) { // 0..1 -> drone intensity
     if (!on) return;
-    droneGain.gain.setTargetAtTime(0.12 + v * 0.3, now(), 1.2);
+    droneGain.gain.setTargetAtTime(0.05 + v * 0.11, now(), 1.2);
   }
 
   /* -------- SFX -------- */
@@ -102,6 +108,16 @@ const A = (() => {
     toggleMute() { muted = !muted; if (master) master.gain.setTargetAtTime(muted ? 0 : 0.45, now(), 0.05); return muted; },
     isMuted: () => muted,
     setDread,
+    music: (typeof MUSIC !== 'undefined') ? MUSIC : null,
+    /* Ducks the score under a big moment (boss roar, explosion) and lets it back up. */
+    duck(amount, seconds) {
+      if (!on || !musicBus) return;
+      const t = now();
+      musicBus.gain.cancelScheduledValues(t);
+      musicBus.gain.setValueAtTime(musicBus.gain.value, t);
+      musicBus.gain.linearRampToValueAtTime(0.85 * (1 - (amount === undefined ? 0.5 : amount)), t + 0.05);
+      musicBus.gain.linearRampToValueAtTime(0.85, t + 0.05 + (seconds || 0.7));
+    },
 
     shoot(pitch) {
       if (!on) return; const t = now();
