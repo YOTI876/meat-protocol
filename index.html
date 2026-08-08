@@ -10,6 +10,9 @@
     font-family:"Courier New",monospace;color:#c8b8a0;cursor:none}
   #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
     background:radial-gradient(ellipse at 50% 50%, #120a12 0%, #05030a 70%)}
+  #stage{position:relative;line-height:0}
+  /* UI text is drawn here at full device resolution so menus aren't blocky */
+  #overlay{position:absolute;left:0;top:0;pointer-events:none}
   #game{
     image-rendering:pixelated;
     image-rendering:-moz-crisp-edges;
@@ -29,7 +32,12 @@
 </style>
 </head>
 <body>
-<div id="wrap"><canvas id="game" width="480" height="270"></canvas></div>
+<div id="wrap">
+  <div id="stage">
+    <canvas id="game" width="480" height="270"></canvas>
+    <canvas id="overlay"></canvas>
+  </div>
+</div>
 
 <div id="boot">
   <h1>MEAT PROTOCOL</h1>

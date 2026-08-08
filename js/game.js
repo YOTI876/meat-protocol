@@ -10,8 +10,43 @@ const cv = document.getElementById('game');
 const ctx = cv.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
+const ov = document.getElementById('overlay');
+const octx = ov.getContext('2d');
+let uiScale = 2;
+
 const lcan = document.createElement('canvas'); lcan.width = W; lcan.height = H;
 const lctx = lcan.getContext('2d');
+
+/* ---------- crisp UI text (drawn on the high-res overlay) ----------
+   Coordinates are in game space (480x270) and scaled up, so layout code stays
+   identical to the pixel canvas — only the rasterisation is sharper. */
+const UI_FONT = '"Oswald", "Arial Narrow", "Segoe UI Semibold", "Segoe UI", system-ui, sans-serif';
+function htxt(s, x, y, col, align, size, opts) {
+  const o = opts || {}, k = uiScale;
+  octx.save();
+  octx.font = (o.weight || '600') + ' ' + ((size || 9) * k) + 'px ' + UI_FONT;
+  octx.textAlign = align || 'left';
+  octx.textBaseline = 'alphabetic';
+  if (octx.letterSpacing !== undefined) octx.letterSpacing = ((o.track === undefined ? 0.06 : o.track) * (size || 9) * k) + 'px';
+  if (o.glow) { octx.shadowColor = o.glow; octx.shadowBlur = (o.glowSize || 10) * k * 0.5; }
+  if (o.alpha !== undefined) octx.globalAlpha = o.alpha;
+  if (!o.noShadow) {
+    octx.fillStyle = 'rgba(0,0,0,0.9)';
+    octx.fillText(s, x * k + k * 0.9, y * k + k * 0.9);
+  }
+  octx.fillStyle = col;
+  octx.fillText(s, x * k, y * k);
+  octx.restore();
+}
+function htxtWidth(s, size, track) {
+  const k = uiScale;
+  octx.save();
+  octx.font = '600 ' + ((size || 9) * k) + 'px ' + UI_FONT;
+  if (octx.letterSpacing !== undefined) octx.letterSpacing = ((track === undefined ? 0.06 : track) * (size || 9) * k) + 'px';
+  const w = octx.measureText(s).width / k;
+  octx.restore();
+  return w;
+}
 let floorCan = null, floorCtx = null, decalCan = null, decalCtx = null;
 
 /* ---------- helpers ---------- */
@@ -72,27 +107,30 @@ cv.addEventListener('wheel', e => { e.preventDefault(); if (S.mode === 'play') c
    ============================================================ */
 const ROOMS = [
   { name: 'THE ABATTOIR', sub: 'floor 01 // where the meat is hung',
-    aw: 940, ah: 660, floor: ['#3a2b26', '#33241f', '#2b1d1a'], grout: '#1d1310',
-    wall: ['#4c3a33', '#2f2320', '#5e463c'], fog: 'rgba(48,8,12,0.16)', dark: 0.90 },
+    aw: 940, ah: 660, floor: ['#4a382f', '#42302a', '#392722'], grout: '#241a16',
+    wall: ['#5e4840', '#3a2c28', '#725648'], fog: 'rgba(48,8,12,0.12)', dark: 0.76 },
   { name: 'THE HOLLOW', sub: 'floor 02 // it goes down further than it should',
-    aw: 1020, ah: 720, floor: ['#242c33', '#1d242a', '#182026'], grout: '#0e1418',
-    wall: ['#33414a', '#1e272d', '#43535e'], fog: 'rgba(10,30,50,0.18)', dark: 0.92 },
+    aw: 1020, ah: 720, floor: ['#2f3a43', '#27313a', '#212a31'], grout: '#141c22',
+    wall: ['#425460', '#28343c', '#556878'], fog: 'rgba(10,30,50,0.13)', dark: 0.78 },
   { name: 'THE MEAT LOOP', sub: 'floor 03 // you have been here before',
-    aw: 1080, ah: 760, floor: ['#33262f', '#2a1e27', '#221820'], grout: '#150e13',
-    wall: ['#45333f', '#291d25', '#573f4e'], fog: 'rgba(60,0,50,0.18)', dark: 0.93 },
+    aw: 1080, ah: 760, floor: ['#42313c', '#392833', '#30212b'], grout: '#1c1319',
+    wall: ['#583f50', '#342532', '#6d5062'], fog: 'rgba(60,0,50,0.13)', dark: 0.80 },
   { name: 'THE RED KITCHEN', sub: 'floor 04 // dinner',
-    aw: 1120, ah: 780, floor: ['#3d2220', '#331b19', '#2a1514'], grout: '#180b0a',
-    wall: ['#552b28', '#311817', '#6b3733'], fog: 'rgba(90,0,10,0.22)', dark: 0.94 }
+    aw: 1120, ah: 780, floor: ['#4e2d2a', '#432422', '#391d1c'], grout: '#20100f',
+    wall: ['#6a3835', '#3e2020', '#84463f'], fog: 'rgba(90,0,10,0.16)', dark: 0.82 }
 ];
 
-/* Enemies hit noticeably harder than they used to; HP scales more gently in
-   exchange, so deeper floors get lethal rather than spongy. */
+/* Individual hits land much harder than they used to. Balanced back by a slower
+   contact rate, longer i-frames and better healing — spikier, not just meaner. */
 const ETYPE = {
-  crawler:  { spr: SPR.crawler,  hp: 26,  spd: 54, dmg: 13, r: 6, score: 10, gib: '#8e6666', name: 'CRAWLER' },
-  shrieker: { spr: SPR.shrieker, hp: 38,  spd: 33, dmg: 16, r: 6, score: 20, gib: '#68785a', name: 'SHRIEKER' },
-  stalker:  { spr: SPR.stalker,  hp: 32,  spd: 84, dmg: 19, r: 6, score: 26, gib: '#a8a294', name: 'STALKER' },
-  bloater:  { spr: SPR.bloater,  hp: 105, spd: 25, dmg: 26, r: 9, score: 40, gib: '#8a3540', name: 'BLOATER' }
+  crawler:  { spr: SPR.crawler,  hp: 26,  spd: 54, dmg: 16, r: 6, score: 10, gib: '#8e6666', name: 'CRAWLER' },
+  shrieker: { spr: SPR.shrieker, hp: 38,  spd: 33, dmg: 20, r: 6, score: 20, gib: '#68785a', name: 'SHRIEKER' },
+  stalker:  { spr: SPR.stalker,  hp: 32,  spd: 84, dmg: 23, r: 6, score: 26, gib: '#a8a294', name: 'STALKER' },
+  bloater:  { spr: SPR.bloater,  hp: 105, spd: 25, dmg: 32, r: 9, score: 40, gib: '#8a3540', name: 'BLOATER' }
 };
+const CONTACT_CD = 0.78;   // was 0.70 — bigger bites, taken less often
+const OMEGA_CARDS = 18;    // the beam is the one thing that got dearer
+const EVO_COST = ev => 100 * Math.pow(2, ev);   // 100, 200, 400, 800 ...
 
 const BOSSES = [
   { key: 'butcher', name: 'THE BUTCHER',      spr: SPR.bossA, tint: null,                     hp: 850,  spd: 40, r: 15, item: 'banana',  pat: 'charge',  cry: 'IT REMEMBERS YOUR NAME' },
@@ -119,12 +157,12 @@ const ITEMS = {
 /* ---- THE ARSENAL. price 0 = you start with it. ---- */
 const WEP = {
   scar:  { id: 'scar',  name: 'SCAR-L',        spr: SPR.scar,  price: 0,   mag: 30,  rate: 0.088, dmg: 13, spread: 0.026, spd: 430, pellets: 1, reload: 1.45, sfx: 'shoot',    col: '#ffe9a8', tag: 'reliable. boring. yours.' },
-  saw:   { id: 'saw',   name: 'MEAT SPLITTER', spr: SPR.saw,   price: 20,  mag: 2,   rate: 0.62,  dmg: 12, spread: 0.24,  spd: 380, pellets: 9, reload: 1.9,  sfx: 'shotgun',  col: '#ffcf8a', knock: 300, tag: 'nine reasons to stand still' },
-  nail:  { id: 'nail',  name: 'THE STAPLER',   spr: SPR.nail,  price: 45,  mag: 60,  rate: 0.045, dmg: 8,  spread: 0.10,  spd: 540, pellets: 1, reload: 2.0,  sfx: 'nailgun',  col: '#f2d14a', pin: 0.45, tag: 'pins them to the floor' },
-  micro: { id: 'micro', name: 'MICROWAVE',     spr: SPR.micro, price: 80,  mag: 16,  rate: 0.24,  dmg: 34, spread: 0.02,  spd: 270, pellets: 1, reload: 2.1,  sfx: 'plasma',   col: '#4fd6e8', bounce: 3, burn: 16, size: 3, tag: 'reheats the dead' },
-  hog:   { id: 'hog',   name: 'THE HOG',       spr: SPR.hog,   price: 140, mag: 120, rate: 0.032, dmg: 10, spread: 0.13,  spd: 500, pellets: 1, reload: 3.4,  sfx: 'minigun',  col: '#ffd28a', spin: 1, slow: 0.45, tag: 'spins up. never stops.' },
-  rail:  { id: 'rail',  name: 'GOD FINGER',    spr: SPR.rail,  price: 250, mag: 5,   rate: 0.55,  dmg: 165, spread: 0,    spd: 950, pellets: 1, reload: 2.4,  sfx: 'railgun',  col: '#a8e8ff', charge: 0.5, pierce: 99, size: 3, knock: 200, tag: 'points. things stop existing.' },
-  omega: { id: 'omega', name: 'OMEGA BEAM',    spr: SPR.omega, price: 0, cards: 10,  mag: 300, rate: 0.02, dmg: 720, spread: 0, spd: 0, pellets: 0, reload: 2.6, sfx: 'beam', col: '#c05cff', beam: 1, girth: 11, tag: 'ten cards. one very wide line.' }
+  saw:   { id: 'saw',   name: 'MEAT SPLITTER', spr: SPR.saw,   price: 15,  mag: 2,   rate: 0.62,  dmg: 12, spread: 0.24,  spd: 380, pellets: 9, reload: 1.9,  sfx: 'shotgun',  col: '#ffcf8a', knock: 300, tag: 'nine reasons to stand still' },
+  nail:  { id: 'nail',  name: 'THE STAPLER',   spr: SPR.nail,  price: 35,  mag: 60,  rate: 0.045, dmg: 8,  spread: 0.10,  spd: 540, pellets: 1, reload: 2.0,  sfx: 'nailgun',  col: '#f2d14a', pin: 0.45, tag: 'pins them to the floor' },
+  micro: { id: 'micro', name: 'MICROWAVE',     spr: SPR.micro, price: 60,  mag: 16,  rate: 0.24,  dmg: 34, spread: 0.02,  spd: 270, pellets: 1, reload: 2.1,  sfx: 'plasma',   col: '#4fd6e8', bounce: 3, burn: 16, size: 3, tag: 'reheats the dead' },
+  hog:   { id: 'hog',   name: 'THE HOG',       spr: SPR.hog,   price: 100, mag: 120, rate: 0.032, dmg: 10, spread: 0.13,  spd: 500, pellets: 1, reload: 3.4,  sfx: 'minigun',  col: '#ffd28a', spin: 1, slow: 0.45, tag: 'spins up. never stops.' },
+  rail:  { id: 'rail',  name: 'GOD FINGER',    spr: SPR.rail,  price: 175, mag: 5,   rate: 0.55,  dmg: 165, spread: 0,    spd: 950, pellets: 1, reload: 2.4,  sfx: 'railgun',  col: '#a8e8ff', charge: 0.5, pierce: 99, size: 3, knock: 200, tag: 'points. things stop existing.' },
+  omega: { id: 'omega', name: 'OMEGA BEAM',    spr: SPR.omega, price: 0, cards: OMEGA_CARDS, mag: 300, rate: 0.02, dmg: 720, spread: 0, spd: 0, pellets: 0, reload: 2.6, sfx: 'beam', col: '#c05cff', beam: 1, girth: 11, tag: 'eighteen cards. one very wide line.' }
 };
 const WORDER = ['scar', 'saw', 'nail', 'micro', 'hog', 'rail', 'omega'];
 const BUYABLE = ['saw', 'nail', 'micro', 'hog', 'rail'];
@@ -165,12 +203,25 @@ function persist() {
     goro: s.goro || S.goro
   });
 }
+/* Evolving has to be earned: 100 coins the first time, doubling after. */
+function canEvolve() { return S.coins >= EVO_COST(S.evo | 0); }
 function evolve() {
+  if (!canEvolve()) { A.denied(); return false; }
   S.evo = (S.evo | 0) + 1;
   S.coins = 0; S.cards = 0;
   persist();
   A.god(); A.roar();
   S.flash = 1.0; S.flashCol = '#b028ff';
+  return true;
+}
+/* ...and undoing it puts the world back to plain, ordinary awful. */
+function resetEvolution() {
+  if (!(S.evo | 0)) { A.denied(); return false; }
+  S.evo = 0;
+  persist();
+  A.bigpickup();
+  S.flash = 0.8; S.flashCol = '#9fe08a';
+  return true;
 }
 function ownedCos() { const s = loadSave(); return s.cosOwned || ['crimson']; }
 function equippedCos() { const s = loadSave(); return s.cosEq || 'crimson'; }
@@ -190,7 +241,7 @@ function freshState() {
     p: null, bul: [], eb: [], en: [], part: [], gibs: [], props: [], drops: [],
     peels: [], floats: [], cracks: [], nades: [], rings: [], shops: [],
     boss: null, door: null, secret: null, corner: null,
-    cam: { cx: 0, cy: 0, z: 1, punch: 0, sh: 0, shx: 0, shy: 0 },
+    cam: { cx: 0, cy: 0, z: 1, punch: 0, sh: 0, shx: 0, shy: 0, shPh: 0, seed: 0 },
     items: {}, god: false,
     coins: sv.coins || 0, cards: sv.cards || 0, vault: sv.vault || 0,
     evo: sv.evo || 0, modagazFound: sv.modagaz || 0,
@@ -308,7 +359,7 @@ function populateShops() {
   }
   if (S.p.owned.indexOf('omega') < 0) {
     const p = freeSpot(190);
-    S.shops.push({ x: p.x, y: p.y, id: 'omega', price: 0, cards: 10, bought: false, bob: rnd(0, TAU) });
+    S.shops.push({ x: p.x, y: p.y, id: 'omega', price: 0, cards: OMEGA_CARDS, bought: false, bob: rnd(0, TAU) });
   }
 }
 
@@ -434,8 +485,31 @@ function blood(x, y, r, col) {
   }
 }
 function ring(x, y, r, col, life, wid) { S.rings.push({ x, y, r0: 2, r1: r, col, life, max: life, wid: wid || 1 }); }
+
+/* The thing you actually see when something dies: a white pop, a meat cloud,
+   a shockwave, sparks and a few rising embers. */
+function deathBurst(e, ang) {
+  const big = !!e.boss, n = big ? 3 : 1;
+  ring(e.x, e.y, big ? 74 : 22, '#ffffff', 0.16, 2);
+  ring(e.x, e.y, big ? 58 : 17, '#c02028', 0.30, 1);
+  gib(e.x, e.y, e.gib, big ? 70 : 12);
+  blood(e.x, e.y + 4, big ? 26 : 11);
+  part(e.x, e.y, e.gib, 14 * n, 165, 0.55, 2);          // meat cloud
+  part(e.x, e.y, '#8a1018', 12 * n, 120, 0.65, 2);
+  part(e.x, e.y, '#ffd9a0', 7 * n, 210, 0.32, 1);       // hot sparks
+  if (ang !== undefined) spray(e.x, e.y, ang, e.gib, 18 * n, 210, 0.6, 0.85);
+  // embers that drift upward and fade
+  for (let i = 0; i < 5 * n; i++) {
+    S.part.push({ x: e.x + rnd(-5, 5), y: e.y + rnd(-5, 5), vx: rnd(-16, 16), vy: rnd(-52, -20),
+      col: pick(['#ff6a4a', '#ffb46a', '#ffe3a8']), life: rnd(0.5, 1.1), max: 1.1, s: 1 });
+  }
+  if (big) { S.flash = Math.max(S.flash, 0.7); S.flashCol = '#ff2b2b'; }
+}
 function float(x, y, text, col, big) { S.floats.push({ x, y, text, col, life: big ? 1.1 : 0.7, big, vy: big ? -30 : -16, sc: big ? 1.6 : 1 }); }
-function shake(a) { S.cam.sh = Math.max(S.cam.sh, a); }
+function shake(a) {
+  const c = S.cam;
+  if (a > c.sh) { c.sh = a; c.seed = Math.random() * 100; }   // new impulse, new direction
+}
 function punch(a) { S.cam.punch = Math.max(S.cam.punch, a); }
 function msg(m, sub, t) { S.msg = m; S.sub = sub || ''; S.msgT = t || 2.2; }
 
@@ -526,7 +600,7 @@ function emit(w) {
   p.vy -= Math.sin(p.ang) * (w.knock ? w.knock * 0.28 : 12);
   spray(mx, my, p.ang, '#ffd07a', w.pellets > 3 ? 14 : 5, 140, 0.18, 0.4);
   S.muzzle = { x: mx, y: my, t: 0.06, big: w.pellets > 3 || !!w.charge };
-  shake(w.pellets > 3 ? 5 : w.charge ? 8 : S.god ? 2.2 : 1.6);
+  shake(w.pellets > 3 ? 3.4 : w.charge ? 5.5 : S.god ? 1.4 : 1.0);
   if (w.charge) punch(0.05);
   if (S.god) A.godshoot(); else A[w.sfx] ? A[w.sfx](spin) : A.shoot();
   if (!w.beam) A.shell();
@@ -558,7 +632,7 @@ function updateBeam(dt) {
   for (const e of hits) damageEnemy(e, w.dmg * st.dmgMul * dt, true, p.ang);
   if (Math.random() < dt * 70) spray(ex, ey, p.ang + Math.PI, '#e0a8ff', 4, 150, 0.35, 1.4);
   if (Math.random() < dt * 26) A.beam();
-  shake(2.2);
+  shake(1.2);
 }
 
 /* ============================================================
@@ -639,11 +713,7 @@ function killEnemy(e, ang) {
   const pts = Math.round(e.score * diff().score * S.combo);
   S.score += pts;
   float(e.x, e.y - 10, '+' + pts, '#ffd070');
-  gib(e.x, e.y, e.gib, e.boss ? 70 : 11);
-  if (ang !== undefined) spray(e.x, e.y, ang, e.gib, 16, 190, 0.6, 0.9);
-  blood(e.x, e.y + 4, e.boss ? 26 : 11);
-  part(e.x, e.y, '#8a1018', e.boss ? 46 : 14, 130, 0.6);
-  ring(e.x, e.y, e.boss ? 60 : 16, '#c02028', 0.28, 1);
+  deathBurst(e, ang);
   S.hitstop = Math.max(S.hitstop, e.boss ? 0.3 : 0.035);
   shake(e.boss ? 18 : 2.5);
   A.gib();
@@ -689,7 +759,7 @@ function hurtPlayer(dmg, sx, sy) {
     A.hit(); shake(4);
     return;
   }
-  p.hp -= dmg; p.iframe = 0.55; p.hurtFlash = 0.35;
+  p.hp -= dmg; p.iframe = 0.62; p.hurtFlash = 0.35;
   S.redness = Math.min(1, S.redness + 0.5);
   S.combo = 1; S.streak = 0;
   shake(8); punch(0.035); S.hitstop = Math.max(S.hitstop, 0.05);
@@ -1141,7 +1211,7 @@ function update(rdt) {
 
     if (Math.hypot(e.x - p.x, e.y - p.y) < e.r + p.r + 1) {
       e.atkT -= dt;
-      if (e.atkT <= 0) { e.atkT = 0.7; hurtPlayer(e.dmg, e.x, e.y); }
+      if (e.atkT <= 0) { e.atkT = CONTACT_CD; hurtPlayer(e.dmg, e.x, e.y); }
     }
     for (const pl of S.peels) {
       if (pl.life > 0 && Math.hypot(e.x - pl.x, e.y - pl.y) < e.r + 6) {
@@ -1178,12 +1248,12 @@ function update(rdt) {
     if (dd < 40 && !perm) { d.x += (p.x - d.x) * dt * 6; d.y += (p.y - d.y) * dt * 6; }
     if (dd < 12) {
       if (d.kind === 'ammo') { p.mags[curW().id] = curW().mag; p.reT = 0; float(p.x, p.y - 16, 'AMMO', '#f2d14a'); A.pickup(); }
-      else if (d.kind === 'med') { p.hp = Math.min(ST().maxhp, p.hp + 25); float(p.x, p.y - 16, '+25 HP', '#ff6b6b'); A.pickup(); }
+      else if (d.kind === 'med') { p.hp = Math.min(ST().maxhp, p.hp + 32); float(p.x, p.y - 16, '+32 HP', '#ff6b6b'); A.pickup(); }
       else if (d.kind === 'nade') { p.nades = Math.min(6, p.nades + 1); float(p.x, p.y - 16, '+1 FRAG', '#7aa35e'); A.pickup(); }
       else if (d.kind === 'coin') { S.coins++; S.vault++; float(p.x, p.y - 16, '+1', '#f5c518'); A.coin(); }
       else if (d.kind === 'card') {
         S.cards++;
-        float(p.x, p.y - 18, 'CARD ' + S.cards + '/10', '#c0202a', true);
+        float(p.x, p.y - 18, 'CARD ' + S.cards + '/' + OMEGA_CARDS, '#c0202a', true);
         A.card(); S.flash = 0.3; S.flashCol = '#e8dfc8'; shake(4);
       }
       else if (d.kind === 'item') grantItem(d.key);
@@ -1427,8 +1497,13 @@ function updateCam(dt) {
   const hw = W / (2 * c.z), hh = H / (2 * c.z);
   c.cx = S.aw > hw * 2 ? clamp(c.cx, hw, S.aw - hw) : S.aw / 2;
   c.cy = S.ah > hh * 2 ? clamp(c.cy, hh, S.ah - hh) : S.ah / 2;
-  c.sh = Math.max(0, c.sh - dt * 30);
-  c.shx = rnd(-c.sh, c.sh); c.shy = rnd(-c.sh, c.sh);
+  // Layered sines instead of per-frame randomness: the camera swings and
+  // settles rather than vibrating, so rapid fire reads as recoil, not static.
+  c.sh = Math.max(0, c.sh - dt * 24);
+  c.shPh = (c.shPh || 0) + dt;
+  const s = c.sh, ph = c.shPh, sd = c.seed || 0;
+  c.shx = (Math.sin(ph * 44 + sd) * 0.66 + Math.sin(ph * 27.7 + sd * 2.3) * 0.34) * s;
+  c.shy = (Math.cos(ph * 38.5 + sd * 1.7) * 0.66 + Math.cos(ph * 33.1 + sd) * 0.34) * s;
 }
 
 function worldToScreen(x, y) {
@@ -1626,12 +1701,26 @@ function drawWorld() {
   actors.sort((a, b) => a.y - b.y);
   for (const a of actors) { if (a === S.p) drawPlayer(a); else drawEnemy(a); }
 
+  // Bullets glow: soft additive halo, a fat tracer, then a hot white core.
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
   for (const b of S.bul) {
-    ctx.strokeStyle = b.col; ctx.lineWidth = b.size;
-    ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.x - b.vx * 0.016, b.y - b.vy * 0.016); ctx.stroke();
-    ctx.fillStyle = '#fff4cf';
+    const tx = b.x - b.vx * 0.018, ty = b.y - b.vy * 0.018;
+    ctx.globalAlpha = 0.22;
+    ctx.strokeStyle = b.col; ctx.lineWidth = b.size * 4 + 3;
+    ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(tx, ty); ctx.stroke();
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = b.size * 2 + 1;
+    ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(tx, ty); ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = b.col;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.size * 1.1 + 1.2, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fffdf2';
     ctx.fillRect(b.x - b.size / 2, b.y - b.size / 2, b.size, b.size);
   }
+  ctx.lineCap = 'butt';
+  ctx.restore();
   for (const b of S.eb) {
     ctx.fillStyle = b.col; ctx.fillRect((b.x - b.r / 2) | 0, (b.y - b.r / 2) | 0, b.r, b.r);
     ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fillRect(b.x | 0, b.y | 0, 1, 1);
@@ -1992,18 +2081,18 @@ function drawLight() {
   const z = S.cam.z;
   const ps = worldToScreen(S.p.x, S.p.y);
 
-  let g = lctx.createRadialGradient(ps.x, ps.y, 4, ps.x, ps.y, 74 * z);
-  g.addColorStop(0, 'rgba(0,0,0,0.95)');
-  g.addColorStop(0.55, 'rgba(0,0,0,0.45)');
+  let g = lctx.createRadialGradient(ps.x, ps.y, 4, ps.x, ps.y, 104 * z);
+  g.addColorStop(0, 'rgba(0,0,0,1)');
+  g.addColorStop(0.5, 'rgba(0,0,0,0.72)');
   g.addColorStop(1, 'rgba(0,0,0,0)');
-  lctx.fillStyle = g; lctx.beginPath(); lctx.arc(ps.x, ps.y, 74 * z, 0, TAU); lctx.fill();
+  lctx.fillStyle = g; lctx.beginPath(); lctx.arc(ps.x, ps.y, 104 * z, 0, TAU); lctx.fill();
 
-  const spread = 0.46, len = 168 * z;
+  const spread = 0.52, len = 210 * z;
   lctx.save();
   lctx.translate(ps.x, ps.y); lctx.rotate(S.p.ang);
   const cg = lctx.createLinearGradient(0, 0, len, 0);
-  cg.addColorStop(0, 'rgba(0,0,0,0.9)');
-  cg.addColorStop(0.5, 'rgba(0,0,0,0.6)');
+  cg.addColorStop(0, 'rgba(0,0,0,1)');
+  cg.addColorStop(0.5, 'rgba(0,0,0,0.78)');
   cg.addColorStop(1, 'rgba(0,0,0,0)');
   lctx.fillStyle = cg;
   lctx.beginPath(); lctx.moveTo(0, 0); lctx.arc(0, 0, len, -spread, spread); lctx.closePath(); lctx.fill();
@@ -2046,18 +2135,18 @@ let grainCans = [];
     for (let i = 0; i < img.data.length; i += 4) {
       const v = Math.random() < 0.5 ? 0 : 255;
       img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-      img.data[i + 3] = Math.random() < 0.10 ? 26 : 0;
+      img.data[i + 3] = Math.random() < 0.045 ? 11 : 0;   // barely there now
     }
     g.putImageData(img, 0, 0);
     grainCans.push(c);
   }
 })();
 const scan = document.createElement('canvas'); scan.width = W; scan.height = H;
-(() => { const g = scan.getContext('2d'); g.fillStyle = 'rgba(0,0,0,0.16)'; for (let y = 0; y < H; y += 2) g.fillRect(0, y, W, 1); })();
+(() => { const g = scan.getContext('2d'); g.fillStyle = 'rgba(0,0,0,0.07)'; for (let y = 0; y < H; y += 2) g.fillRect(0, y, W, 1); })();
 
 function post() {
-  const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.28, W / 2, H / 2, H * 0.92);
-  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.82)');
+  const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.40, W / 2, H / 2, H * 0.98);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.60)');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
   if (S.redness > 0.01) { ctx.fillStyle = 'rgba(150,0,10,' + (S.redness * 0.34) + ')'; ctx.fillRect(0, 0, W, H); }
@@ -2088,11 +2177,11 @@ function post() {
       ctx.fillStyle = 'rgba(' + (f ? '10,0,10' : '176,40,255') + ',' + rnd(0.15, 0.6) + ')';
       ctx.fillRect(0, (Math.random() * H) | 0, W, 1 + Math.random() * 5);
     }
-    for (let i = 0; i < 5; i++) {
-      const sx = W / 2 + rnd(-5, 5), sy = H / 2 + rnd(-5, 5);
-      txt('GOROMANIA', sx, sy, f ? '#0a0006' : '#ffffff', 'center', 26 + rnd(-2, 4));
+    for (let i = 0; i < 4; i++) {
+      htxt('GOROMANIA', W / 2 + rnd(-5, 5), H / 2 + rnd(-5, 5), f ? '#0a0006' : '#ffffff',
+           'center', 30 + rnd(-2, 4), { weight: '700', track: 0.14, noShadow: true });
     }
-    txt('GOROMANIA', W / 2, H / 2 + 26, f ? '#160020' : '#e0b0ff', 'center', 10);
+    htxt('GOROMANIA', W / 2, H / 2 + 28, f ? '#160020' : '#e0b0ff', 'center', 11, { track: 0.40 });
   }
 }
 
@@ -2128,7 +2217,7 @@ function drawHUD() {
   drawSpr(ctx, SPR.coin, 11, 30, 0.9);
   txt(String(S.coins), 18, 33, '#f5c518');
   drawSpr(ctx, SPR.card, 48, 30, 0.62);
-  txt(S.cards + '/10', 55, 33, S.cards >= 10 ? '#ff5a62' : '#b3a888');
+  txt(S.cards + '/' + OMEGA_CARDS, 55, 33, S.cards >= OMEGA_CARDS ? '#ff5a62' : '#b3a888');
   drawSpr(ctx, SPR.grenade, 100, 30, 0.9);
   txt(String(p.nades), 107, 33, '#9fc98a');
   if (S.evo) txt('EVO ' + S.evo, 130, 33, '#ff5a62');
@@ -2198,19 +2287,20 @@ function drawHUD() {
     ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(W / 2 - bw / 2 - 1, 36, bw + 2, 7);
     ctx.fillStyle = '#8a1018'; ctx.fillRect(W / 2 - bw / 2, 37, bw * clamp(S.boss.hp / S.boss.max, 0, 1), 5);
     ctx.fillStyle = 'rgba(255,80,80,0.35)'; ctx.fillRect(W / 2 - bw / 2, 37, bw * clamp(S.boss.hp / S.boss.max, 0, 1), 2);
-    txt(S.boss.name, W / 2, 50, '#ff6a72', 'center');
+    htxt(S.boss.name, W / 2, 51, '#ff7a82', 'center', 9.5, { weight: '700', glow: '#8c0a14', glowSize: 12, track: 0.22 });
   }
 
   if (S.msgT > 0) {
-    ctx.globalAlpha = clamp(S.msgT, 0, 1);
-    if (S.msg) txt(S.msg, W / 2, H / 2 - 24, '#e8d8b8', 'center', 16);
-    if (S.sub) txt(S.sub, W / 2, H / 2 - 10, '#9a8672', 'center');
-    ctx.globalAlpha = 1;
+    const a = clamp(S.msgT, 0, 1);
+    if (S.msg) htxt(S.msg, W / 2, H / 2 - 24, '#f0e0c2', 'center', 19,
+                    { weight: '700', alpha: a, glow: 'rgba(0,0,0,0.9)', glowSize: 18, track: 0.16 });
+    if (S.sub) htxt(S.sub, W / 2, H / 2 - 10, '#a89279', 'center', 8.5, { alpha: a, track: 0.10 });
   }
 
   if (S.banner) {
     const b = S.banner;
-    ctx.globalAlpha = clamp(b.t / 1.2, 0, 1);
+    const a = clamp(b.t / 1.2, 0, 1);
+    ctx.globalAlpha = a;
     ctx.fillStyle = 'rgba(8,4,8,0.86)'; ctx.fillRect(0, H / 2 + 18, W, 44);
     const col = b.wep ? WEP[b.wep].col : b.key === 'god' ? '#ff2b2b' : ITEMS[b.key].col;
     ctx.fillStyle = col; ctx.fillRect(0, H / 2 + 18, W, 1); ctx.fillRect(0, H / 2 + 61, W, 1);
@@ -2218,9 +2308,9 @@ function drawHUD() {
     drawSpr(ctx, spr, W / 2 - 84, H / 2 + 40, b.wep ? 2 : 1.8);
     const nm = b.wep ? WEP[b.wep].name : b.key === 'god' ? 'THE THIRD EYE OF DAMJAN' : ITEMS[b.key].n[Math.min(b.lv - 1, 1)];
     const de = b.wep ? WEP[b.wep].tag : b.key === 'god' ? 'you are no longer bound by meat.' : ITEMS[b.key].d[Math.min(b.lv - 1, 1)];
-    txt(nm, W / 2 - 58, H / 2 + 36, col, 'left', 11);
-    txt(de, W / 2 - 58, H / 2 + 50, '#a08c78', 'left', 8);
     ctx.globalAlpha = 1;
+    htxt(nm, W / 2 - 58, H / 2 + 36, col, 'left', 12, { weight: '700', alpha: a, glow: col, glowSize: 12, track: 0.10 });
+    htxt(de, W / 2 - 58, H / 2 + 50, '#b09a84', 'left', 8, { alpha: a, track: 0.05 });
   }
 
   crosshair();
@@ -2236,91 +2326,167 @@ function crosshair() {
 }
 
 /* ---------- screens ---------- */
-function uiBtn(x, y, w, h, label, col, fn, sub) {
-  const hot = mouse.x > x && mouse.x < x + w && mouse.y > y && mouse.y < y + h;
-  ctx.fillStyle = hot ? 'rgba(60,20,24,0.9)' : 'rgba(14,8,12,0.8)';
-  ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = hot ? col : 'rgba(90,70,60,0.8)';
-  ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y + h - 1, w, 1);
-  txt(label, x + w / 2, y + h / 2 + 3, hot ? '#fff' : col, 'center');
-  if (sub) txt(sub, x + w / 2, y + h - 3, '#5f5044', 'center', 6);
-  S.ui.push({ x, y, w, h, fn });
+/* Buttons animate toward their hover state instead of snapping, and dim when
+   they can't be used. Frame is drawn on the pixel canvas, label on the overlay. */
+const hoverT = {};
+function uiBtn(x, y, w, h, label, col, fn, sub, disabled) {
+  const hot = !disabled && mouse.x > x && mouse.x < x + w && mouse.y > y && mouse.y < y + h;
+  const k = label + x;
+  hoverT[k] = clamp((hoverT[k] || 0) + (hot ? 0.22 : -0.18), 0, 1);
+  const t = hoverT[k];
+  const off = t * 1.5;                                    // lifts toward you
+
+  if (disabled) {
+    ctx.fillStyle = 'rgba(10,7,10,0.72)';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = 'rgba(70,58,54,0.5)';
+    ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y + h - 1, w, 1);
+    ctx.fillRect(x, y, 1, h); ctx.fillRect(x + w - 1, y, 1, h);
+  } else {
+    // body darkens to a bruised red as it wakes up
+    ctx.fillStyle = 'rgba(' + Math.round(12 + t * 52) + ',' + Math.round(7 + t * 12) + ',' + Math.round(11 + t * 16) + ',' + (0.82 + t * 0.14) + ')';
+    ctx.fillRect(x, y - off, w, h);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = t * 0.16;
+    ctx.fillStyle = col; ctx.fillRect(x, y - off, w, h);
+    ctx.restore();
+    ctx.fillStyle = col;
+    ctx.globalAlpha = 0.45 + t * 0.55;
+    ctx.fillRect(x, y - off, w, 1); ctx.fillRect(x, y + h - 1 - off, w, 1);
+    ctx.globalAlpha = 0.18 + t * 0.82;
+    ctx.fillRect(x, y - off, 1, h); ctx.fillRect(x + w - 1, y - off, 1, h);
+    // corner ticks grow on hover
+    const c2 = 2 + t * 4;
+    ctx.globalAlpha = t;
+    ctx.fillRect(x - 1, y - 1 - off, c2, 1); ctx.fillRect(x - 1, y - 1 - off, 1, c2);
+    ctx.fillRect(x + w + 1 - c2, y - 1 - off, c2, 1); ctx.fillRect(x + w, y - 1 - off, 1, c2);
+    ctx.fillRect(x - 1, y + h - off, c2, 1); ctx.fillRect(x - 1, y + h + 1 - c2 - off, 1, c2);
+    ctx.fillRect(x + w + 1 - c2, y + h - off, c2, 1); ctx.fillRect(x + w, y + h + 1 - c2 - off, 1, c2);
+    ctx.globalAlpha = 1;
+  }
+
+  const ty = y + h / 2 + (sub ? 0 : 3) - off;
+  htxt(label, x + w / 2, ty, disabled ? 'rgba(120,104,98,0.75)' : (t > 0.4 ? '#fff6ee' : col),
+       'center', 10, { glow: t > 0.15 && !disabled ? col : null, glowSize: 14 * t, track: 0.10 });
+  if (sub) htxt(sub, x + w / 2, y + h - 4 - off, disabled ? 'rgba(96,82,78,0.7)' : 'rgba(168,146,132,' + (0.6 + t * 0.4) + ')', 'center', 6.5, { track: 0.08, noShadow: true });
+  S.ui.push({ x, y, w, h, fn: disabled ? function () { A.denied(); } : fn });
+}
+
+/* A stat strip: pixel icon on the game canvas, crisp number on the overlay. */
+function statRow(items, cy, col) {
+  let total = 0;
+  for (const it of items) total += 13 + htxtWidth(it.v, 8);
+  let x = W / 2 - total / 2;
+  for (const it of items) {
+    if (it.spr) drawSpr(ctx, it.spr, x + 5, cy - 3, it.sc || 0.85);
+    htxt(it.v, x + 12, cy, it.col || col || '#b9a693', 'left', 8, { track: 0.05 });
+    x += 13 + htxtWidth(it.v, 8);
+  }
 }
 
 function drawTitle() {
   S.ui = [];
-  ctx.fillStyle = '#07040a'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#0a0610'; ctx.fillRect(0, 0, W, H);
   for (let i = 0; i < 9; i++) {
     const x = (i * 71 + Math.sin(S.t * 0.35 + i) * 40 + S.t * 12) % (W + 40) - 20;
-    const y = 56 + ((i * 53) % 170);
-    ctx.globalAlpha = 0.10 + (i % 3) * 0.04;
+    const y = 52 + ((i * 53) % 170);
+    ctx.globalAlpha = 0.13 + (i % 3) * 0.05;
     drawSpr(ctx, i % 3 === 0 ? SPR.stalker : i % 3 === 1 ? SPR.crawler : SPR.shrieker, x, y, 1.6, i % 2 === 0);
   }
   ctx.globalAlpha = 1;
 
-  ctx.globalAlpha = Math.sin(S.t * 30) > 0.92 ? 0.35 : 1;
-  txt('MEAT PROTOCOL', W / 2, 54, '#d4202a', 'center', 26);
-  ctx.globalAlpha = 1;
-  txt('a Damjan situation', W / 2, 68, '#6b5a4e', 'center');
+  // a slow red breath behind the logo
+  const bg = ctx.createRadialGradient(W / 2, 46, 4, W / 2, 46, 150);
+  bg.addColorStop(0, 'rgba(140,14,22,' + (0.20 + Math.sin(S.t * 1.4) * 0.06) + ')');
+  bg.addColorStop(1, 'rgba(140,14,22,0)');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, 120);
 
-  drawSpr(ctx, bodySprite(), W / 2, 108, 2.2);
-  drawSpr(ctx, legSprite(0), W / 2, 132, 2.2);
-  drawSprRot(ctx, SPR.scar, W / 2 + 4, 116, 0.15, 2, 2, 3, false);
+  const flick = Math.sin(S.t * 30) > 0.93 ? 0.4 : 1;
+  htxt('MEAT PROTOCOL', W / 2, 52, '#e02630', 'center', 30,
+       { weight: '700', glow: '#8c0a14', glowSize: 26, alpha: flick, track: 0.14 });
+  htxt('a Damjan situation', W / 2, 66, '#7d6a5c', 'center', 8, { track: 0.30 });
+
+  drawSpr(ctx, bodySprite(), W / 2, 104, 2.2);
+  drawSpr(ctx, legSprite(0), W / 2, 128, 2.2);
+  drawSprRot(ctx, SPR.scar, W / 2 + 4, 112, 0.15, 2, 2, 3, false);
   if (cosDef(equippedCos()).fx === 'fire' && Math.random() < 0.8)
-    part(W / 2 + rnd(-10, 10), 92, pick(['#ff8a20', '#ffd05a']), 1, 30, 0.5);
+    part(W / 2 + rnd(-10, 10), 88, pick(['#ff8a20', '#ffd05a']), 1, 30, 0.5);
   for (const q of S.part) { ctx.globalAlpha = clamp(q.life / q.max, 0, 1); ctx.fillStyle = q.col; ctx.fillRect(q.x | 0, q.y | 0, q.s, q.s); }
   ctx.globalAlpha = 1;
   updateParticles(1 / 60);
 
-  txt('WASD move  ·  MOUSE aim  ·  LMB fire  ·  RMB frag  ·  WHEEL swap  ·  R reload  ·  E buy', W / 2, 158, '#8b7a68', 'center', 7);
-  txt('bosses drop groceries and 5 coins. coins buy guns off the floor. cards buy the beam.', W / 2, 170, '#5f5044', 'center', 7);
+  const evoCost = EVO_COST(S.evo | 0);
+  uiBtn(W / 2 - 150, 150, 96, 22, 'PLAY', '#e8b25a', () => startRun(), 'enter');
+  uiBtn(W / 2 - 48, 150, 96, 22, 'COSMETICS', '#b558ff', () => { S.cosReturn = 'title'; S.mode = 'cos'; }, 'vault ' + S.vault);
+  uiBtn(W / 2 + 54, 150, 96, 22, 'EVOLVE ' + (S.evo | 0), '#ff4a54', () => evolve(),
+        canEvolve() ? 'costs ' + evoCost : 'need ' + evoCost + ' coins', !canEvolve());
+  if (S.evo | 0)
+    uiBtn(W / 2 - 48, 176, 96, 16, 'RESET EVOLUTION', '#7fe08a', () => resetEvolution(), 'back to normal');
 
-  uiBtn(W / 2 - 148, 182, 90, 18, 'PLAY', '#c8a04a', () => startRun());
-  uiBtn(W / 2 - 46, 182, 92, 18, 'COSMETICS', '#b028ff', () => { S.cosReturn = 'title'; S.mode = 'cos'; }, 'vault ' + S.vault);
-  uiBtn(W / 2 + 58, 182, 90, 18, 'EVOLVE ' + (S.evo | 0), '#ff3b46', () => evolve(),
-        'wipe wallet, harder');
+  statRow([
+    { spr: SPR.coin, v: String(S.coins), col: '#f5c518' },
+    { spr: SPR.card, v: S.cards + '/' + OMEGA_CARDS, sc: 0.6, col: '#d8b8b8' },
+    { v: 'VAULT ' + S.vault, col: '#9d8a7a' },
+    { v: 'EVO ' + (S.evo | 0), col: (S.evo | 0) ? '#ff6a72' : '#6b5a4e' }
+  ], (S.evo | 0) ? 204 : 190);
 
   const sv = loadSave();
-  txt('coins ' + S.coins + '   cards ' + S.cards + '/10   vault ' + S.vault +
-      '   evolution ' + (S.evo | 0), W / 2, 212, '#8b7a68', 'center', 7);
-  txt('BEST ' + (sv.best || 0) + '   FLOOR ' + (sv.deep || 1) +
-      (sv.godFound ? '   [EYE]' : '') + (sv.modagaz ? '   [MODAGAZ x' + sv.modagaz + ']' : '') +
-      (sv.goro ? '   [GOROMANIA]' : ''),
-      W / 2, 224, '#4a3f36', 'center', 7);
-  txt('coins and cards follow you between runs. EVOLVE burns them for a worse world.', W / 2, 240, '#3d332e', 'center', 7);
-  txt('one thing is hidden on floor 1. one in every corner. one behind a door that is shut.', W / 2, 250, '#3d332e', 'center', 7);
+  const y0 = (S.evo | 0) ? 218 : 206;
+  htxt('BEST ' + (sv.best || 0) + '   ·   DEEPEST FLOOR ' + (sv.deep || 1) +
+       (sv.godFound ? '   ·   EYE' : '') + (sv.modagaz ? '   ·   MODAGAZ x' + sv.modagaz : '') +
+       (sv.goro ? '   ·   GOROMANIA' : ''), W / 2, y0, '#6d5c4e', 'center', 7.5, { track: 0.12 });
+  htxt('WASD move · MOUSE aim · LMB fire · RMB frag · WHEEL swap · R reload · E buy',
+       W / 2, y0 + 13, '#7e6d5f', 'center', 7.5, { track: 0.06 });
+  htxt('one thing is hidden on floor 1.  one in every corner.  one behind a door that is shut.',
+       W / 2, H - 8, 'rgba(126,86,86,0.55)', 'center', 7, { track: 0.10, noShadow: true });
   post();
   crosshair();
 }
 
 function drawCosmetics() {
   S.ui = [];
-  ctx.fillStyle = '#07040a'; ctx.fillRect(0, 0, W, H);
-  txt('COSMETICS', W / 2, 24, '#b028ff', 'center', 18);
-  drawSpr(ctx, SPR.coin, W / 2 - 34, 34, 1);
-  txt('VAULT ' + S.vault, W / 2 - 26, 37, '#f5c518', 'left');
+  ctx.fillStyle = '#0a0610'; ctx.fillRect(0, 0, W, H);
+  const bg = ctx.createRadialGradient(W / 2, 20, 4, W / 2, 20, 170);
+  bg.addColorStop(0, 'rgba(120,30,190,0.16)'); bg.addColorStop(1, 'rgba(120,30,190,0)');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  htxt('COSMETICS', W / 2, 24, '#c46bff', 'center', 20, { weight: '700', glow: '#7016b8', glowSize: 20, track: 0.20 });
+  drawSpr(ctx, SPR.coin, W / 2 - 36, 33, 1);
+  htxt('VAULT ' + S.vault, W / 2 - 28, 36, '#f5c518', 'left', 9, { track: 0.08 });
 
   const owned = ownedCos(), eq = equippedCos();
   COSMETICS.forEach((c, i) => {
-    const x = 26, y = 52 + i * 30, w = W - 52, h = 26;
+    const x = 30, y = 48 + i * 30, w = W - 60, h = 26;
     const has = owned.indexOf(c.id) >= 0;
     const on = eq === c.id;
     const hot = mouse.x > x && mouse.x < x + w && mouse.y > y && mouse.y < y + h;
-    ctx.fillStyle = on ? 'rgba(50,20,60,0.9)' : hot ? 'rgba(30,16,26,0.9)' : 'rgba(12,8,12,0.75)';
+    const key = 'cos' + c.id;
+    hoverT[key] = clamp((hoverT[key] || 0) + (hot ? 0.22 : -0.18), 0, 1);
+    const t = hoverT[key];
+
+    ctx.fillStyle = on ? 'rgba(46,18,58,0.92)' : 'rgba(14,9,15,' + (0.76 + t * 0.16) + ')';
     ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = on ? '#b028ff' : has ? '#4a6b3a' : 'rgba(80,60,54,0.7)';
-    ctx.fillRect(x, y, 2, h);
+    if (t > 0) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = t * 0.12;
+      ctx.fillStyle = has ? '#7fe08a' : '#c46bff'; ctx.fillRect(x, y, w, h); ctx.restore();
+    }
+    const edge = on ? '#c46bff' : has ? '#7fe08a' : 'rgba(120,92,82,0.8)';
+    ctx.fillStyle = edge; ctx.fillRect(x, y, 2 + t * 2, h);
+    ctx.globalAlpha = 0.2 + t * 0.6;
+    ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y + h - 1, w, 1);
+    ctx.globalAlpha = 1;
 
-    // live preview of Damjan wearing it
-    drawSpr(ctx, c.id === 'crimson' ? SPR.body : variant(SPR.body, c.id, c.pal), x + 18, y + 13, 1.1);
-    txt(c.name, x + 34, y + 12, has ? '#e8d8b8' : '#7b6a58');
-    txt(c.tag, x + 34, y + 21, '#5f5044', 'left', 7);
+    drawSpr(ctx, c.id === 'crimson' ? SPR.body : variant(SPR.body, c.id, c.pal), x + 20, y + 13, 1.15);
+    htxt(c.name, x + 36, y + 12, has ? '#efe0c8' : '#8b7a68', 'left', 9.5, { track: 0.10 });
+    htxt(c.tag, x + 36, y + 21, 'rgba(150,128,112,' + (0.7 + t * 0.3) + ')', 'left', 7, { track: 0.04, noShadow: true });
 
-    if (on) txt('EQUIPPED', x + w - 8, y + 16, '#b028ff', 'right');
-    else if (has) txt('[ EQUIP ]', x + w - 8, y + 16, '#9fe08a', 'right');
+    if (on) htxt('EQUIPPED', x + w - 10, y + 17, '#c46bff', 'right', 9, { glow: t > 0.2 ? '#7016b8' : null, track: 0.12 });
+    else if (has) htxt('EQUIP', x + w - 10, y + 17, '#7fe08a', 'right', 9, { glow: t > 0.2 ? '#2e7a38' : null, track: 0.12 });
     else {
       const ok = S.vault >= c.price;
-      txt(c.price + ' ', x + w - 8, y + 16, ok ? '#f5c518' : '#8a5a5a', 'right');
+      htxt(String(c.price), x + w - 10, y + 17, ok ? '#f5c518' : '#96605e', 'right', 9.5, { track: 0.08 });
+      drawSpr(ctx, SPR.coin, x + w - 14 - htxtWidth(String(c.price), 9.5), y + 14, 0.72);
     }
     S.ui.push({ x, y, w, h, fn: () => {
       if (has) { writeSave({ cosEq: c.id }); A.pickup(); return; }
@@ -2332,7 +2498,7 @@ function drawCosmetics() {
     } });
   });
 
-  uiBtn(W / 2 - 40, H - 22, 80, 16, 'BACK', '#c8a04a', () => { S.mode = S.cosReturn || 'title'; });
+  uiBtn(W / 2 - 48, H - 26, 96, 18, 'BACK', '#e8b25a', () => { S.mode = S.cosReturn || 'title'; }, 'esc');
   post();
   crosshair();
 }
@@ -2342,53 +2508,78 @@ function drawDead() {
   ctx.fillStyle = 'rgba(10,0,4,' + clamp(S.deadT * 0.7, 0, 0.9) + ')';
   ctx.fillRect(0, 0, W, H);
   if (S.deadT > 0.4) {
-    txt('YOU ARE MEAT', W / 2, 70, '#d4202a', 'center', 24);
-    txt('floor ' + (S.room + 1) + ' — wave ' + S.wave, W / 2, 88, '#8b7a68', 'center');
-    txt('SCORE ' + S.score, W / 2, 106, '#d8c49a', 'center', 12);
-    txt('kills ' + S.kills + '   guns ' + S.p.owned.length + '/7   items ' + Object.keys(S.items).length + '/5' + (S.god ? '   + THE EYE' : ''), W / 2, 122, '#6b5a4e', 'center', 7);
-    txt('you keep ' + S.coins + ' coins and ' + S.cards + ' cards. vault ' + S.vault + '.', W / 2, 136, '#f5c518', 'center', 7);
+    htxt('YOU ARE MEAT', W / 2, 62, '#e02630', 'center', 28, { weight: '700', glow: '#8c0a14', glowSize: 24, track: 0.14 });
+    htxt('FLOOR ' + (S.room + 1) + '  ·  WAVE ' + S.wave, W / 2, 78, '#96826f', 'center', 8.5, { track: 0.22 });
+    htxt(String(S.score), W / 2, 102, '#e8d2a4', 'center', 22, { weight: '700', track: 0.06 });
+    htxt('SCORE', W / 2, 112, '#6b5a4e', 'center', 7, { track: 0.34 });
+
+    statRow([
+      { spr: SPR.coin, v: String(S.coins), col: '#f5c518' },
+      { spr: SPR.card, v: String(S.cards), sc: 0.6, col: '#d8b8b8' },
+      { v: 'VAULT ' + S.vault, col: '#9d8a7a' },
+      { v: 'KILLS ' + S.kills, col: '#9d8a7a' }
+    ], 128);
     const sv = loadSave();
-    txt('best ' + (sv.best || 0) + '   evolution ' + (S.evo | 0), W / 2, 150, '#4a3f36', 'center', 7);
+    htxt('guns ' + S.p.owned.length + '/7  ·  items ' + Object.keys(S.items).length + '/5' +
+         (S.god ? '  ·  THE EYE' : '') + '  ·  best ' + (sv.best || 0),
+         W / 2, 142, '#5f5044', 'center', 7, { track: 0.10 });
+
     if (S.deadT > 1.0) {
-      uiBtn(W / 2 - 148, 168, 92, 18, 'RETRY', '#c8a04a', () => startRun(), '[R]');
-      uiBtn(W / 2 - 46, 168, 92, 18, 'COSMETICS', '#b028ff', () => { S.cosReturn = 'dead'; S.mode = 'cos'; }, '[C]');
-      uiBtn(W / 2 + 56, 168, 92, 18, 'EVOLVE ' + (S.evo | 0), '#ff3b46', () => evolve(), 'wipe wallet');
-      uiBtn(W / 2 - 46, 194, 92, 16, 'TITLE', '#7b6a58', () => { S.mode = 'title'; });
+      const evoCost = EVO_COST(S.evo | 0);
+      uiBtn(W / 2 - 150, 156, 96, 22, 'RETRY', '#e8b25a', () => startRun(), 'R');
+      uiBtn(W / 2 - 48, 156, 96, 22, 'COSMETICS', '#b558ff', () => { S.cosReturn = 'dead'; S.mode = 'cos'; }, 'C');
+      uiBtn(W / 2 + 54, 156, 96, 22, 'EVOLVE ' + (S.evo | 0), '#ff4a54', () => evolve(),
+            canEvolve() ? 'costs ' + evoCost : 'need ' + evoCost, !canEvolve());
+      if (S.evo | 0) uiBtn(W / 2 - 150, 182, 96, 18, 'RESET EVO', '#7fe08a', () => resetEvolution(), 'back to normal');
+      uiBtn(W / 2 + 54, 182, 96, 18, 'TITLE', '#8b7a68', () => { S.mode = 'title'; });
     }
   }
 }
 
 function drawPause() {
   S.ui = [];
-  ctx.fillStyle = 'rgba(4,2,6,0.80)'; ctx.fillRect(0, 0, W, H);
-  txt('PAUSED', W / 2, 26, '#d8c49a', 'center', 20);
-  txt('ESC resume  ·  M mute  ·  WHEEL / 1-7 swap gun  ·  E buy at pedestals', W / 2, 38, '#7b6a58', 'center', 7);
-  uiBtn(W - 108, 16, 92, 16, 'COSMETICS', '#b028ff', () => { S.cosReturn = 'pause'; S.mode = 'cos'; }, '[C]');
+  ctx.fillStyle = 'rgba(5,3,8,0.84)'; ctx.fillRect(0, 0, W, H);
+  htxt('PAUSED', W / 2, 26, '#e8d2a4', 'center', 22, { weight: '700', glow: '#4a2a10', glowSize: 16, track: 0.24 });
+  htxt('ESC resume  ·  M mute  ·  WHEEL / 1-7 swap gun  ·  E buy at pedestals',
+       W / 2, 38, '#8b7a68', 'center', 7.5, { track: 0.08 });
+  uiBtn(W - 112, 14, 96, 18, 'COSMETICS', '#b558ff', () => { S.cosReturn = 'pause'; S.mode = 'cos'; }, 'C');
+  if (S.evo | 0) uiBtn(16, 14, 96, 18, 'RESET EVO', '#7fe08a', () => resetEvolution(), 'evo ' + S.evo);
 
-  let y = 64;
-  txt('GROCERIES', 26, y, '#8b7a68'); y += 11;
+  let y = 62;
+  htxt('GROCERIES', 30, y, '#9d8a7a', 'left', 9, { track: 0.26 });
+  ctx.fillStyle = 'rgba(157,138,122,0.3)'; ctx.fillRect(30, y + 3, W - 60, 1);
+  y += 14;
   let any = false;
   for (const k of ['banana', 'melon', 'coolade', 'glock', 'bike']) {
     const lv = S.items[k] | 0; if (!lv) continue; any = true;
-    drawSpr(ctx, ITEMS[k].spr, 32, y - 2, 0.9);
-    txt(ITEMS[k].n[Math.min(lv - 1, 1)] + ' — ' + ITEMS[k].d[Math.min(lv - 1, 1)], 44, y + 1, ITEMS[k].col, 'left', 7);
+    drawSpr(ctx, ITEMS[k].spr, 38, y - 2, 0.9);
+    htxt(ITEMS[k].n[Math.min(lv - 1, 1)], 50, y + 1, ITEMS[k].col, 'left', 8, { track: 0.06 });
+    htxt(ITEMS[k].d[Math.min(lv - 1, 1)], 50 + htxtWidth(ITEMS[k].n[Math.min(lv - 1, 1)], 8) + 6, y + 1,
+         'rgba(140,120,106,0.85)', 'left', 7, { track: 0.03, noShadow: true });
     y += 12;
   }
-  if (S.god) { drawSpr(ctx, SPR.eye, 32, y - 2, 0.8); txt('THE THIRD EYE — you cannot die', 44, y + 1, '#ff5b5b', 'left', 7); y += 12; any = true; }
-  if (!any) { txt('empty. go kill something with a name.', 32, y + 1, '#4a3f36', 'left', 7); y += 12; }
+  if (S.god) { drawSpr(ctx, SPR.eye, 38, y - 2, 0.8); htxt('THE THIRD EYE — you cannot die', 50, y + 1, '#ff5b5b', 'left', 8); y += 12; any = true; }
+  if (!any) { htxt('empty. go kill something with a name.', 38, y + 1, '#5f5044', 'left', 7.5); y += 12; }
 
   y += 8;
-  txt('ARSENAL', 26, y, '#8b7a68'); y += 11;
+  htxt('ARSENAL', 30, y, '#9d8a7a', 'left', 9, { track: 0.26 });
+  ctx.fillStyle = 'rgba(157,138,122,0.3)'; ctx.fillRect(30, y + 3, W - 60, 1);
+  y += 13;
   for (const id of WORDER) {
     const w = WEP[id], has = S.p.owned.indexOf(id) >= 0;
-    drawSpr(ctx, w.spr, 40, y - 1, 0.9, false, has ? 1 : 0.22);
-    txt(w.name, 58, y + 2, has ? w.col : '#3d332e', 'left', 7);
-    txt(has ? w.tag : (w.cards ? w.cards + ' cards' : w.price + ' coins'), 150, y + 2, has ? '#5f5044' : '#6b5a4e', 'left', 7);
+    drawSpr(ctx, w.spr, 44, y - 1, 0.9, false, has ? 1 : 0.2);
+    htxt(w.name, 62, y + 2, has ? w.col : '#4a3f36', 'left', 8, { track: 0.06 });
+    htxt(has ? w.tag : (w.cards ? w.cards + ' cards' : w.price + ' coins'), 168, y + 2,
+         has ? 'rgba(130,112,100,0.9)' : '#6b5a4e', 'left', 7, { track: 0.03, noShadow: true });
     y += 11;
   }
-  txt('coins ' + S.coins + '   cards ' + S.cards + '/10   vault ' + S.vault +
-      '   evolution ' + (S.evo | 0) + (S.goro ? '   GOROMANIA +25% dmg' : ''),
-      W - 26, H - 10, '#f5c518', 'right', 7);
+  statRow([
+    { spr: SPR.coin, v: String(S.coins), col: '#f5c518' },
+    { spr: SPR.card, v: S.cards + '/' + OMEGA_CARDS, sc: 0.6, col: '#d8b8b8' },
+    { v: 'VAULT ' + S.vault, col: '#9d8a7a' },
+    { v: 'EVO ' + (S.evo | 0), col: (S.evo | 0) ? '#ff6a72' : '#6b5a4e' }
+  ], H - 10);
+  if (S.goro) htxt('GOROMANIA  +25% DMG', W - 30, H - 22, '#b558ff', 'right', 7.5, { track: 0.14 });
 }
 
 /* ============================================================
@@ -2416,6 +2607,7 @@ function frame(now) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
+  octx.clearRect(0, 0, ov.width, ov.height);
 
   if (S.mode === 'title') drawTitle();
   else if (S.mode === 'cos') drawCosmetics();
@@ -2436,8 +2628,17 @@ function frame(now) {
 function fitCanvas() {
   const sx = window.innerWidth / W, sy = window.innerHeight / H;
   const scale = Math.max(2, Math.floor(Math.min(sx, sy)));   // 200% floor, integer steps
-  cv.style.width = (W * scale) + 'px';
-  cv.style.height = (H * scale) + 'px';
+  const cssW = W * scale, cssH = H * scale;
+  cv.style.width = cssW + 'px';
+  cv.style.height = cssH + 'px';
+  // Overlay matches on screen but carries a much denser backing store, so UI
+  // text is rasterised at full resolution instead of being upscaled 2-6x.
+  uiScale = Math.min(6, scale * 2);
+  ov.style.width = cssW + 'px';
+  ov.style.height = cssH + 'px';
+  ov.width = Math.round(W * uiScale);
+  ov.height = Math.round(H * uiScale);
+  octx.imageSmoothingEnabled = true;
 }
 addEventListener('resize', fitCanvas);
 fitCanvas();
@@ -2459,6 +2660,8 @@ requestAnimationFrame(frame);
 
 // dev hook
 window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantItem, grantGod, breakSecret,
-                giveWeapon, explode, triggerModagaz, populateShops, ITEMS, BOSSES, WEP, WORDER, COSMETICS, frame, nextRoom };
+                giveWeapon, explode, triggerModagaz, triggerGoromania, populateShops,
+                evolve, resetEvolution, canEvolve, EVO_COST, OMEGA_CARDS,
+                ITEMS, BOSSES, WEP, WORDER, COSMETICS, frame, nextRoom };
 
 })();
