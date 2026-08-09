@@ -96,6 +96,12 @@ const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
 // Rainbow tints feed the sprite bake cache, so quantize hue to 12 steps.
 function godTint(alpha, speed) { return 'hsla(' + (Math.floor((S.t * (speed || 3)) % 12) * 30) + ',90%,62%,' + alpha + ')'; }
+/* '#rrggbb' + alpha -> rgba(). Lets a palette colour be reused as a wash
+   without a second hardcoded copy of the same colour drifting out of sync. */
+function hexA(h, a) {
+  return 'rgba(' + parseInt(h.slice(1, 3), 16) + ',' + parseInt(h.slice(3, 5), 16) + ',' +
+         parseInt(h.slice(5, 7), 16) + ',' + a + ')';
+}
 
 /* ---------- input ---------- */
 const keys = {}, mouse = { x: W / 2, y: H / 2, down: false, rdown: false, wx: 0, wy: 0 };
@@ -112,9 +118,15 @@ addEventListener('keydown', e => {
     else if (S.mode === 'deck') S.mode = 'pause';
     else if (S.mode === 'cos' || S.mode === 'contracts') S.mode = S.cosReturn || 'title';
   }
-  if (e.code === 'KeyB' && (S.mode === 'play' || S.mode === 'pause')) S.mode = 'deck';
+  /* B toggles the deck. This was two statements with an `else if` chained off
+     the Escape line below it, so pressing B in play opened the deck and the
+     second branch — now seeing mode === 'deck' — closed it again in the same
+     event. From pause it silently unpaused you. One statement, one decision. */
+  if (e.code === 'KeyB') {
+    if (S.mode === 'deck') S.mode = 'play';
+    else if (S.mode === 'play' || S.mode === 'pause') S.mode = 'deck';
+  }
   if (e.code === 'Escape' && S.mode === 'augment') refuseAugments();
-  else if (e.code === 'KeyB' && S.mode === 'deck') S.mode = 'play';
   // cosmetics are reachable from anywhere that isn't a firefight
   if (e.code === 'KeyC' && S.mode !== 'cos' && S.mode !== 'play') { S.cosReturn = S.mode; S.mode = 'cos'; }
   if (S.mode === 'title' && (e.code === 'Enter' || e.code === 'Space')) startRun();
@@ -254,12 +266,24 @@ const ITEMS = {
    Butcher's grades, because of course they are. `mul` scales a card's
    numbers; `glow` is how hard the thing shines on a pedestal.
    ============================================================ */
+/* THE RARITY LADDER.
+
+   Plain names on purpose. The butcher's grades (SELECT / CHOICE / PRIME /
+   BLACK LABEL) were thematic and completely opaque: nothing about the word
+   PRIME tells you it sits above CHOICE, so the ladder had to be explained
+   every time it was shown. These five need no explaining, and the palette is
+   the one every player already knows.
+
+   `mul` scales the card's number, `glow` is how hard it shines, `w` is the
+   raw weight before luck. The rung that matters is RARE: it is where the
+   riders switch on, so the odds are tuned to make it uncommon enough to be an
+   event and common enough that a run gets two or three. */
 const GRADE = [
-  { n: 'SELECT',      col: '#b0a696', mul: 1.00, w: 100, glow: 0  },
-  { n: 'CHOICE',      col: '#7fe08a', mul: 1.40, w: 34,  glow: 9  },
-  { n: 'PRIME',       col: '#7fd0ff', mul: 1.85, w: 9,   glow: 15 },
-  { n: 'BLACK LABEL', col: '#ffb03a', mul: 2.40, w: 2,   glow: 22 },
-  { n: 'CONDEMNED',   col: '#c05cff', mul: 3.20, w: 0,   glow: 28 }   // never rolled — placed by hand
+  { n: 'COMMON',    col: '#b8b0a4', mul: 1.00, w: 100, glow: 0,  sfx: null },
+  { n: 'UNCOMMON',  col: '#6ede7a', mul: 1.35, w: 30,  glow: 10, sfx: null },
+  { n: 'RARE',      col: '#4aa8ff', mul: 1.75, w: 8,   glow: 17, sfx: 'card' },
+  { n: 'EPIC',      col: '#b45cff', mul: 2.25, w: 1.6, glow: 26, sfx: 'secret' },
+  { n: 'LEGENDARY', col: '#ffa02a', mul: 3.00, w: 0,   glow: 34, sfx: 'god' }  // never rolled — off-cuts and signatures only
 ];
 /* Luck (from cards and contracts) tilts the weights up the ladder rather than
    rerolling: every point multiplies the odds of each grade above SELECT. */
@@ -373,9 +397,14 @@ function freshState() {
     coins: sv.coins || 0, cards: sv.cards || 0, vault: sv.vault || 0,
     evo: sv.evo || 0, modagazFound: sv.modagaz || 0,
     goro: false, goroHits: 0, goroT: 0, vacuum: 0,
-    /* THE MENU. `deck` is the run's whole build; `luck` tilts every hand. */
+    /* THE MENU. `deck` is the run's whole build; `luck` tilts every hand.
+       `aisle` is the per-aisle rank tally THE ORDER reads, `fused` the
+       off-cuts taken, and handTop/handIn drive how loudly a hand arrives. */
     xp: 0, level: 1, xpNext: 48, upgPts: 0,
     deck: {}, hand: null, lvlLuck: 0, rerolls: 0, cardsTaken: 0, luck: 0,
+    aisle: {}, fused: {}, fusedOrder: [], dealt: 0, handTop: 0, handIn: 0,
+    sigOffer: null, sigDue: false, orbs: [], pools: [], arcs: [],
+    moveT: 0, holdT: 0, waveKills: 0, waveHit: false, frostT: 0, shotN: 0, bleedT: 0,
     augs: {}, augOffer: null, tomce: null,
     floorBosses: 0, apexKills: 0, fx: [], coinFrac: 0,
     killsSinceNova: 0, savesLeft: 0, regenT: 0, pendingLuck: 0, lvlDelay: 0, pendingKick: 0,
@@ -402,12 +431,19 @@ freshState();
 function ST() {
   const it = S.items;
   const b = it.banana | 0, m = it.melon | 0, k = it.coolade | 0, g = it.glock | 0, bk = it.bike | 0;
-  const maxhp = Math.max(30, Math.round((100 + (m === 1 ? 38 : m >= 2 ? 76 : 0) + dk('roughage'))
+  const maxhp = Math.max(30, Math.round((100 + (m === 1 ? 38 : m >= 2 ? 76 : 0) + dk('roughage')
+                            + (aisleT1('produce') ? 20 : 0))
                            * (1 - Math.min(0.24, dkr('pricehike') * 0.08))
                            * (1 - ag('glass') * 0.15 - ag('hollow') * 0.10 + ag('ballast') * 0.22)));
   /* Missing health feeds RAW NERVE. Guarded because ST() is called before the
      player exists during boot. */
-  const hurt = S.p ? clamp(1 - S.p.hp / Math.max(1, maxhp), 0, 1) : 0;
+  const hp01 = S.p ? clamp(S.p.hp / Math.max(1, maxhp), 0, 1) : 1;
+  const hurt = 1 - hp01;
+  /* ---- riders that are just a number, resolved once here ----
+     MOMENTUM ramps while you move (update keeps S.moveT), THE LONG PIG counts
+     the wave's dead, ARTERY reads the same wound RAW NERVE does. */
+  const momentum = rd('adrenaline') ? clamp(S.moveT / 2.2, 0, 1) * 0.18 : 0;
+  const longpig = dkr('longpig') ? Math.min(dkc('longpig') / 100 * Math.floor(S.waveKills / 10), 1.2) : 0;
   return {
     speed: 94 * (1 + (b === 1 ? 0.22 : b >= 2 ? 0.44 : 0) + (bk === 1 ? 0.16 : bk >= 2 ? 0.30 : 0))
               * (1 + dk('adrenaline') / 100)
@@ -416,44 +452,68 @@ function ST() {
     dmgMul: (k === 1 ? 1.38 : k >= 2 ? 1.85 : 1) * (S.god ? 3 : 1) * (S.goro ? 1.25 : 1)
               * (1 + dkc('malice') / 100)
               * (1 + dkc('nerve') / 100 * hurt)
+              * (1 + dkc('debtcard') / 100)
+              * (1 + momentum + longpig)
+              * (1 + (aisleT1('butchery') ? 0.12 : 0))
+              * (1 + (rd('pricehike') ? 0.18 : 0))
+              * (1 + (fz('primecut') ? 0.25 : 0))
               * (1 + ag('cataract') * 0.15 + ag('glass') * 0.24 + ag('thinskin') * 0.30),
     flatDmg: dkc('caliber'),
     crit: dkc('cleaver') / 100 + ag('coldblood') * 0.09,
     critMul: 2.0 + dkc('deepcut') / 100,
-    resist: (1 - dkc('callus') / 100) * (1 + ag('thinskin') * 0.22 + ag('grease') * 0.11),
+    /* TUNNEL VISION pays out exactly where RAW NERVE is loudest. */
+    resist: (1 - dkc('callus') / 100) * (1 - (aisleT1('frozen') ? 0.10 : 0))
+              * ((rd('nerve') && hp01 < 0.34) ? 0.75 : 1)
+              * (1 + ag('thinskin') * 0.22 + ag('grease') * 0.11),
     dodge: dkc('aegis') / 100,
     pierce: (k === 1 ? 1 : k >= 2 ? 2 : 0) + dkc('carve'),
-    shieldMax: m === 1 ? 2 : m >= 2 ? 4 : 0,
-    shieldCd: m >= 2 ? 8 : 14,
+    shieldMax: (m === 1 ? 2 : m >= 2 ? 4 : 0) + dkc('apron'),
+    shieldCd: (m >= 2 ? 8 : 14) * (dkr('apron') ? 0.75 : 1),
     peel: b > 0, peelBoom: b >= 2,
     glocks: g === 1 ? 1 : g >= 2 ? 2 : 0,
     glockRate: g >= 2 ? 0.11 : 0.20,
     glockDmg: 13,
     ram: bk === 1 ? 40 : bk >= 2 ? 95 : 0,
     ramFire: bk >= 2,
-    dashCd: (bk ? 0.45 : (b ? 0.58 : 0.85)) * (1 - ag('grease') * 0.30),
+    dashCd: (bk ? 0.45 : (b ? 0.58 : 0.85)) * (1 - dkc('wind') / 100) * (1 - ag('grease') * 0.30),
     /* ---- deck-driven weapon mods. These used to be bought per gun in the
-       armory; they are cards now and they apply to whatever you are holding. */
-    rateMul: 1 / (1 + dkc('cycle') / 100 + ag('tinnitus') * 0.16),
+       armory; they are cards now and they apply to whatever you are holding.
+       WOUND UP and ARTERY both push the same dial from different directions. */
+    rateMul: 1 / (1 + dkc('cycle') / 100
+                    + (rd('cycle') ? clamp(S.holdT / 1.8, 0, 1) * 0.25 : 0)
+                    + (fz('artery') ? hurt * 0.60 : 0)
+                    + ag('tinnitus') * 0.16),
     split: dkc('split'),
-    magMul: Math.max(0.35, 1 + dkc('hopper') / 100 - ag('shortfuse') * 0.16),
+    magMul: Math.max(0.35, 1 + dkc('hopper') / 100 + (aisleT1('hardware') ? 0.15 : 0) - ag('shortfuse') * 0.16),
     reloadMul: Math.max(0.2, 1 - dkc('quick') / 100 - ag('shortfuse') * 0.22),
-    bounce: dkc('ricochet'),
+    bounce: dkc('ricochet') + (fz('crosscut') ? 2 : 0),
     home: dkc('guidance'),
     burn: dkc('spoiled'),
     slowHit: dkc('coldsnap') / 100,
     freeze: dkc('frostbite') / 100,
     aura: dkc('walkin') / 100,
+    auraDmg: rd('walkin') ? 7 : 0,
     overkill: dkc('overkill'),
     graze: dkc('grazing') + ag('feeder') * 1.5,
-    regen: dkc('regrowth'),
+    regen: dkc('regrowth') * ((rd('regrowth') && hp01 < 0.5) ? 2 : 1),
     lootMul: 1 + dkc('clearance') / 100,
     novaEvery: dkr('flashpoint') ? Math.max(8, 22 - dkc('flashpoint') * 5) : 0,
+    /* ---- the new verbs ---- */
+    hooks: dkc('hooks'),
+    tender: dkc('tender') / 100,
+    pool: dkc('render'),
+    frostEvery: dkr('frost') ? Math.max(5, 11 - dkc('frost') * 3) : 0,
+    marrow: dkc('marrow') / 100,
+    /* The bleed is BLOOD DEBT's price and is charged at every grade. PAID
+       FORWARD is the rider on top of it, and it is the refund. */
+    bleed: dkr('debtcard') ? 1 : 0,
+    payback: rd('debtcard') ? 3 : 0,
     /* ---- TOMCE's side of the ledger ---- */
-    xpMul: Math.max(0.3, 1 - ag('debt') * 0.14 - ag('feeder') * 0.18 + ag('loudmouth') * 0.45),
-    coinMul: 1 + ag('debt') * 0.40,
+    xpMul: Math.max(0.3, (1 + dkc('ripe') / 100)
+              * (1 - ag('debt') * 0.14 - ag('feeder') * 0.18 + ag('loudmouth') * 0.45)),
+    coinMul: (1 + ag('debt') * 0.40) * (rd('clearance') ? 2 : 1),
     sight: clamp(1 - ag('cataract') * 0.11 - ag('sleepless') * 0.10, 0.5, 1),
-    magnet: clamp(1 - ag('coldblood') * 0.30, 0.3, 1),
+    magnet: clamp((1 + dkc('ripe') / 100) * (1 - ag('coldblood') * 0.30), 0.3, 3),
     swarm: 1 + ag('loudmouth') * 0.18,
     /* the sidearm gains a mark every FLOOR: new colour, new voice, +20% each */
     scarMul: 1 + 0.20 * (S.scarLv - 1)
@@ -463,63 +523,151 @@ function ST() {
 /* ============================================================
    THE MENU — the card deck.
 
-   There is no armory and there are no grocery drops any more; everything
-   that used to be bought with coins or dropped by a boss is a card you pick
-   on level-up. Five aisles, one grade ladder, and the five groceries sit at
-   the top of the deck as CONDEMNED signature cards.
+   Three separate things used to be shuffled into one pile. They are not the
+   same kind of reward and they no longer share a screen:
 
-   A card holds { rank, amt }: rank is how many times you took it, amt is the
-   accumulated number, which is what the game actually reads. Grade scales
-   what a single pick is worth, so a PRIME MALICE is worth two SELECT ones.
+     level up      -> a hand of cards from the five aisles      (this file, below)
+     floor boss    -> one of two SIGNATURE groceries            (THE COLD ROOM)
+     TOMCE         -> one of three augments, each with a bill   (unchanged)
+
+   A card holds { rank, amt, g }: rank is how many times you took it, amt is
+   the accumulated number the game actually reads, and g is the best grade you
+   ever took it at.
+
+   RARITY IS NOT A MULTIPLIER. It was, and an EPIC card was just the same card
+   with a bigger number on it, which is not a moment. Every card now carries a
+   RIDER — a second, qualitative effect that only switches on if you take the
+   card at RARE or better. A RARE MALICE is not 1.75 MALICEs, it is a
+   different card. That is the whole excitement engine, and it is why the
+   rarity is the first thing on the face.
    ============================================================ */
+const RIDER_AT = 2;                 // RARE. Take a card at this or better and its rider lights.
+const riderOn = id => { const d = S.deck[id]; return !!d && (d.g | 0) >= RIDER_AT; };
+const rd = riderOn;                 // short name, used all over the engine hooks
+
+/* The aisles are no longer just a colour on the edge of a card. Commit to one
+   and it commits back: four ranks anywhere in an aisle buys a standing perk,
+   eight buys a much louder one. This is what makes a run have a shape instead
+   of being a pile of percentages. */
+/* One word each, and the word says what the aisle does — BUTCHERY / PRODUCE /
+   HARDWARE / EXPIRED were flavour that you had to memorise a mapping for.
+
+   The colours are deliberately muted earth tones. The rarity ladder owns the
+   bright saturated palette, and these two systems appear on the same screen;
+   keeping them in different registers is the only reason a player can tell at
+   a glance which colour means "quality" and which means "category". Nothing
+   on a card is ever drawn in an aisle colour — the aisle colours live on THE
+   ORDER strip and the deck headings, and nowhere else. */
 const AISLES = {
-  butchery: { n: 'BUTCHERY', col: '#ff5a62' },
-  produce:  { n: 'PRODUCE',  col: '#7fe08a' },
-  frozen:   { n: 'FROZEN',   col: '#7fd0ff' },
-  hardware: { n: 'HARDWARE', col: '#f5c518' },
-  expired:  { n: 'EXPIRED',  col: '#c05cff' }
+  butchery: { n: 'BLADES', col: '#a8564e', sub: 'hurting things',
+              p1: '+12% damage', p2: 'crits cleave everything behind the target' },
+  produce:  { n: 'FRESH',  col: '#6f9450', sub: 'health and speed',
+              p1: '+20 max health', p2: 'clearing a wave heals a quarter of it back' },
+  frozen:   { n: 'FROZEN', col: '#5486a0', sub: 'armour and slowing them down',
+              p1: '-10% damage taken', p2: 'anything that dies slowed shatters for 45' },
+  hardware: { n: 'TOOLS',  col: '#a8823c', sub: 'whatever gun you are holding',
+              p1: '+15% magazine',  p2: 'finishing a reload throws out a shockwave' },
+  expired:  { n: 'JUNK',   col: '#8a5f96', sub: 'bad for you. worth it.',
+              p1: '+1 LUCK',        p2: 'every fourth card dealt comes up a rarity better' }
 };
 const AISLE_ORDER = ['butchery', 'produce', 'frozen', 'hardware', 'expired'];
+const AISLE_T1 = 4, AISLE_T2 = 8;
+/* Recomputed on every pick rather than derived on read — ST() runs many times
+   a frame and this would otherwise walk the whole card list each time. */
+function recalcAisles() {
+  S.aisle = {};
+  for (const c of CARDS) { const r = dkr(c.id); if (r) S.aisle[c.aisle] = (S.aisle[c.aisle] | 0) + r; }
+}
+const ais = k => S.aisle ? (S.aisle[k] | 0) : 0;
+const aisleT1 = k => ais(k) >= AISLE_T1;
+const aisleT2 = k => ais(k) >= AISLE_T2;
 
+/* Every entry: `d(v)` is what one more rank does, `r` is the rider that only
+   exists at RARE or better. Riders are deliberately verbs — they change what
+   you do, not what your numbers are — because a run you remember is a run
+   where something started behaving differently. */
 const CARDS = [
   /* ---- BUTCHERY: hurting things ---- */
-  { id: 'malice',    name: 'MALICE',        aisle: 'butchery', max: 6, b: 0, v: 6,   d: v => '+' + v + '% damage' },
-  { id: 'cleaver',   name: 'CLEAVER',       aisle: 'butchery', max: 5, b: 0, v: 4,  cap: 60,  d: v => '+' + v + '% critical chance' },
-  { id: 'deepcut',   name: 'DEEP CUT',      aisle: 'butchery', max: 4, b: 1, v: 18,  d: v => '+' + v + '% critical damage' },
-  { id: 'overkill',  name: 'OVERKILL',      aisle: 'butchery', max: 3, b: 2, v: 18,  d: v => 'kills burst for ' + v + ' damage' },
-  { id: 'nerve',     name: 'RAW NERVE',     aisle: 'butchery', max: 3, b: 1, v: 15, cap: 80,  d: v => 'up to +' + v + '% damage as you bleed' },
-  { id: 'carve',     name: 'CARVE',         aisle: 'butchery', max: 2, b: 0, v: 1, int: 1, cap: 2, d: v => 'shots pass through ' + v + ' more' },
+  { id: 'malice',    name: 'MALICE',        aisle: 'butchery', max: 6, b: 0, v: 6,   d: v => '+' + v + '% damage',
+    r: { n: 'SHARPENED', d: 'every 6th shot always crits' } },
+  { id: 'cleaver',   name: 'CLEAVER',       aisle: 'butchery', max: 5, b: 0, v: 4,  cap: 60,  d: v => '+' + v + '% critical chance',
+    r: { n: 'FOLLOW-THROUGH', d: 'crits splash everything within 26' } },
+  { id: 'deepcut',   name: 'DEEP CUT',      aisle: 'butchery', max: 4, b: 1, v: 18,  d: v => '+' + v + '% critical damage',
+    r: { n: 'HAMSTRUNG', d: 'a crit stuns whatever it lands on' } },
+  { id: 'overkill',  name: 'OVERKILL',      aisle: 'butchery', max: 3, b: 2, v: 18,  d: v => 'kills burst for ' + v + ' damage',
+    r: { n: 'RENDERED', d: 'the burst sets the ground alight' } },
+  { id: 'nerve',     name: 'RAW NERVE',     aisle: 'butchery', max: 3, b: 1, v: 15, cap: 80,  d: v => 'up to +' + v + '% damage as you bleed',
+    r: { n: 'TUNNEL VISION', d: 'under a third health, -25% damage taken' } },
+  { id: 'carve',     name: 'CARVE',         aisle: 'butchery', max: 2, b: 0, v: 1, int: 1, cap: 2, d: v => 'shots pass through ' + v + ' more',
+    r: { n: 'SKEWER', d: 'each body a shot passes adds +25% damage' } },
+  { id: 'tender',    name: 'TENDERISER',    aisle: 'butchery', max: 3, b: 0, v: 16, cap: 60, d: v => '+' + v + '% damage to slowed, frozen or pinned',
+    r: { n: 'DEAD WEIGHT', d: 'and your hits stagger them too' } },
+  { id: 'hooks',     name: 'THE HOOKS',     aisle: 'butchery', max: 3, b: 1, v: 1, int: 1, cap: 3, d: v => v + ' meat hook' + (v > 1 ? 's orbit' : ' orbits') + ' you',
+    r: { n: 'ON THE RAIL', d: 'they swing wider and drag things in' } },
   /* ---- PRODUCE: staying alive and moving ---- */
-  { id: 'adrenaline',name: 'ADRENALINE',    aisle: 'produce', max: 6, b: 0, v: 5,    d: v => '+' + v + '% move speed' },
-  { id: 'roughage',  name: 'ROUGHAGE',      aisle: 'produce', max: 6, b: 0, v: 15,   d: v => '+' + v + ' max health' },
-  { id: 'regrowth',  name: 'REGROWTH',      aisle: 'produce', max: 4, b: 0, v: 0.4, dec: 1, cap: 3, d: v => '+' + v + ' health a second' },
-  { id: 'grazing',   name: 'GRAZING',       aisle: 'produce', max: 4, b: 0, v: 0.6, dec: 1, cap: 4, d: v => '+' + v + ' health a kill' },
-  { id: 'banana',    name: 'BANANA',        aisle: 'produce', max: 2, b: 2, sig: 'banana', fixed: 4 },
-  { id: 'bike',      name: 'STOLEN BICYCLE',aisle: 'produce', max: 2, b: 2, sig: 'bike',   fixed: 4 },
+  { id: 'adrenaline',name: 'ADRENALINE',    aisle: 'produce', max: 6, b: 0, v: 5,    d: v => '+' + v + '% move speed',
+    r: { n: 'MOMENTUM', d: 'keep moving for up to +18% damage' } },
+  { id: 'roughage',  name: 'ROUGHAGE',      aisle: 'produce', max: 6, b: 0, v: 15,   d: v => '+' + v + ' max health',
+    r: { n: 'STOCKED', d: 'and it heals you for that much on the spot' } },
+  { id: 'regrowth',  name: 'REGROWTH',      aisle: 'produce', max: 4, b: 0, v: 0.4, dec: 1, cap: 3, d: v => '+' + v + ' health a second',
+    r: { n: 'SCAR TISSUE', d: 'twice as fast below half health' } },
+  { id: 'grazing',   name: 'GRAZING',       aisle: 'produce', max: 4, b: 0, v: 0.6, dec: 1, cap: 4, d: v => '+' + v + ' health a kill',
+    r: { n: 'GORGED', d: 'healing past full banks a shield instead' } },
+  { id: 'wind',      name: 'SECOND WIND',   aisle: 'produce', max: 3, b: 0, v: 15, cap: 50, d: v => '+' + v + '% dash rate, and dashes chill',
+    r: { n: 'THROUGH THEM', d: 'dashing through something opens it up' } },
+  { id: 'ripe',      name: 'RIPE',          aisle: 'produce', max: 3, b: 0, v: 12, cap: 45, d: v => '+' + v + '% experience and pickup reach',
+    r: { n: 'WINDFALL', d: 'the floor gives up its loot from anywhere' } },
+  { id: 'marrow',    name: 'MARROW',        aisle: 'produce', max: 3, b: 1, v: 6, cap: 24, d: v => 'clearing a wave heals ' + v + '% of your health',
+    r: { n: 'BONE BROTH', d: 'and hands you a frag with it' } },
   /* ---- FROZEN: taking less, slowing them down ---- */
-  { id: 'callus',    name: 'CALLUS',        aisle: 'frozen', max: 6, b: 0, v: 5, cap: 45,  d: v => '-' + v + '% damage taken' },
-  { id: 'aegis',     name: 'AEGIS PLATING', aisle: 'frozen', max: 3, b: 0, v: 7, cap: 32,  d: v => v + '% chance a hit does nothing' },
-  { id: 'coldsnap',  name: 'COLD SNAP',     aisle: 'frozen', max: 3, b: 0, v: 11, cap: 50, d: v => 'your hits slow by ' + v + '%' },
-  { id: 'frostbite', name: 'FROSTBITE',     aisle: 'frozen', max: 3, b: 1, v: 4, cap: 20,  d: v => v + '% chance to freeze solid' },
-  { id: 'walkin',    name: 'THE WALK-IN',   aisle: 'frozen', max: 3, b: 0, v: 8, cap: 40,  d: v => 'things near you crawl ' + v + '% slower' },
-  { id: 'melon',     name: 'MELON',         aisle: 'frozen', max: 2, b: 2, sig: 'melon',  fixed: 4 },
+  { id: 'callus',    name: 'CALLUS',        aisle: 'frozen', max: 6, b: 0, v: 5, cap: 45,  d: v => '-' + v + '% damage taken',
+    r: { n: 'THICK HIDE', d: 'the first hit of every wave does nothing' } },
+  { id: 'aegis',     name: 'AEGIS PLATING', aisle: 'frozen', max: 3, b: 0, v: 7, cap: 32,  d: v => v + '% chance a hit does nothing',
+    r: { n: 'DEFLECTION', d: 'a plated hit throws the room off you' } },
+  { id: 'coldsnap',  name: 'COLD SNAP',     aisle: 'frozen', max: 3, b: 0, v: 11, cap: 50, d: v => 'your hits slow by ' + v + '%',
+    r: { n: 'BRITTLE', d: 'anything slowed takes +22% from everything' } },
+  { id: 'frostbite', name: 'FROSTBITE',     aisle: 'frozen', max: 3, b: 1, v: 4, cap: 20,  d: v => v + '% chance to freeze solid',
+    r: { n: 'SHATTER', d: 'frozen things burst for 60 when they go' } },
+  { id: 'walkin',    name: 'THE WALK-IN',   aisle: 'frozen', max: 3, b: 0, v: 8, cap: 40,  d: v => 'things near you crawl ' + v + '% slower',
+    r: { n: 'FREEZER DOOR', d: 'and the cold does 7 a second' } },
+  { id: 'apron',     name: "BUTCHER'S APRON",aisle:'frozen', max: 2, b: 1, v: 1, int: 1, cap: 2, d: v => '+' + v + ' rind shield, regrows on its own',
+    r: { n: 'SPRUNG', d: 'a shield breaking knocks the room back' } },
+  { id: 'frost',     name: 'HARD FROST',    aisle: 'frozen', max: 2, b: 2, v: 1, int: 1, cap: 2, d: v => 'a freezing pulse every ' + Math.max(5, 11 - v * 3) + 's',
+    r: { n: 'DEEP FREEZE', d: 'the pulse cuts as well as freezes' } },
   /* ---- HARDWARE: whatever you are holding ---- */
-  { id: 'cycle',     name: 'CYCLE',         aisle: 'hardware', max: 5, b: 0, v: 6, cap: 45, d: v => '+' + v + '% fire rate' },
-  { id: 'split',     name: 'SPLIT',         aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 2, d: v => 'your shot forks ' + (v * 2 + 1) + ' ways' },
-  { id: 'caliber',   name: 'CALIBER',       aisle: 'hardware', max: 5, b: 0, v: 1.2, dec: 1, cap: 12, d: v => '+' + v + ' flat damage a shot' },
-  { id: 'hopper',    name: 'HOPPER',        aisle: 'hardware', max: 3, b: 0, v: 22, cap: 90, d: v => '+' + v + '% magazine' },
-  { id: 'quick',     name: 'QUICK HANDS',   aisle: 'hardware', max: 3, b: 0, v: 11, cap: 45, d: v => '-' + v + '% reload time' },
-  { id: 'ricochet',  name: 'RICOCHET',      aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 3, d: v => 'shots bounce ' + v + ' more times' },
-  { id: 'guidance',  name: 'GUIDANCE',      aisle: 'hardware', max: 2, b: 2, v: 1.1, dec: 1, cap: 3.5, d: v => 'shots steer, turn rate ' + v },
-  { id: 'munitions', name: 'MUNITIONS',     aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 2, d: v => '+' + v + ' frag every wave' },
+  { id: 'cycle',     name: 'CYCLE',         aisle: 'hardware', max: 5, b: 0, v: 6, cap: 45, d: v => '+' + v + '% fire rate',
+    r: { n: 'WOUND UP', d: 'holding the trigger winds to another +25%' } },
+  { id: 'split',     name: 'SPLIT',         aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 2, d: v => 'your shot forks ' + (v * 2 + 1) + ' ways',
+    r: { n: 'CROSSFIRE', d: 'the outer forks steer themselves in' } },
+  { id: 'caliber',   name: 'CALIBER',       aisle: 'hardware', max: 5, b: 0, v: 1.2, dec: 1, cap: 12, d: v => '+' + v + ' flat damage a shot',
+    r: { n: 'OVERBORE', d: 'and the rounds come out visibly bigger' } },
+  { id: 'hopper',    name: 'HOPPER',        aisle: 'hardware', max: 3, b: 0, v: 22, cap: 90, d: v => '+' + v + '% magazine',
+    r: { n: 'BOTTOM OF THE BOX', d: 'the last third of a mag hits 35% harder' } },
+  { id: 'quick',     name: 'QUICK HANDS',   aisle: 'hardware', max: 3, b: 0, v: 11, cap: 45, d: v => '-' + v + '% reload time',
+    r: { n: 'SLAM FIRE', d: 'a finished reload blows the room back' } },
+  { id: 'ricochet',  name: 'RICOCHET',      aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 3, d: v => 'shots bounce ' + v + ' more times',
+    r: { n: 'ANGLE OF ATTACK', d: 'every bounce adds +30% damage' } },
+  { id: 'guidance',  name: 'GUIDANCE',      aisle: 'hardware', max: 2, b: 2, v: 1.1, dec: 1, cap: 3.5, d: v => 'shots steer, turn rate ' + v,
+    r: { n: 'LOCK', d: 'they pick their own target and keep it' } },
+  { id: 'munitions', name: 'MUNITIONS',     aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 2, d: v => '+' + v + ' frag every wave',
+    r: { n: 'INCENDIARY', d: 'frags leave the ground burning' } },
   /* ---- EXPIRED: the bad idea aisle ---- */
-  { id: 'clearance', name: 'CLEARANCE',     aisle: 'expired', max: 3, b: 1, v: 18, cap: 70, d: v => '+' + v + '% loot, and better cards' },
-  { id: 'pricehike', name: 'PRICE HIKE',    aisle: 'expired', max: 2, b: 1, v: 30, cap: 80, d: v => '+' + v + '% experience, -8% max health' },
-  { id: 'spoiled',   name: 'SPOILED',       aisle: 'expired', max: 3, b: 0, v: 6, cap: 30,  d: v => 'your hits burn for ' + v + '/s' },
-  { id: 'seconds',   name: 'SECOND HELPING',aisle: 'expired', max: 1, b: 2, v: 1, int: 1, cap: 1, d: v => 'survive ' + v + ' fatal hit a floor' },
-  { id: 'flashpoint',name: 'FLASHPOINT',    aisle: 'expired', max: 2, b: 2, v: 1, int: 1, cap: 2, d: v => 'a nova every ' + Math.max(8, 22 - v * 5) + ' kills' },
-  { id: 'coolade',   name: 'COOLADE',       aisle: 'expired', max: 2, b: 2, sig: 'coolade', fixed: 4 },
-  { id: 'glock',     name: 'GLOCK-18',      aisle: 'expired', max: 2, b: 2, sig: 'glock',   fixed: 4 }
+  { id: 'clearance', name: 'CLEARANCE',     aisle: 'expired', max: 3, b: 1, v: 18, cap: 70, d: v => '+' + v + '% loot, and better cards',
+    r: { n: 'DOUBLE COUPON', d: 'coins are worth two' } },
+  { id: 'pricehike', name: 'PRICE HIKE',    aisle: 'expired', max: 2, b: 1, v: 30, cap: 80, d: v => '+' + v + '% experience, -8% max health',
+    r: { n: 'WORTH IT', d: 'and +18% damage on top' } },
+  { id: 'spoiled',   name: 'SPOILED',       aisle: 'expired', max: 3, b: 0, v: 6, cap: 30,  d: v => 'your hits burn for ' + v + '/s',
+    r: { n: 'CONTAGION', d: 'a burning thing sets its neighbours alight' } },
+  { id: 'seconds',   name: 'SECOND HELPING',aisle: 'expired', max: 1, b: 2, v: 1, int: 1, cap: 1, d: v => 'survive ' + v + ' fatal hit a floor',
+    r: { n: 'FULL PLATE', d: 'and you come back at full health' } },
+  { id: 'flashpoint',name: 'FLASHPOINT',    aisle: 'expired', max: 2, b: 2, v: 1, int: 1, cap: 2, d: v => 'a nova every ' + Math.max(8, 22 - v * 5) + ' kills',
+    r: { n: 'FALLOUT', d: 'the nova leaves the floor burning' } },
+  { id: 'debtcard',  name: 'BLOOD DEBT',    aisle: 'expired', max: 2, b: 1, v: 20, cap: 44, d: v => '+' + v + '% damage. you bleed 1 a second',
+    r: { n: 'PAID FORWARD', d: 'every kill gives 3 health back' } },
+  { id: 'longpig',   name: 'THE LONG PIG',  aisle: 'expired', max: 2, b: 2, v: 7, cap: 16, d: v => '+' + v + '% damage per 10 kills this wave',
+    r: { n: 'NO LEFTOVERS', d: 'it never resets' } },
+  { id: 'render',    name: 'RENDERING',     aisle: 'expired', max: 3, b: 1, v: 10, cap: 36, d: v => 'the dead leave a pool that burns for ' + v,
+    r: { n: 'THE DRAIN', d: 'the pools pull things into them' } }
 ];
 /* What a card needs before it will be dealt. Tier 1 opens on the wave-4 elite
    and tier 2 — novas, second chances, the signature groceries — only on a real
@@ -532,6 +680,55 @@ function cardUnlocked(c) {
 }
 const CARD_BY_ID = {};
 for (const c of CARDS) CARD_BY_ID[c.id] = c;
+
+/* ============================================================
+   OFF-CUTS — the fusions.
+
+   Two cards you already hold, at the ranks named, and a third thing exists
+   that neither of them was. An off-cut is LEGENDARY, it is guaranteed a seat
+   in the next hand the moment it unlocks, and the screen makes noise about
+   it. This is the part of the deck you go looking for on the second run.
+   ============================================================ */
+const FUSIONS = [
+  { id: 'crosscut', name: 'CROSS-CUT',      need: [['split', 1], ['ricochet', 1]],
+    d: 'forks bounce twice more, and harder' },
+  { id: 'grinder',  name: 'THE GRINDER',    need: [['hooks', 2], ['coldsnap', 1]],
+    d: 'the hooks freeze whatever they catch' },
+  { id: 'furnace',  name: 'BLAST FURNACE',  need: [['spoiled', 2], ['overkill', 1]],
+    d: 'anything that dies burning detonates' },
+  { id: 'permafrost', name: 'PERMAFROST',   need: [['frostbite', 1], ['walkin', 2]],
+    d: 'your aura freezes instead of slowing' },
+  { id: 'artery',   name: 'ARTERY',         need: [['nerve', 2], ['debtcard', 1]],
+    d: 'hurt is fast. up to +60% fire rate' },
+  { id: 'bill',     name: "BUTCHER'S BILL", need: [['cleaver', 3], ['deepcut', 2]],
+    d: 'a crit arcs to two more throats' },
+  { id: 'harvest',  name: 'HARVEST',        need: [['grazing', 2], ['render', 1]],
+    d: 'standing in your own pools heals you' },
+  { id: 'flood',    name: 'FLASH FLOOD',    need: [['flashpoint', 1], ['frost', 1]],
+    d: 'every nova freezes the room solid' },
+  { id: 'trigger',  name: 'HAIR TRIGGER',   need: [['cycle', 3], ['quick', 2]],
+    d: 'instant reloads below a quarter mag' },
+  { id: 'primecut', name: 'PRIME CUT',      need: 'three cards held at RARE or better',
+    d: '+25% damage, +1 LUCK, and every hand runs hotter' }
+];
+const FUSION_BY_ID = {};
+for (const f of FUSIONS) FUSION_BY_ID[f.id] = f;
+const fz = id => !!(S.fused && S.fused[id]);
+/* PRIME CUT is the odd one out: its condition is about the grades you have
+   taken rather than about two named cards, so it gets its own read. */
+function primeCount() { let n = 0; for (const k in S.deck) if ((S.deck[k].g | 0) >= RIDER_AT) n++; return n; }
+function fusionReady(f) {
+  if (fz(f.id)) return false;
+  if (f.id === 'primecut') return primeCount() >= 3;
+  return f.need.every(([id, r]) => dkr(id) >= r);
+}
+/* What is missing, phrased for the card back so a nearly-there off-cut reads
+   as a goal rather than as a locked box. */
+function fusionHint(f) {
+  if (f.id === 'primecut') return primeCount() + '/3 cards at RARE or better';
+  return f.need.map(([id, r]) => CARD_BY_ID[id].name + ' ' + Math.min(dkr(id), r) + '/' + r).join('   ·   ');
+}
+function availableFusions() { return FUSIONS.filter(fusionReady); }
 
 /* Read a card's accumulated number, and its rank. These two are all the rest
    of the game needs to know about the deck. */
@@ -551,33 +748,34 @@ function cardVal(c, g) {
   const raw = c.v * GRADE[g].mul;
   return c.int ? Math.max(1, Math.round(raw)) : c.dec ? Math.round(raw * 10) / 10 : Math.round(raw);
 }
-function cardLine(c, v) {
-  if (c.sig) { const lv = clamp((S.items[c.sig] | 0), 0, 1); return ITEMS[c.sig].d[lv]; }
-  return c.d(c.cap !== undefined ? Math.min(c.cap, v) : v);
-}
-function cardName(c) {
-  if (c.sig) return ITEMS[c.sig].n[Math.min(S.items[c.sig] | 0, 1)];
-  return c.name;
-}
+function cardLine(c, v) { return c.d(c.cap !== undefined ? Math.min(c.cap, v) : v); }
+function cardName(c) { return c.name; }
 
-/* Deal a hand. Signature cards are deliberately rare until THE FULL MENU is
-   signed off, and every card rolls its own grade. */
+/* Deal a hand.
+
+   An unlocked off-cut always takes the first seat — it is the reward for
+   having built toward it, and burying it behind a weight roll would waste the
+   moment. The rest roll their own grade, and the EXPIRED mastery quietly
+   upgrades every fourth card that comes off the top. */
 function dealCards(n, luckBonus) {
   const luck = S.luck + (luckBonus || 0);
-  const sigW = contractDone('menu') ? 0.9 : 0.4;
-  const pool = CARDS.filter(c => dkr(c.id) < c.max && cardUnlocked(c));
   const out = [];
+  for (const f of availableFusions()) {
+    if (out.length >= Math.max(1, n - 1)) break;      // never a hand of nothing but off-cuts
+    out.push({ fusion: f, g: 4, val: 0 });
+  }
+  const pool = CARDS.filter(c => dkr(c.id) < c.max && cardUnlocked(c));
   while (out.length < n && pool.length) {
-    let tw = 0;
-    for (const c of pool) tw += c.sig ? sigW : 1;
-    let r = Math.random() * tw, ci = pool.length - 1;
-    for (let i = 0; i < pool.length; i++) { r -= pool[i].sig ? sigW : 1; if (r <= 0) { ci = i; break; } }
-    const c = pool.splice(ci, 1)[0];
-    const g = c.fixed !== undefined ? c.fixed : rollGrade(luck);
-    out.push({ c, g, val: c.sig ? 0 : cardVal(c, g) });
+    const c = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+    let g = rollGrade(luck);
+    S.dealt = (S.dealt | 0) + 1;
+    if (aisleT2('expired') && S.dealt % 4 === 0) g = Math.min(3, g + 1);
+    out.push({ c, g, val: cardVal(c, g) });
   }
   return out;
 }
+/* The best grade in a hand decides how loudly it arrives — see openLevelUp. */
+function handDrama(hand) { return hand.reduce((m, o) => Math.max(m, o.g | 0), 0); }
 
 const SCAR_COLS = ['#ffe9a8', '#7fd0ff', '#8fff9a', '#ff7fe0', '#ffb03a',
                    '#c05cff', '#ff4a54', '#4fd6e8', '#eaff6a', '#ff8a3a'];
@@ -662,12 +860,24 @@ function gainXP(n) {
 /* How many cards you get to look at. The APEX contract widens the hand. */
 function handSize() { return (contractDone('apex') ? 4 : 3) + ag('hollow'); }
 function rerollCost() { return 20 + S.rerolls * 15; }
+/* A hand arrives with the weight of the best thing in it. A screen of three
+   COMMONs should open quietly; an EPIC should announce itself before you have
+   finished reading the names. */
+function dealDrama(hand) {
+  const top = handDrama(hand);
+  S.handTop = top;
+  S.handIn = 0;                                    // drives the deal-in animation
+  if (A.duck) A.duck(0.5, 3);
+  if (top >= 4) { S.flash = 0.85; S.flashCol = GRADE[4].col; A.god(); A.secret(); shake(9); }
+  else if (top === 3) { S.flash = 0.6; S.flashCol = GRADE[3].col; A.secret(); shake(5); }
+  else if (top === 2) { S.flash = 0.35; S.flashCol = GRADE[2].col; A.card(); }
+}
 function openLevelUp(luckBonus) {
   if (S.mode === 'levelup') return;
   S.mode = 'levelup';
   S.lvlLuck = luckBonus || 0;
   S.hand = dealCards(handSize(), S.lvlLuck);
-  if (A.duck) A.duck(0.5, 3);
+  dealDrama(S.hand);
 }
 function rerollHand() {
   const c = rerollCost();
@@ -675,26 +885,94 @@ function rerollHand() {
   S.coins -= c; S.rerolls++;
   S.hand = dealCards(handSize(), S.lvlLuck + 0.35);
   A.rack(); persist();
+  dealDrama(S.hand);
+}
+/* Shared tail of taking anything off the level-up screen. */
+function afterPick(g) {
+  S.upgPts--;
+  S.cardsTaken++;
+  if (g >= RIDER_AT) bump('prime');
+  recalcLuck(); recalcAisles();
+  A.buy();
+  S.flash = Math.max(S.flash, 0.5); S.flashCol = GRADE[g].col;
+  if (S.p) S.p.hp = Math.min(ST().maxhp, S.p.hp + 8);
+  checkContracts();
+  if (S.upgPts <= 0) { S.mode = 'play'; S.hand = null; }
+  else { S.hand = dealCards(handSize(), S.lvlLuck); dealDrama(S.hand); }
 }
 function takeCard(o) {
   if (S.upgPts <= 0 || !o) return;
+  if (o.fusion) return takeFusion(o);
   const c = o.c;
+  const before = ais(c.aisle);
   const d = S.deck[c.id] || (S.deck[c.id] = { rank: 0, amt: 0, g: 0 });
+  const hadRider = (d.g | 0) >= RIDER_AT;
   d.rank++;
   d.amt = Math.round((d.amt + o.val) * 10) / 10;
   d.g = Math.max(d.g | 0, o.g);
-  if (c.sig) grantItem(c.sig);            // the five groceries still run on the old plumbing
-  S.upgPts--;
-  S.cardsTaken++;
-  if (o.g >= 2) bump('prime');
-  const sigs = CARDS.filter(x => x.sig && dkr(x.id) > 0).length;
-  if (sigs) bumpMax('sigs', sigs);
+  recalcAisles();
+  /* Two things worth a banner: a rider coming online for the first time, and
+     an aisle mastery tripping. Both are silent state changes otherwise, and a
+     silent state change is a mechanic the player never learns they have. */
+  if (!hadRider && (d.g | 0) >= RIDER_AT && c.r)
+    msg(c.r.n, c.name + ' — ' + c.r.d, 3.4);
+  const after = ais(c.aisle), ai = AISLES[c.aisle];
+  if (before < AISLE_T1 && after >= AISLE_T1) { msg(ai.n + ' — THE ORDER', ai.p1, 3.4); A.secret(); }
+  else if (before < AISLE_T2 && after >= AISLE_T2) { msg(ai.n + ' — MASTERED', ai.p2, 4); A.god(); S.flash = 0.7; S.flashCol = ai.col; }
+  // STOCKED: the max-health card also fills what it just added
+  if (c.id === 'roughage' && rd('roughage') && S.p) S.p.hp += o.val;
+  afterPick(o.g);
+}
+function takeFusion(o) {
+  const f = o.fusion;
+  S.fused[f.id] = true;
+  S.fusedOrder.push(f.id);
   recalcLuck();
-  A.buy();
-  S.flash = 0.5; S.flashCol = GRADE[o.g].col;
-  if (S.p) S.p.hp = Math.min(ST().maxhp, S.p.hp + 8);
-  if (S.upgPts <= 0) { S.mode = 'play'; S.hand = null; }
-  else S.hand = dealCards(handSize(), S.lvlLuck);
+  msg(f.name, f.d, 4.2);
+  A.god(); A.roar();
+  S.flash = 1.0; S.flashCol = GRADE[4].col;
+  shake(14); punch(0.06);
+  if (S.p) { ring(S.p.x, S.p.y, 110, GRADE[4].col, 0.8, 3); float(S.p.x, S.p.y - 30, f.name, GRADE[4].col, true); }
+  afterPick(4);
+}
+
+/* ============================================================
+   THE COLD ROOM — the signature pick.
+
+   The five groceries used to be dealt into the level-up hand alongside +5%
+   move speed, which is two different kinds of reward wearing the same coat:
+   one is a percentage, the other is a permanent change to the character, and
+   the hand could not price them against each other. They have their own door
+   now. Kill a floor boss, the cold room opens, and you choose one of two.
+   ============================================================ */
+const SIG_ORDER = ['banana', 'melon', 'coolade', 'glock', 'bike'];
+const SIG_MAX = 2;                 // plain, then upgraded
+function sigLevel(k) { return S.items[k] | 0; }
+function sigPool() { return SIG_ORDER.filter(k => sigLevel(k) < SIG_MAX); }
+function openColdRoom() {
+  const pool = sigPool();
+  if (!pool.length) return false;
+  const out = [];
+  const bag = pool.slice();
+  while (out.length < 2 && bag.length) out.push(bag.splice(Math.floor(Math.random() * bag.length), 1)[0]);
+  S.sigOffer = out;
+  S.mode = 'coldroom';
+  if (A.duck) A.duck(0.6, 3.5);
+  A.god(); A.doorOpen();
+  S.flash = 0.7; S.flashCol = GRADE[4].col;
+  return true;
+}
+function takeSig(k) {
+  if (S.mode !== 'coldroom') return;
+  grantItem(k);                                    // the groceries keep their old plumbing
+  S.sigOffer = null; S.mode = 'play';
+  const held = SIG_ORDER.filter(x => sigLevel(x) > 0).length;
+  bumpMax('sigs', held);
+  checkContracts();
+  A.bigpickup(); A.roar();
+  S.flash = 0.9; S.flashCol = ITEMS[k].col;
+  shake(10); punch(0.05);
+  if (S.p) ring(S.p.x, S.p.y, 100, ITEMS[k].col, 0.7, 3);
 }
 
 /* ============================================================
@@ -707,7 +985,7 @@ const CONTRACTS = [
   { id: 'seal',  name: 'BREAK THE SEAL',   goal: 8,     stat: 'bosses', d: 'put down 8 floor bosses',           u: 'THE ROTISSERIE joins the crate' },
   { id: 'deep',  name: 'THE DESCENT',      goal: 8,     stat: 'deep',   d: 'reach floor 8',                     u: 'FREEZER BURN joins the crate' },
   { id: 'reg',   name: 'REGULAR',          goal: 12,    stat: 'shops',  d: 'visit PACI 12 times',               u: 'PACI lays out a fourth pedestal' },
-  { id: 'grade', name: 'GRADED',           goal: 25,    stat: 'prime',  d: 'take 25 PRIME-or-better cards',     u: '+1 LUCK on every card you are dealt' },
+  { id: 'grade', name: 'GRADED',           goal: 25,    stat: 'prime',  d: 'take 25 RARE-or-better cards',      u: '+1 LUCK on every card you are dealt' },
   { id: 'dozen', name: "BUTCHER'S DOZEN",  goal: 3000,  stat: 'kills',  d: '3000 kills, all runs counted',      u: 'start every run one level up' },
   { id: 'hoard', name: 'HOARDER',          goal: 12000, stat: 'vault',  d: 'bank 12000 coins in the vault',     u: 'start every run holding 60 coins' },
   { id: 'apex',  name: 'APEX PREDATOR',    goal: 1,     stat: 'apex',   d: 'kill an APEX',                      u: 'you are dealt four cards, not three' },
@@ -946,7 +1224,7 @@ function enterShop() {
     S.secret = null; S.corner = null; S.tomce = null;
     S.en.length = 0; S.bul.length = 0; S.eb.length = 0; S.cracks.length = 0;
     S.nades.length = 0; S.part.length = 0; S.gibs.length = 0; S.rings.length = 0;
-    S.props.length = 0; S.peels.length = 0;
+    S.props.length = 0; S.peels.length = 0; S.pools.length = 0; S.arcs.length = 0;
     S.boss = null; S.vacuum = 0;
     /* The wave-end vacuum deliberately never pulls in permanent drops — a boss's
        grocery has to be walked to. The shop opens on a timer, not on your say-so,
@@ -1371,6 +1649,15 @@ function cycleWeapon(dir) {
 function startReload() {
   const p = S.p, w = curW();
   if (p.reT > 0 || S.god || p.mags[w.id] >= magCap(w)) return;
+  /* HAIR TRIGGER: run it dry and it is already loaded. Deliberately rewards
+     emptying the magazine rather than tapping R, so it changes how you fire. */
+  if (fz('trigger') && p.mags[w.id] <= magCap(w) / 4) {
+    p.mags[w.id] = magCap(w);
+    part(p.x, p.y, '#f5c518', 10, 110, 0.3);
+    float(p.x, p.y - 18, 'HAIR TRIGGER', '#f5c518');
+    A.rack();
+    return;
+  }
   p.reT = w.reload * ST().reloadMul; p.reMax = p.reT; p.reStage = 0;
 }
 
@@ -1396,7 +1683,15 @@ function emit(w) {
   const base = (w.spread + p.recoil * 0.05) * (S.god ? 0.4 : 1);
   const mx = p.x + Math.cos(p.ang) * 11, my = p.y + Math.sin(p.ang) * 11 - 1;
   const evo = !!w.evolve;
-  const dmg = (w.dmg + st.flatDmg) * st.dmgMul * (evo ? st.scarMul : 1);
+  /* ---- the riders that live on the trigger ----
+     SHARPENED counts shots and forces the sixth. BOTTOM OF THE BOX pays out
+     on the dregs of a magazine, so it reads the mag before it is spent. */
+  S.shotN = (S.shotN | 0) + 1;
+  const forceCrit = rd('malice') && S.shotN % 6 === 0;
+  const cap = magCap(w);
+  const magLow = rd('hopper') && !S.god && cap > 3 && p.mags[w.id] <= cap / 3;
+  let dmg = (w.dmg + st.flatDmg) * st.dmgMul * (evo ? st.scarMul : 1);
+  if (magLow) dmg *= 1.35;
   const col = S.god ? '#ff6cf5' : (evo ? scarCol() : w.col);
   /* THE ROTISSERIE ignores the crosshair entirely and walks its own angle
      around you — that is the whole joke, and the whole reason to own it. */
@@ -1406,18 +1701,23 @@ function emit(w) {
   const fan = 0.20;
   for (let d = 0; d < dirs; d++) {
     const off = dirs === 1 ? 0 : (d - (dirs - 1) / 2) * fan;
+    // CROSSFIRE: the middle shot goes where you pointed, the forks come back in
+    const outer = dirs > 1 && d !== (dirs - 1) / 2;
+    const homing = (st.home || 0) + (rd('split') && outer ? 3.2 : 0);
     for (let i = 0; i < w.pellets; i++) {
       const a = aim + off + rnd(-base, base);
       S.bul.push({
         x: mx, y: my, vx: Math.cos(a) * w.spd, vy: Math.sin(a) * w.spd,
         dmg, pierce: (w.pierce || 0) + st.pierce, hitIds: [], life: 1.4,
-        col, size: (w.size || 1) + (evo && S.scarLv > 3 ? 1 : 0),
+        col, size: (w.size || 1) + (evo && S.scarLv > 3 ? 1 : 0) + (rd('caliber') ? 1 : 0),
         knock: w.knock || 60, pin: w.pin || 0, burn: (w.burn || 0) + st.burn,
         bounce: (w.bounce || 0) + st.bounce, mark: w.mark || 0, chill: w.chill || 0,
-        home: st.home || 0, spd: w.spd, god: S.god
+        home: homing, lock: rd('guidance') ? null : undefined,
+        crit: forceCrit, spd: w.spd, god: S.god
       });
     }
   }
+  if (magLow) part(mx, my, '#ffb03a', 3, 60, 0.25);
   p.recoil = Math.min(1, p.recoil + (w.pellets > 3 ? 0.7 : 0.24));
   p.kick = w.pellets > 3 ? 6 : w.charge ? 7 : 2.6;
   p.vx -= Math.cos(p.ang) * (w.knock ? w.knock * 0.28 : 12);
@@ -1523,13 +1823,19 @@ function explode(x, y, r, dmg, col) {
    DAMAGE
    ============================================================ */
 const MARK_MUL = 1.6;      // what THE PRICE GUN's tag is worth to everything else
-function damageEnemy(e, dmg, fromBullet, ang, noRoll) {
+/* Slowed, stunned, pinned or frozen — the state TENDERISER and BRITTLE both
+   price, kept in one place so the two cards can never disagree. */
+function impaired(e) { return e.slowT > 0 || e.stun > 0 || e.mark > 0; }
+
+function damageEnemy(e, dmg, fromBullet, ang, noRoll, forceCrit) {
   if (e.dead) return 0;
   const st = ST();
   let crit = false;
   if (!noRoll) {
     if (e.mark > 0) dmg *= MARK_MUL;
-    if (st.crit > 0 && Math.random() < st.crit) { dmg *= st.critMul; crit = true; }
+    if (st.tender > 0 && impaired(e)) dmg *= 1 + st.tender;
+    if (rd('coldsnap') && e.slowT > 0) dmg *= 1.22;          // BRITTLE
+    if (forceCrit || (st.crit > 0 && Math.random() < st.crit)) { dmg *= st.critMul; crit = true; }
   }
   e.hp -= dmg;
   e.hit = crit ? 0.16 : 0.09;
@@ -1539,6 +1845,28 @@ function damageEnemy(e, dmg, fromBullet, ang, noRoll) {
     part(e.x, e.y, '#fff0c0', 10, 190, 0.35, 2);
     ring(e.x, e.y, 16, '#ffd070', 0.18, 1);
     A.hit();
+    /* HAMSTRUNG, FOLLOW-THROUGH, the BUTCHERY mastery and BUTCHER'S BILL all
+       hang off the same crit. Every secondary hit passes noRoll so a crit can
+       never crit its own splash and run away with itself. */
+    if (rd('deepcut')) e.stun = Math.max(e.stun, 0.5);
+    const splash = rd('cleaver') ? 26 : aisleT2('butchery') ? 30 : 0;
+    if (splash) {
+      ring(e.x, e.y, splash, '#ffd070', 0.22, 1);
+      for (const o of S.en)
+        if (!o.dead && o !== e && Math.hypot(o.x - e.x, o.y - e.y) < splash)
+          damageEnemy(o, dmg * 0.5, false, ang, true);
+    }
+    if (fz('bill')) {
+      let n = 0;
+      for (const o of S.en) {
+        if (n >= 2) break;
+        if (o.dead || o === e) continue;
+        if (Math.hypot(o.x - e.x, o.y - e.y) > 120) continue;
+        n++;
+        S.arcs.push({ x1: e.x, y1: e.y, x2: o.x, y2: o.y, life: 0.16, col: '#ffd070' });
+        damageEnemy(o, dmg * 0.6, false, ang, true);
+      }
+    }
   }
   if (ang !== undefined) spray(e.x, e.y, ang, e.gib, 5, 120, 0.35, 0.7);
   else part(e.x, e.y, e.gib, 3, 70, 0.3);
@@ -1566,12 +1894,42 @@ function killEnemy(e, ang) {
 
   /* ---- what the deck does when something dies ---- */
   const st = ST();
+  S.waveKills++;
   /* OVERKILL and FLASHPOINT are both triggered BY a kill and both CAUSE kills.
      Fired inline they recurse — one death used to clear a room of 140 and put
      600 bullets on screen in a single frame. They go on a queue that drains a
-     few at a time, once a frame, so a chain is a chain and not a stack. */
-  if (st.overkill > 0) S.fx.push({ k: 'boom', x: e.x, y: e.y, r: 42, d: st.overkill * st.dmgMul });
-  if (st.graze > 0 && S.p.hp > 0) S.p.hp = Math.min(st.maxhp, S.p.hp + st.graze);
+     few at a time, once a frame, so a chain is a chain and not a stack. Every
+     death-triggered rider added since goes on the same queue for the same
+     reason; none of them may call damageEnemy directly from here. */
+  if (st.overkill > 0) S.fx.push({ k: 'boom', x: e.x, y: e.y, r: 42, d: st.overkill * st.dmgMul, fire: rd('overkill') });
+  /* GORGED: healing past the ceiling is banked as a temporary shield instead
+     of being thrown away, which is what makes stacked GRAZING worth having. */
+  if (st.graze > 0 && S.p.hp > 0) {
+    const room = st.maxhp - S.p.hp;
+    if (st.graze > room && rd('grazing')) S.p.tempShield = Math.min(4, S.p.tempShield + (st.graze - room) * 0.05);
+    S.p.hp = Math.min(st.maxhp, S.p.hp + st.graze);
+  }
+  if (fz('harvest') && S.p.hp > 0) S.p.hp = Math.min(st.maxhp, S.p.hp + 0.5);
+  if (st.payback && S.p.hp > 0) S.p.hp = Math.min(st.maxhp, S.p.hp + st.payback);   // PAID FORWARD
+  /* SHATTER and the FROZEN mastery are the same idea at two prices: something
+     that died held still leaves a hole where it stood. */
+  const wasFrozen = e.stun > 0, wasSlowed = e.slowT > 0;
+  if (rd('frostbite') && wasFrozen)
+    S.fx.push({ k: 'boom', x: e.x, y: e.y, r: 40, d: 60 * st.dmgMul, col: '#bfefff' });
+  else if (aisleT2('frozen') && (wasSlowed || wasFrozen))
+    S.fx.push({ k: 'boom', x: e.x, y: e.y, r: 36, d: 45 * st.dmgMul, col: '#bfefff' });
+  /* CONTAGION and BLAST FURNACE both read the same corpse: it was on fire. */
+  if (e.burnT > 0) {
+    if (fz('furnace')) S.fx.push({ k: 'boom', x: e.x, y: e.y, r: 54, d: 85 * st.dmgMul, col: '#ff8a2b' });
+    if (rd('spoiled')) {
+      for (const o of S.en)
+        if (!o.dead && o !== e && Math.hypot(o.x - e.x, o.y - e.y) < 44) {
+          o.burn = Math.max(o.burn, st.burn || 6); o.burnT = Math.max(o.burnT, 2.6);
+        }
+    }
+  }
+  // RENDERING: the dead leave something behind that the living have to walk through
+  if (st.pool > 0 && !e.boss) S.pools.push({ x: e.x, y: e.y, r: 20, life: 6, max: 6, d: st.pool });
   if (st.novaEvery > 0) {
     S.killsSinceNova++;
     if (S.killsSinceNova >= st.novaEvery) { S.killsSinceNova = 0; S.fx.push({ k: 'nova', x: S.p.x, y: S.p.y }); }
@@ -1603,15 +1961,19 @@ function killEnemy(e, ang) {
 
     S.bossKills++;
     if (S.bossKills % SHOP_EVERY === 0) S.shopDue = true;
-    /* Only a FLOOR boss opens the top of the deck — elites do not count. */
+    /* Only a FLOOR boss opens the top of the deck — elites do not count. It
+       also unlocks the cold room, which is where the five signature groceries
+       live now. An elite pays a card; a floor boss pays a card and a name. */
     if (!elite) {
       S.floorBosses++;
       if (e.apex) S.apexKills++;
       bump('bosses'); if (e.apex) bump('apex');
-      float(e.x, e.y - 44, 'THE DECK OPENS', '#ffb03a', true);
+      if (sigPool().length) { S.sigDue = true; float(e.x, e.y - 44, 'THE COLD ROOM IS OPEN', '#c05cff', true); }
+      else float(e.x, e.y - 44, 'THE DECK OPENS', '#ffb03a', true);
     }
     checkContracts();
     msg(e.name + ' IS MEAT', elite ? 'an elite. the deck opens.'
+        : S.sigDue ? 'the cold room is unlocked. go and take something.'
         : e.apex ? 'the apex is down. take something obscene.' : 'the floor is yours. pick a card.', 3);
     if (S.shopDue) float(e.x, e.y - 30, 'A DOOR OPENS SIDEWAYS', '#c05cff', true);
     A.roar();
@@ -1647,18 +2009,131 @@ function fireNova(x, y) {
   part(x, y, '#fff0a8', 40, 200, 0.7, 2);
   shake(9); punch(0.05); S.flash = Math.max(S.flash, 0.45); S.flashCol = '#ffcf8a';
   A.boom();
+  // FALLOUT leaves the ground going; FLASH FLOOD puts the room on ice with it
+  if (rd('flashpoint')) S.pools.push({ x, y, r: 40, life: 5, max: 5, d: 16, fire: 1 });
+  if (fz('flood')) frostPulse(x, y, false);
+}
+
+/* ============================================================
+   THE NEW VERBS
+
+   Three cards do something the engine could not previously do, so they get
+   real machinery rather than another multiplier: THE HOOKS orbit, RENDERING
+   leaves ground behind, HARD FROST pulses. Everything else in the deck rides
+   on hooks that already existed.
+   ============================================================ */
+
+/* THE HOOKS. The array is rebuilt only when the count changes, so the ring
+   keeps its phase across a level-up instead of snapping back to zero. */
+function updateOrbs(dt, st) {
+  const want = st.hooks | 0;
+  if (S.orbs.length !== want) {
+    const base = S.orbs.length ? S.orbs[0].a : 0;
+    S.orbs = [];
+    for (let i = 0; i < want; i++) S.orbs.push({ a: base + i / want * TAU, hit: [] });
+  }
+  if (!want) return;
+  const p = S.p, wide = rd('hooks');
+  const R = wide ? 46 : 34, spin = wide ? 2.6 : 2.1;
+  for (const o of S.orbs) {
+    o.a += dt * spin;
+    o.x = p.x + Math.cos(o.a) * R;
+    o.y = p.y + Math.sin(o.a) * R;
+    for (let i = o.hit.length - 1; i >= 0; i--) { o.hit[i].t -= dt; if (o.hit[i].t <= 0) o.hit.splice(i, 1); }
+    for (const e of S.en) {
+      if (e.dead || o.hit.some(h => h.e === e)) continue;
+      if (Math.hypot(e.x - o.x, e.y - o.y) > e.r + 6) continue;
+      o.hit.push({ e, t: 0.5 });                       // one bite per pass, not per frame
+      damageEnemy(e, 26 * st.dmgMul, false, o.a);
+      part(o.x, o.y, '#ff5a62', 5, 80, 0.3);
+      A.hit();
+      // ON THE RAIL drags them in; THE GRINDER puts them on ice as well
+      if (wide) { const a = Math.atan2(p.y - e.y, p.x - e.x); e.vx += Math.cos(a) * 150; e.vy += Math.sin(a) * 150; }
+      if (fz('grinder')) { e.stun = Math.max(e.stun, 0.9); float(e.x, e.y - 10, 'HUNG', '#bfefff'); }
+    }
+  }
+}
+
+/* RENDERING's pools. They tick on the same 0.25s cadence as the walk-in aura
+   so a floor covered in them costs a predictable amount of frame. */
+function updatePools(dt, st) {
+  if (!S.pools.length) return;
+  const p = S.p, drain = rd('render');
+  S.poolT = (S.poolT || 0) + dt;
+  const tick = S.poolT >= 0.25;
+  if (tick) S.poolT -= 0.25;
+  for (let i = S.pools.length - 1; i >= 0; i--) {
+    const q = S.pools[i];
+    q.life -= dt;
+    if (q.life <= 0) { S.pools.splice(i, 1); continue; }
+    if (Math.random() < dt * 6)
+      part(q.x + rnd(-q.r, q.r) * 0.7, q.y + rnd(-q.r, q.r) * 0.5, q.fire ? '#ff8a2b' : '#8fdc5a', 1, 12, 0.5);
+    if (!tick) continue;
+    for (const e of S.en) {
+      if (e.dead) continue;
+      const d = Math.hypot(e.x - q.x, e.y - q.y);
+      if (d > q.r) continue;
+      damageEnemy(e, q.d * 0.25, false, undefined, true);
+      if (drain && d > 4) { const a = Math.atan2(q.y - e.y, q.x - e.x); e.vx += Math.cos(a) * 55; e.vy += Math.sin(a) * 55; }
+    }
+    // HARVEST turns your own mess into a health pack you have to stand in
+    if (fz('harvest') && Math.hypot(p.x - q.x, p.y - q.y) < q.r && p.hp > 0)
+      p.hp = Math.min(st.maxhp, p.hp + 1);
+  }
+  if (S.pools.length > 40) S.pools.splice(0, S.pools.length - 40);
+}
+
+/* One shared shove. DEFLECTION, SPRUNG, SLAM FIRE and the HARDWARE mastery
+   are the same gesture bought in four different aisles. */
+function knockRoom(x, y, r, force, col) {
+  ring(x, y, r, col, 0.35, 2);
+  part(x, y, col, 18, 160, 0.4);
+  shake(6); A.ram();
+  for (const e of S.en) {
+    if (e.dead) continue;
+    const d = Math.hypot(e.x - x, e.y - y);
+    if (d > r) continue;
+    const a = Math.atan2(e.y - y, e.x - x), f = 1 - d / r;
+    e.vx += Math.cos(a) * force * f; e.vy += Math.sin(a) * force * f;
+    e.stun = Math.max(e.stun, 0.3 * f);
+  }
+}
+
+/* HARD FROST / PERMAFROST / FLASH FLOOD all land here. */
+function frostPulse(x, y, deep) {
+  const st = ST();
+  ring(x, y, 96, '#bfefff', 0.45, 2);
+  part(x, y, '#dff4ff', 26, 150, 0.6, 2);
+  A.hit(); shake(4);
+  for (const e of S.en) {
+    if (e.dead || Math.hypot(e.x - x, e.y - y) > 96) continue;
+    if (e.boss) { e.slowT = Math.max(e.slowT, 2.4); e.slowAmt = Math.max(e.slowAmt, 0.5); }
+    else { e.stun = Math.max(e.stun, 1.5); float(e.x, e.y - 10, 'FROZEN', '#bfefff'); }
+    if (deep) damageEnemy(e, 55 * st.dmgMul, false, undefined, true);
+  }
 }
 
 function hurtPlayer(dmg, sx, sy) {
   const p = S.p;
   if (S.god || p.iframe > 0 || p.tempShield > 0 || S.mode !== 'play') return;
   const stp = ST();
+  /* THICK HIDE: the first thing to reach you each wave simply does not. */
+  if (rd('callus') && !S.waveHit) {
+    S.waveHit = true;
+    p.iframe = 0.5;
+    float(p.x, p.y - 14, 'THICK HIDE', '#7fd0ff');
+    ring(p.x, p.y, 24, '#7fd0ff', 0.3, 2);
+    A.hit();
+    return;
+  }
+  S.waveHit = true;
   /* AEGIS PLATING: sometimes the hit just doesn't land. */
   if (stp.dodge > 0 && Math.random() < stp.dodge) {
     p.iframe = 0.3;
     float(p.x, p.y - 14, 'PLATED', '#7fd0ff');
     part(p.x, p.y, '#c6e8ff', 10, 90, 0.35);
     A.hit();
+    if (rd('aegis')) knockRoom(p.x, p.y, 120, 300, '#7fd0ff');    // DEFLECTION
     return;
   }
   dmg *= stp.resist;
@@ -1668,6 +2143,7 @@ function hurtPlayer(dmg, sx, sy) {
     ring(p.x, p.y, 22, '#63b04a', 0.3, 2);
     float(p.x, p.y - 14, 'RIND', '#63b04a');
     A.hit(); shake(4);
+    if (rd('apron')) knockRoom(p.x, p.y, 130, 330, '#63b04a');     // SPRUNG
     return;
   }
   const wasStage = hurtStage();
@@ -1688,10 +2164,11 @@ function hurtPlayer(dmg, sx, sy) {
     A.crack();
   }
   if (sx !== undefined) { p.vx += (p.x - sx) * 1.8; p.vy += (p.y - sy) * 1.8; }
-  /* SECOND HELPING: one refusal per floor, per rank. */
+  /* SECOND HELPING: one refusal per floor, per rank. FULL PLATE makes the
+     refusal total rather than a sliver. */
   if (p.hp <= 0 && S.savesLeft > 0) {
     S.savesLeft--;
-    p.hp = Math.round(stp.maxhp * 0.30);
+    p.hp = Math.round(stp.maxhp * (rd('seconds') ? 1 : 0.30));
     p.iframe = 2.0;
     S.slow = 0.7; S.flash = 1.0; S.flashCol = '#c05cff';
     shake(16); punch(0.09);
@@ -1824,9 +2301,19 @@ function updateWaves(dt) {
       S.waveState = 'clear'; S.waveT = 3.0;
       S.vacuum = 2.6;                 // sweep the floor clean
       A.pickup();
-      const heal = S.wave === BOSS_WAVE ? 30 : 12;
-      S.p.hp = Math.min(ST().maxhp, S.p.hp + heal);
-      S.p.nades = Math.min(9, S.p.nades + 1 + dkc('munitions'));
+      /* MARROW and the PRODUCE mastery both pay out here, and BONE BROTH adds
+         a frag to it. waveKills/waveHit reset on the same beat so THE LONG PIG
+         and THICK HIDE start the next wave clean — unless NO LEFTOVERS says
+         otherwise. */
+      const st2 = ST();
+      let heal = S.wave === BOSS_WAVE ? 30 : 12;
+      heal += st2.marrow * st2.maxhp;
+      if (aisleT2('produce')) heal += st2.maxhp * 0.25;
+      heal = Math.round(heal);
+      S.p.hp = Math.min(st2.maxhp, S.p.hp + heal);
+      S.p.nades = Math.min(9, S.p.nades + 1 + dkc('munitions') + (rd('marrow') ? 1 : 0));
+      if (!rd('longpig')) S.waveKills = 0;
+      S.waveHit = false;
       S.score += 100 * S.wave * (S.room + 1);
       persist();
       if (S.wave >= 10) {
@@ -1911,11 +2398,48 @@ function update(rdt) {
   const p = S.p, st = ST(), w = curW();
 
   /* The hand is dealt from here rather than from gainXP, so a boss can add its
-     guaranteed pick and its luck bonus before the cards are turned over. */
-  if (S.upgPts > 0) {
+     guaranteed pick and its luck bonus before the cards are turned over. The
+     cold room jumps the queue when a floor boss has just opened it — the
+     signature is the bigger moment and it should not arrive third. */
+  if (S.sigDue || S.upgPts > 0) {
     S.lvlDelay -= rdt;
-    if (S.lvlDelay <= 0 && !S.fadeDir) { openLevelUp(S.pendingLuck); S.pendingLuck = 0; }
+    if (S.lvlDelay <= 0 && !S.fadeDir) {
+      if (S.sigDue) { S.sigDue = false; if (openColdRoom()) S.lvlDelay = 0.4; }
+      else { openLevelUp(S.pendingLuck); S.pendingLuck = 0; }
+    }
   }
+
+  /* ---- the deck's per-frame verbs ----
+     MOMENTUM wants to know how long you have been moving, WOUND UP how long
+     the trigger has been down. Both decay faster than they build so neither
+     is free. */
+  S.moveT = (keys.KeyW || keys.KeyA || keys.KeyS || keys.KeyD ||
+             keys.ArrowUp || keys.ArrowDown || keys.ArrowLeft || keys.ArrowRight)
+            ? S.moveT + rdt : Math.max(0, S.moveT - rdt * 3);
+  S.holdT = mouse.down ? S.holdT + rdt : Math.max(0, S.holdT - rdt * 4);
+  if (st.bleed && p.hp > 1) p.hp = Math.max(1, p.hp - st.bleed * rdt);   // BLOOD DEBT
+  for (let i = S.arcs.length - 1; i >= 0; i--) { S.arcs[i].life -= rdt; if (S.arcs[i].life <= 0) S.arcs.splice(i, 1); }
+
+  /* THE WALK-IN's rider turns the slow field into a damage field. Ticked on a
+     0.25s cadence rather than per-frame so the number on the card is honest. */
+  if (st.auraDmg > 0) {
+    S.auraT = (S.auraT || 0) + rdt;
+    if (S.auraT >= 0.25) {
+      S.auraT -= 0.25;
+      for (const e of S.en)
+        if (!e.dead && Math.hypot(e.x - p.x, e.y - p.y) < 66) damageEnemy(e, st.auraDmg * 0.25, false, undefined, true);
+    }
+  }
+
+  /* HARD FROST: a pulse on a timer, which is the only card that does anything
+     while you stand still. FLASH FLOOD makes every nova do it too. */
+  if (st.frostEvery > 0) {
+    S.frostT += rdt;
+    if (S.frostT >= st.frostEvery) { S.frostT = 0; frostPulse(p.x, p.y, rd('frost')); }
+  }
+
+  updateOrbs(rdt, st);
+  updatePools(rdt, st);
 
   /* REGROWTH ticks once a second so the number on the card is the number you get. */
   if (st.regen > 0 && p.hp > 0) {
@@ -1948,12 +2472,29 @@ function update(rdt) {
   if ((keys.ShiftLeft || keys.ShiftRight || keys.Space) && p.dashCd <= 0 && (ix || iy)) {
     p.dash = 0.16; p.dashCd = st.dashCd; p.iframe = Math.max(p.iframe, 0.24);
     p.ramHit.length = 0;
+    if (p.windHit) p.windHit.length = 0; else p.windHit = [];
     part(p.x, p.y, '#ffffff', 14, 100, 0.3);
     ring(p.x, p.y, 20, 'rgba(255,255,255,0.6)', 0.22, 1);
     punch(0.02);
     if (st.ram) A.ram(); else A.burn();
   }
   if (p.dash > 0) p.dash -= dt;
+
+  /* SECOND WIND — the dash drags a cold wake through the room. Its rider
+     turns passing through something into an actual attack, which is what
+     makes a dash-build want to go through the crowd rather than around it. */
+  if (dkr('wind') && p.dash > 0) {
+    if (Math.random() < dt * 40) part(p.x, p.y, '#9fe4ff', 1, 30, 0.5);
+    if (!p.windHit) p.windHit = [];
+    for (const e of S.en) {
+      if (e.dead || Math.hypot(e.x - p.x, e.y - p.y) > e.r + p.r + 9) continue;
+      e.slowT = Math.max(e.slowT, 1.6); e.slowAmt = Math.max(e.slowAmt, 0.45);
+      if (!rd('wind') || p.windHit.indexOf(e) >= 0) continue;
+      p.windHit.push(e);
+      damageEnemy(e, 45 * st.dmgMul, false, Math.atan2(p.vy, p.vx));
+      float(e.x, e.y - 12, 'THROUGH', '#9fe4ff');
+    }
+  }
 
   /* STOLEN BICYCLE — the dash becomes a battering ram */
   if (st.ram && p.dash > 0) {
@@ -2056,7 +2597,11 @@ function update(rdt) {
       p.reStage = 3; A.rack();
       part(p.x + Math.cos(p.ang) * 12, p.y + Math.sin(p.ang) * 12, '#ffe9a8', 5, 60, 0.2);
     }
-    if (p.reT <= 0) { p.mags[w.id] = magCap(w); p.reT = 0; }
+    if (p.reT <= 0) {
+      p.mags[w.id] = magCap(w); p.reT = 0;
+      // SLAM FIRE, and the HARDWARE mastery, both cash out the moment it seats
+      if (rd('quick') || aisleT2('hardware')) knockRoom(p.x, p.y, 116, 300, '#f5c518');
+    }
   }
 
   /* ---- firing ---- */
@@ -2096,11 +2641,17 @@ function update(rdt) {
     const b = S.bul[i];
     // Seeking rounds steer toward the nearest thing they haven't already hit.
     if (b.home) {
+      /* LOCK: the round picks one and keeps it, instead of re-deciding every
+         frame and drifting between two things that are equally close. */
       let best = null, bd = 260;
-      for (const e of S.en) {
-        if (e.dead || b.hitIds.indexOf(e) >= 0) continue;
-        const d2 = Math.hypot(e.x - b.x, e.y - b.y);
-        if (d2 < bd) { bd = d2; best = e; }
+      if (b.lock && !b.lock.dead && b.hitIds.indexOf(b.lock) < 0) best = b.lock;
+      else {
+        for (const e of S.en) {
+          if (e.dead || b.hitIds.indexOf(e) >= 0) continue;
+          const d2 = Math.hypot(e.x - b.x, e.y - b.y);
+          if (d2 < bd) { bd = d2; best = e; }
+        }
+        if (b.lock !== undefined) b.lock = best;
       }
       if (best) {
         const want = Math.atan2(best.y - b.y, best.x - b.x);
@@ -2137,6 +2688,7 @@ function update(rdt) {
         }
         if (b.bounce > 0) {                       // microwave orbs ricochet
           b.bounce--;
+          b.bounced = (b.bounced | 0) + 1;        // ANGLE OF ATTACK prices each one
           b.x = px; b.y = py;
           if (pointInWall(b.x + b.vx * dt, b.y)) b.vx *= -1; else b.vy *= -1;
           part(b.x, b.y, b.col, 6, 80, 0.3);
@@ -2168,8 +2720,13 @@ function update(rdt) {
             float(e.x, e.y - 10, 'FROZEN', '#bfefff');
             part(e.x, e.y, '#dff4ff', 12, 90, 0.5);
           }
-          damageEnemy(e, b.dmg, true, a);
-          float(b.x, b.y - 6, Math.round(b.dmg), b.god ? '#ff5cf0' : b.dmg > 60 ? '#ff8a3a' : '#ffe8b0', b.dmg > 60);
+          /* SKEWER pays for depth, ANGLE OF ATTACK pays for patience. Both
+             read counters the bullet was already keeping. */
+          let hd = b.dmg;
+          if (rd('carve')) hd *= 1 + 0.25 * b.hitIds.length;
+          if (rd('ricochet') && b.bounced) hd *= 1 + 0.30 * b.bounced;
+          damageEnemy(e, hd, true, a, false, b.crit);
+          float(b.x, b.y - 6, Math.round(hd), b.god ? '#ff5cf0' : hd > 60 ? '#ff8a3a' : '#ffe8b0', hd > 60);
           b.hitIds.push(e);
           if (b.hitIds.length > b.pierce) { S.bul.splice(i, 1); removed = true; }
           break;
@@ -2202,7 +2759,11 @@ function update(rdt) {
       else { g.vz = 0; g.vx *= 0.86; g.vy *= 0.86; }
     }
     if (Math.random() < dt * 22) part(g.x, g.y - g.z, '#8a8a8a', 1, 16, 0.4);
-    if (g.fuse <= 0) { explode(g.x, g.y, 58, 130 * ST().dmgMul, '#ffb03a'); S.nades.splice(i, 1); }
+    if (g.fuse <= 0) {
+      explode(g.x, g.y, 58, 130 * ST().dmgMul, '#ffb03a');
+      if (rd('munitions')) S.pools.push({ x: g.x, y: g.y, r: 44, life: 5, max: 5, d: 18, fire: 1 });  // INCENDIARY
+      S.nades.splice(i, 1);
+    }
   }
 
   /* ---- enemies ---- */
@@ -2238,7 +2799,14 @@ function update(rdt) {
     e.mark = Math.max(0, e.mark - dt);
     e.slowT = Math.max(0, e.slowT - dt);
     let sl = e.slowT > 0 ? e.slowAmt : 0;
-    if (st.aura > 0 && Math.hypot(e.x - p.x, e.y - p.y) < 66) sl = Math.max(sl, st.aura);
+    if (st.aura > 0 && Math.hypot(e.x - p.x, e.y - p.y) < 66) {
+      sl = Math.max(sl, st.aura);
+      // PERMAFROST: standing near you stops being slow and starts being fatal
+      if (fz('permafrost') && !e.boss && Math.random() < dt * 1.6) {
+        e.stun = Math.max(e.stun, 1.1);
+        part(e.x, e.y, '#dff4ff', 6, 60, 0.4);
+      }
+    }
     e.spd = e.base * (1 - Math.min(0.85, sl));
     if (e.stun > 0) {
       e.stun -= dt;
@@ -2295,7 +2863,8 @@ function update(rdt) {
       d.vx = d.vy = 0;
       if (Math.random() < dt * 12) part(d.x, d.y, '#ffe9a8', 1, 20, 0.3);
     }
-    else if (dd < 40 * ST().magnet && !perm) { d.x += (p.x - d.x) * dt * 6; d.y += (p.y - d.y) * dt * 6; }
+    // WINDFALL: the reach stops being a radius and becomes the whole floor
+    else if (!perm && (rd('ripe') || dd < 40 * ST().magnet)) { d.x += (p.x - d.x) * dt * 6; d.y += (p.y - d.y) * dt * 6; }
     if (dd < 12) {
       if (d.kind === 'ammo') { p.mags[curW().id] = magCap(curW()); p.reT = 0; float(p.x, p.y - 16, 'AMMO', '#f2d14a'); A.pickup(); }
       else if (d.kind === 'med') { p.hp = Math.min(ST().maxhp, p.hp + 26); float(p.x, p.y - 16, '+26 HP', '#ff6b6b'); A.pickup(); }
@@ -2389,7 +2958,11 @@ function update(rdt) {
     const batch = S.fx.splice(0, 3);
     for (const f of batch) {
       if (f.k === 'nova') fireNova(f.x, f.y);
-      else explode(f.x, f.y, f.r, f.d, '#ff6a72');
+      else {
+        explode(f.x, f.y, f.r, f.d, f.col || '#ff6a72');
+        // RENDERED: OVERKILL's burst leaves the floor alight where it went off
+        if (f.fire) S.pools.push({ x: f.x, y: f.y, r: 26, life: 4, max: 4, d: 14, fire: 1 });
+      }
     }
     if (S.fx.length > 12) S.fx.length = 12;    // a runaway chain still has to end
   }
@@ -2692,7 +3265,8 @@ function triggerGoromania() {
 /* LUCK tilts every hand up the grade ladder. Recomputed whenever the deck
    changes, because CLEARANCE feeds it. */
 function recalcLuck() {
-  S.luck = dkc('clearance') / 100 + (contractDone('grade') ? 1 : 0);
+  S.luck = dkc('clearance') / 100 + (contractDone('grade') ? 1 : 0)
+         + (aisleT1('expired') ? 1 : 0) + (fz('primecut') ? 1 : 0);
 }
 
 function startRun() {
@@ -2724,6 +3298,7 @@ function nextRoom() {
     S.en.length = 0; S.bul.length = 0; S.eb.length = 0; S.drops.length = 0;
     S.peels.length = 0; S.gibs.length = 0; S.part.length = 0; S.cracks.length = 0;
     S.nades.length = 0; S.props.length = 0; S.rings.length = 0;
+    S.pools.length = 0; S.arcs.length = 0; S.waveKills = 0; S.waveHit = false;
     S.boss = null; S.wave = 0; S.waveState = 'idle';
     S.p.x = S.aw / 2; S.p.y = S.ah - 60; S.p.vx = S.p.vy = 0;
     S.p.hp = Math.min(ST().maxhp, S.p.hp + 30);
@@ -2768,6 +3343,21 @@ function drawWorld() {
   }
 
   drawCornerSigil();
+
+  /* RENDERING's pools sit on the floor, under everything that walks on them.
+     Drawn as two stacked ellipses so they read as depth rather than as a
+     flat disc, and they shrink as they dry up. */
+  for (const q of S.pools) {
+    const k = clamp(q.life / q.max, 0, 1), r = q.r * (0.7 + k * 0.3);
+    const hot = q.fire;
+    ctx.globalAlpha = k * 0.5;
+    ctx.fillStyle = hot ? '#5a2408' : '#25400f';
+    ctx.beginPath(); ctx.ellipse(q.x, q.y + 3, r, r * 0.55, 0, 0, TAU); ctx.fill();
+    ctx.globalAlpha = k * (0.35 + Math.sin(S.t * 5 + q.x) * 0.08);
+    ctx.fillStyle = hot ? '#ff8a2b' : '#8fdc5a';
+    ctx.beginPath(); ctx.ellipse(q.x, q.y + 3, r * 0.66, r * 0.36, 0, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
 
   for (const q of S.peels) drawSpr(ctx, SPR.banana, q.x, q.y, 0.6, false, clamp(q.life / 2, 0, 1));
 
@@ -2858,6 +3448,39 @@ function drawWorld() {
   actors.push(S.p);
   actors.sort((a, b) => a.y - b.y);
   for (const a of actors) { if (a === S.p) drawPlayer(a); else drawEnemy(a); }
+
+  /* THE HOOKS. Drawn over the actors — they are on a rail above the floor,
+     and they have to stay readable when the ring is inside a crowd. */
+  for (const o of S.orbs) {
+    if (o.x === undefined) continue;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.30;
+    ctx.fillStyle = '#ff5a62';
+    ctx.beginPath(); ctx.arc(o.x, o.y, 7, 0, TAU); ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = '#2a1216'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(o.x, o.y - 4); ctx.lineTo(o.x, o.y + 1);
+    ctx.arc(o.x + 2, o.y + 1, 2.4, Math.PI, TAU * 0.75, true); ctx.stroke();
+    ctx.strokeStyle = '#d8c8b0'; ctx.lineWidth = 1.4;
+    ctx.beginPath(); ctx.moveTo(o.x, o.y - 4); ctx.lineTo(o.x, o.y + 1);
+    ctx.arc(o.x + 2, o.y + 1, 2.4, Math.PI, TAU * 0.75, true); ctx.stroke();
+  }
+  // BUTCHER'S BILL's arcs, and anything else that wants a line between two throats
+  if (S.arcs.length) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.lineCap = 'round';
+    for (const a of S.arcs) {
+      ctx.globalAlpha = clamp(a.life / 0.16, 0, 1);
+      ctx.strokeStyle = a.col; ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.moveTo(a.x1, a.y1);
+      ctx.lineTo((a.x1 + a.x2) / 2 + rnd(-5, 5), (a.y1 + a.y2) / 2 + rnd(-5, 5));
+      ctx.lineTo(a.x2, a.y2); ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
+    ctx.restore();
+  }
 
   // Bullets glow: soft additive halo, a fat tracer, then a hot white core.
   ctx.save();
@@ -2983,7 +3606,7 @@ function drawShops() {
     ctx.beginPath(); ctx.arc(sh.x, sh.y - 14 + by, 15, 0, TAU); ctx.fill();
     ctx.globalAlpha = 1;
     if (w.gr >= 2) {
-      // a slow ring of sparks, one per grade above PRIME
+      // a slow ring of sparks, one per rarity rung above UNCOMMON
       for (let k = 0; k < w.gr - 1; k++) {
         const a = S.t * (0.8 + k * 0.4) + k * 2.1;
         ctx.fillStyle = gr.col;
@@ -4131,59 +4754,123 @@ function drawDead() {
 }
 
 /* A card face, drawn the same way on the level-up hand and in THE MENU. */
-function cardFace(o, x, y, cw, ch, t, held) {
-  const c = o.c, g = GRADE[o.g], ai = AISLES[c.aisle];
-  const off = t * 3;
-  const yy = y - off;
-
-  ctx.fillStyle = 'rgba(' + Math.round(9 + t * 22) + ',' + Math.round(8 + t * 20) + ',' + Math.round(11 + t * 24) + ',0.95)';
-  ctx.fillRect(x, yy, cw, ch);
-  // the grade's own light, pooled at the top of the card
-  if (g.glow > 0) {
+/* ---------- the card frame ----------
+   Shared by cards and off-cuts so a hand is one shape repeated, not two
+   competing designs sitting next to each other. */
+function frameBox(x, y, w, h, col, t, glow) {
+  ctx.fillStyle = 'rgba(' + Math.round(9 + t * 20) + ',' + Math.round(8 + t * 18) + ',' + Math.round(11 + t * 22) + ',0.96)';
+  ctx.fillRect(x, y, w, h);
+  if (glow > 0) {
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    const lg = ctx.createLinearGradient(x, yy, x, yy + ch);
-    lg.addColorStop(0, g.col); lg.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.globalAlpha = (0.05 + g.glow / 28 * 0.13) * (0.55 + t * 0.75);
-    ctx.fillStyle = lg; ctx.fillRect(x, yy, cw, ch);
+    const lg = ctx.createLinearGradient(x, y, x, y + h);
+    lg.addColorStop(0, col); lg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = (0.05 + glow / 32 * 0.15) * (0.55 + t * 0.8);
+    ctx.fillStyle = lg; ctx.fillRect(x, y, w, h);
     ctx.restore();
   }
-  // aisle colour down the left edge, grade colour across the top
-  ctx.fillStyle = ai.col; ctx.globalAlpha = 0.55 + t * 0.45;
-  ctx.fillRect(x, yy, 2, ch);
-  ctx.fillStyle = g.col; ctx.globalAlpha = 0.7 + t * 0.3;
-  ctx.fillRect(x, yy, cw, 2);
-  ctx.globalAlpha = 0.20 + t * 0.5;
-  ctx.fillRect(x, yy + ch - 1, cw, 1); ctx.fillRect(x + cw - 1, yy, 1, ch);
+  ctx.fillStyle = col;
+  ctx.globalAlpha = 0.22 + t * 0.5;
+  ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y + h - 1, w, 1);
+  ctx.fillRect(x, y, 1, h); ctx.fillRect(x + w - 1, y, 1, h);
+  // corner ticks grow with hover, which is what makes the box feel picked up
+  const tk = 5 + t * 7;
+  ctx.globalAlpha = 0.55 + t * 0.45;
+  ctx.fillRect(x, y, tk, 2); ctx.fillRect(x, y, 2, tk);
+  ctx.fillRect(x + w - tk, y, tk, 2); ctx.fillRect(x + w - 2, y, 2, tk);
+  ctx.fillRect(x, y + h - 2, tk, 2); ctx.fillRect(x, y + h - tk, 2, tk);
+  ctx.fillRect(x + w - tk, y + h - 2, tk, 2); ctx.fillRect(x + w - 2, y + h - tk, 2, tk);
   ctx.globalAlpha = 1;
-
-  htxt(g.n, x + cw / 2, yy + 12, g.col, 'center', 6.5,
-       { track: 0.30, glow: o.g >= 2 ? g.col : null, glowSize: g.glow * 0.5 });
-
-  if (c.sig) drawSpr(ctx, ITEMS[c.sig].spr, x + cw / 2, yy + 28, 1.5);
-  const nm = cardName(c);
-  const nsz = nm.length > 14 ? 9 : nm.length > 10 ? 10.5 : 12;
-  htxt(nm, x + cw / 2, yy + (c.sig ? 48 : 38), t > 0.4 ? '#ffffff' : ai.col, 'center', nsz,
-       { weight: '700', glow: t > 0.15 ? ai.col : null, glowSize: 15 * t, track: 0.06 });
-
-  const ey = yy + (c.sig ? 60 : 52);
-  const lines = wrapped(cardLine(c, o.val), x + cw / 2, ey, cw - 14, '#a89a8c', 7.5);
-
-  const rank = dkr(c.id);
-  /* What you already hold, printed under what this pick adds. It wraps too — a
-     fully stacked RAW NERVE is a long sentence. */
-  if (held && rank && !c.sig)
-    wrapped('held: ' + cardLine(c, dk(c.id)), x + cw / 2, ey + lines * 9 + 4, cw - 12,
-            'rgba(176,158,138,0.8)', 6.5);
-
-  htxt(ai.n, x + cw / 2, yy + ch - 16, 'rgba(150,136,124,0.7)', 'center', 6, { track: 0.24, noShadow: true });
-  for (let j = 0; j < c.max; j++) {
-    ctx.fillStyle = j < rank ? ai.col : 'rgba(255,255,255,0.16)';
-    ctx.fillRect(x + cw / 2 - c.max * 3 + j * 6, yy + ch - 10, 4, 3);
-  }
 }
 
-/* Two lines, centred, broken on a space. Card copy is short but not that short. */
-function wrapped(str, cx, y, maxw, col, size) {
+/* ONE CARD, ONE COLOUR.
+
+   Everything drawn inside a card frame is the rarity's colour and nothing
+   else. Cards used to carry an aisle stripe as well, so a hand was two
+   competing colour systems in five boxes and neither could be read; the aisle
+   is now text at the foot of the card and colour only on THE ORDER strip.
+
+   The card also stopped saying so much. There was a rarity word, a rarity
+   ladder, an aisle line, a name, an effect, a rider band that was drawn even
+   when it was locked and said nothing, a "held" line and a row of pips. Six of
+   those are only worth reading once. What is left is what you actually choose
+   between: how rare, what it is called, what it does, and — when it has one —
+   the rider. */
+function cardFace(o, x, y, cw, ch, t, held) {
+  const fusion = !!o.fusion;
+  const c = fusion ? null : o.c;
+  const g = GRADE[o.g];
+  const yy = y - t * 4;
+  const lit = fusion || o.g >= RIDER_AT;
+  const cx = x + cw / 2 + 1;
+
+  frameBox(x, yy, cw, ch, g.col, t, g.glow);
+  /* The top of the card pools the rarity's light. Legendary keeps a slow
+     sheen over the whole face so it is never the calm card in the row. */
+  if (o.g >= 4) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.05 + Math.sin(S.t * 2.6) * 0.03 + t * 0.06;
+    ctx.fillStyle = g.col; ctx.fillRect(x, yy, cw, ch);
+    ctx.restore();
+  }
+
+  // rarity, and a hairline under it — the only rule on the card
+  htxt(fusion ? 'LEGENDARY  ·  OFF-CUT' : g.n, cx, yy + 12, g.col, 'center', 6.5,
+       { track: 0.26, mid: 1, glow: o.g >= 2 ? g.col : null, glowSize: g.glow * 0.5 });
+  ctx.fillStyle = g.col;
+  ctx.globalAlpha = 0.30 + t * 0.35;
+  ctx.fillRect(x + 16, yy + 19, cw - 32, 1);
+  ctx.globalAlpha = 1;
+
+  /* With no rider the name and effect sit in the middle of the card rather
+     than leaving a hole at the bottom where the band used to be. */
+  const ny = lit ? yy + 38 : yy + 54;
+  const nm = fusion ? o.fusion.name : cardName(c);
+  const nsz = nm.length > 15 ? 8.5 : nm.length > 11 ? 10 : 11.5;
+  htxt(nm, cx, ny, t > 0.4 ? '#ffffff' : '#efe4d2', 'center', nsz,
+       { weight: '700', mid: 1, glow: g.col, glowSize: 7 + 15 * t, track: 0.05 });
+  // a five-card hand leaves each card 84px wide; the copy scales with it so a
+  // long effect wraps instead of being silently cut off at the third line
+  const esz = cw < 100 ? 6.8 : 7.5;
+  wrapped(fusion ? o.fusion.d : cardLine(c, o.val), cx, ny + 16, cw - 14, '#c8bba8', esz, lit ? 3 : 4);
+
+  // the rider, when the rarity paid for one. No band, no box — just air above it.
+  if (lit) {
+    const by = yy + ch - 46;
+    htxt('◆ ' + (fusion ? 'MADE FROM' : c.r.n), cx, by, g.col, 'center', 6.5,
+         { track: 0.14, mid: 1, glow: g.col, glowSize: 8 });
+    const txt2 = fusion
+      ? (o.fusion.id === 'primecut' ? 'three RARE or better cards'
+         : o.fusion.need.map(([id]) => CARD_BY_ID[id].name).join(' + '))
+      : c.r.d;
+    wrapped(txt2, cx, by + 11, cw - 16, '#ded2c0', 6.5);
+  }
+
+  // foot: which aisle it came from, and how many you hold. Aisle in grey —
+  // its colour belongs to THE ORDER strip, not in here.
+  const foot = yy + ch - 9;
+  if (fusion) {
+    htxt('OFF-CUT', cx, foot, 'rgba(150,136,124,0.7)', 'center', 5.5, { track: 0.26, mid: 1, noShadow: true });
+    return 1;
+  }
+  const ai = AISLES[c.aisle], rank = dkr(c.id);
+  const lbl = ai.n, lw = htxtWidth(lbl, 5.5, 0.26);
+  const pw = 4, pg = 2, pipsW = c.max * pw + (c.max - 1) * pg;
+  const tot = lw + 9 + pipsW, sx = cx - tot / 2;
+  htxt(lbl, sx, foot, 'rgba(150,136,124,0.7)', 'left', 5.5, { track: 0.26, mid: 1, noShadow: true });
+  for (let j = 0; j < c.max; j++) {
+    const px = sx + lw + 9 + j * (pw + pg);
+    if (j < rank) { ctx.fillStyle = g.col; ctx.globalAlpha = 0.9; ctx.fillRect(px, foot - 1.5, pw, 3); }
+    else if (j === rank) { ctx.fillStyle = g.col; ctx.globalAlpha = 0.4 + Math.sin(S.t * 6) * 0.2; ctx.fillRect(px, foot - 1.5, pw, 3); }
+    else { ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.13; ctx.fillRect(px, foot - 0.5, pw, 1); }
+    ctx.globalAlpha = 1;
+  }
+  return 1;
+}
+
+/* Centred, broken on a space. `max` defaults to three lines, but a five-card
+   hand makes each card narrow enough that a long effect needs a fourth or it
+   is silently truncated mid-sentence. */
+function wrapped(str, cx, y, maxw, col, size, max) {
   const words = String(str).split(' ');
   let line = '', out = [];
   for (const wd of words) {
@@ -4191,83 +4878,301 @@ function wrapped(str, cx, y, maxw, col, size) {
     if (htxtWidth(t, size, 0.03) > maxw && line) { out.push(line); line = wd; } else line = t;
   }
   if (line) out.push(line);
-  out = out.slice(0, 3);
+  out = out.slice(0, max || 3);
   out.forEach((l, i) => htxt(l, cx, y + i * 9, col, 'center', size, { track: 0.03, noShadow: true }));
   return out.length;
 }
 
+/* THE ORDER, as a strip of five chips — one per aisle, filled toward the next
+   threshold.
+
+   It ships with its own headline because it needs one: five empty boxes
+   labelled 0/4 at the start of a run tell you nothing about what they are or
+   why you would want them, and sitting under a row of cards that also carry
+   coloured edges, they read as a second rarity scale. The heading says what
+   the bar is; the chip says what the aisle pays. */
+function drawOrderStrip(y) {
+  const any = AISLE_ORDER.some(k => ais(k) > 0);
+  htxt('THE ORDER', 20, y, '#9d8a7a', 'left', 7, { track: 0.26, mid: 1, noShadow: true });
+  htxt(any ? 'collect from one aisle — 4 cards earns its perk, 8 masters it'
+           : 'cards come from five aisles. take 4 from one and it starts paying you back.',
+       20 + htxtWidth('THE ORDER', 7, 0.26) + 8, y, 'rgba(126,114,104,0.75)', 'left', 6.5,
+       { track: 0.04, mid: 1, noShadow: true });
+
+  const cw = 88, gap = 6, x0 = W / 2 - (cw * 5 + gap * 4) / 2, cy = y + 8;
+  AISLE_ORDER.forEach((key, i) => {
+    const ai = AISLES[key], n = ais(key), x = x0 + i * (cw + gap);
+    const t2 = n >= AISLE_T2, t1 = n >= AISLE_T1;
+    const goal = t2 ? AISLE_T2 : AISLE_T1;
+    const f = clamp(n / goal, 0, 1);
+    ctx.fillStyle = 'rgba(10,8,12,0.85)'; ctx.fillRect(x, cy, cw, 22);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = t2 ? 0.20 : t1 ? 0.13 : 0.07;
+    ctx.fillStyle = ai.col; ctx.fillRect(x, cy, cw * f, 22);
+    ctx.restore();
+    ctx.fillStyle = ai.col; ctx.globalAlpha = t1 ? 0.9 : 0.35;
+    ctx.fillRect(x, cy, 2, 22);
+    ctx.globalAlpha = 1;
+    htxt(ai.n, x + 6, cy + 6, t1 ? ai.col : 'rgba(150,136,124,0.85)', 'left', 6,
+         { track: 0.16, mid: 1, noShadow: true });
+    htxt(t2 ? 'MAX' : n + '/' + goal, x + cw - 5, cy + 6, t1 ? ai.col : 'rgba(130,118,108,0.7)', 'right', 6,
+         { track: 0.04, mid: 1, noShadow: true });
+    /* What the aisle actually pays. Without this the chip is a progress bar
+       toward an unnamed prize, which is not a reason to do anything. */
+    const perk = t2 ? ai.p2 : ai.p1;
+    htxt(perk.length > 30 ? perk.slice(0, 29) + '…' : perk, x + 6, cy + 15,
+         t1 ? 'rgba(210,196,180,0.85)' : 'rgba(120,110,102,0.6)', 'left', 5.5,
+         { track: 0.02, mid: 1, noShadow: true });
+  });
+}
+
 function drawLevelUp() {
   S.ui = []; uiWipe();
+  const top = S.handTop | 0;
   ctx.fillStyle = 'rgba(4,3,6,0.90)'; ctx.fillRect(0, 0, W, H);
-  const bg = ctx.createRadialGradient(W / 2, H / 2, 6, W / 2, H / 2, 200);
-  bg.addColorStop(0, 'rgba(120,40,150,0.15)'); bg.addColorStop(1, 'rgba(120,40,150,0)');
+  /* The backdrop takes the colour of the best thing in the hand, so an EPIC
+     screen is a different colour of room before you have read a word. Derived
+     from the ladder rather than hardcoded, so retuning the palette retunes
+     the room with it. */
+  const wash = top >= 2 ? GRADE[top].col : '#6a4478';
+  const bg = ctx.createRadialGradient(W / 2, H / 2, 6, W / 2, H / 2, 210);
+  bg.addColorStop(0, hexA(wash, 0.13 + top * 0.03));
+  bg.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
-  htxt('THE MENU', W / 2, 34, '#e8d2a4', 'center', 24,
-       { weight: '700', glow: '#5a2a6a', glowSize: 20, track: 0.20 });
+  htxt('THE MENU', W / 2, 17, '#e8d2a4', 'center', 20,
+       { weight: '700', mid: 1, glow: wash, glowSize: 14 + top * 5, track: 0.20 });
   htxt('LEVEL ' + S.level + (S.upgPts > 1 ? '  ·  ' + S.upgPts + ' PICKS LEFT' : '  ·  TAKE ONE'),
-       W / 2, 48, '#8d7f92', 'center', 8, { track: 0.24 });
+       W / 2, 30, '#8d7f92', 'center', 7.5, { track: 0.24, mid: 1 });
 
   const hand = S.hand || [];
-  const CW = hand.length > 3 ? 104 : 116, gap = 10, CH = 118;
+  S.handIn = Math.min(1, (S.handIn || 0) + 0.06);
+  /* The hand is not always three. THE FULL MENU widens it to four and TOMCE's
+     HOLLOW adds a fifth, and a fixed card width put five cards 86px past both
+     edges of a 480px screen. Fit the row to the space instead of guessing. */
+  const gap = 9, ROOM = W - 24;
+  const CW = Math.min(118, Math.floor((ROOM - gap * (hand.length - 1)) / Math.max(1, hand.length)));
+  const CH = 126, cy = 39;
   const x0 = W / 2 - (CW * hand.length + gap * (hand.length - 1)) / 2;
   hand.forEach((o, i) => {
-    const x = x0 + i * (CW + gap), y = 62;
-    const hot = mouse.x > x && mouse.x < x + CW && mouse.y > y - 4 && mouse.y < y + CH;
-    const k = 'card' + i + o.c.id;
-    hoverT[k] = clamp((hoverT[k] || 0) + (hot ? 0.22 : -0.18), 0, 1);
-    cardFace(o, x, y, CW, CH, hoverT[k], true);
-    S.ui.push({ x, y: y - 4, w: CW, h: CH, fn: () => takeCard(o) });
+    // each card deals in a beat after the one before it
+    const a = clamp(S.handIn * 3.2 - i * 0.55, 0, 1);
+    const ease = 1 - Math.pow(1 - a, 3);
+    const x = x0 + i * (CW + gap), y = cy + (1 - ease) * 26;
+    const key = 'card' + i + (o.fusion ? o.fusion.id : o.c.id);
+    const hot = a >= 1 && mouse.x > x && mouse.x < x + CW && mouse.y > y - 6 && mouse.y < y + CH;
+    hoverT[key] = clamp((hoverT[key] || 0) + (hot ? 0.22 : -0.18), 0, 1);
+    ctx.save();
+    ctx.globalAlpha = ease;
+    cardFace(o, x, y, CW, CH, hoverT[key], true);
+    ctx.restore();
+    if (a >= 1) S.ui.push({ x, y: y - 6, w: CW, h: CH + 6, fn: () => takeCard(o) });
   });
+
+  drawOrderStrip(172);
 
   /* Rerolling is the only thing coins do during a fight, which keeps them
      worth picking up between shops. */
   const rc = rerollCost(), can = S.coins >= rc;
-  uiBtn(W / 2 - 66, H - 32, 132, 18, 'REROLL  ' + rc, can ? '#f5c518' : '#6b5a4e', () => rerollHand(), !can);
-  htxt('LUCK ' + (Math.round((S.luck + S.lvlLuck) * 10) / 10) + '   ·   ' + S.coins + ' coins   ·   ' +
-       'SELECT → CHOICE → PRIME → BLACK LABEL',
-       W / 2, H - 8, 'rgba(126,114,124,0.7)', 'center', 7, { track: 0.10, noShadow: true });
+  uiBtn(W / 2 - 66, 206, 132, 17, 'REROLL  ' + rc, can ? '#f5c518' : '#6b5a4e', () => rerollHand(), !can);
+
+  drawGradeLegend(233, top);
+
+  /* The nearest unbuilt off-cut, printed as a goal. This is the single line
+     that turns a pile of cards into something a player aims at. */
+  let near = null, nd = 1e9;
+  for (const f of FUSIONS) {
+    if (fz(f.id) || fusionReady(f)) continue;
+    let have = 0, want = 0;
+    if (f.id === 'primecut') { have = Math.min(primeCount(), 3); want = 3; }
+    else for (const [id, r] of f.need) { have += Math.min(dkr(id), r); want += r; }
+    const miss = want - have;
+    if (have > 0 && miss < nd) { nd = miss; near = f; }
+  }
+  if (near) {
+    const lbl = 'NEXT OFF-CUT  ' + near.name + '  —  ' + fusionHint(near);
+    htxt(lbl, W / 2, 255, 'rgba(180,150,200,0.85)', 'center', 6.5, { track: 0.04, mid: 1, noShadow: true });
+  } else {
+    htxt('LUCK ' + (Math.round((S.luck + S.lvlLuck) * 10) / 10) + '   ·   ' + S.coins + ' coins',
+         W / 2, 255, 'rgba(126,114,124,0.7)', 'center', 6.5, { track: 0.10, mid: 1, noShadow: true });
+  }
   crosshair();
 }
 
-/* THE MENU, read-only: everything the run has picked up so far. */
+/* The rarity ladder, spelled out in its own colours with the current rung
+   marked. It went missing when the footer was rewritten, which left PRIME as
+   a word on a card with nothing anywhere to say it was a rung on a scale —
+   and that is exactly how it read. */
+function drawGradeLegend(y, top) {
+  const names = GRADE.slice(0, 4);
+  const sep = '  ·  ', sepW = htxtWidth(sep, 6.5, 0.04);
+  let total = 0;
+  const ws = names.map(g => htxtWidth(g.n, 6.5, 0.10));
+  for (const w of ws) total += w;
+  total += sepW * (names.length - 1);
+  const lead = 'RARITY   ', leadW = htxtWidth(lead, 6.5, 0.22);
+  let x = W / 2 - (total + leadW) / 2;
+  htxt(lead, x, y, 'rgba(120,110,102,0.7)', 'left', 6.5, { track: 0.22, mid: 1, noShadow: true });
+  x += leadW;
+  names.forEach((g, i) => {
+    const isTop = i === top;
+    htxt(g.n, x, y, g.col, 'left', 6.5,
+         { track: 0.10, mid: 1, alpha: isTop ? 1 : 0.55, glow: isTop ? g.col : null, glowSize: 9, noShadow: !isTop });
+    x += ws[i];
+    if (i < names.length - 1) {
+      htxt(sep, x, y, 'rgba(110,100,94,0.5)', 'left', 6.5, { track: 0.04, mid: 1, noShadow: true });
+      x += sepW;
+    }
+  });
+  htxt('◆  RARE or better also unlocks the card\'s rider — a second, bigger effect',
+       W / 2, y + 10, 'rgba(126,114,104,0.75)', 'center', 6.5, { track: 0.04, mid: 1, noShadow: true });
+}
+
+/* ---------- THE COLD ROOM ----------
+   Two signatures, one door. Deliberately the widest, slowest screen in the
+   game: it happens five times a run at most and it should feel like it. */
+function drawColdRoom() {
+  S.ui = []; uiWipe();
+  ctx.fillStyle = 'rgba(3,4,8,0.94)'; ctx.fillRect(0, 0, W, H);
+  const bg = ctx.createRadialGradient(W / 2, H / 2, 8, W / 2, H / 2, 230);
+  bg.addColorStop(0, 'rgba(150,60,190,0.18)'); bg.addColorStop(1, 'rgba(150,60,190,0)');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  // hanging rails, because it is a cold room
+  ctx.fillStyle = 'rgba(120,140,150,0.10)';
+  for (let i = 0; i < 9; i++) ctx.fillRect(24 + i * 52, 0, 1, 46);
+
+  htxt('THE COLD ROOM', W / 2, 24, '#e8d2a4', 'center', 22,
+       { weight: '700', mid: 1, glow: '#7a2ea0', glowSize: 22, track: 0.20 });
+  htxt('the floor is yours. one of these leaves with you.', W / 2, 40, '#8d7f92', 'center', 7.5,
+       { track: 0.10, mid: 1 });
+
+  const offer = S.sigOffer || [];
+  const CW = 176, gap = 16, CH = 136, cy = 56;
+  const x0 = W / 2 - (CW * offer.length + gap * (offer.length - 1)) / 2;
+  offer.forEach((k, i) => {
+    const it = ITEMS[k], lv = sigLevel(k);
+    const x = x0 + i * (CW + gap);
+    const hot = mouse.x > x && mouse.x < x + CW && mouse.y > cy - 6 && mouse.y < cy + CH;
+    const key = 'sig' + k;
+    hoverT[key] = clamp((hoverT[key] || 0) + (hot ? 0.20 : -0.16), 0, 1);
+    const t = hoverT[key], y = cy - t * 4;
+
+    frameBox(x, y, CW, CH, it.col, t, 26);
+    ctx.fillStyle = it.col; ctx.globalAlpha = 0.14 + t * 0.12;
+    ctx.fillRect(x + 2, y + 3, CW - 3, 12);
+    ctx.globalAlpha = 1;
+    htxt(lv ? 'UPGRADE' : 'SIGNATURE', x + CW / 2, y + 9, it.col, 'center', 6.5,
+         { track: 0.28, mid: 1, glow: it.col, glowSize: 10 });
+
+    // the grocery itself, floating, with its own light under it
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.10 + t * 0.10 + Math.sin(S.t * 2.4) * 0.03;
+    ctx.fillStyle = it.col;
+    ctx.beginPath(); ctx.arc(x + CW / 2, y + 42, 26, 0, TAU); ctx.fill();
+    ctx.restore();
+    drawSpr(ctx, it.spr, x + CW / 2, y + 42 + Math.sin(S.t * 2 + i) * 1.5, 2.6);
+
+    htxt(it.n[Math.min(lv, 1)], x + CW / 2, y + 74, t > 0.4 ? '#ffffff' : '#e8dcc8', 'center', 12,
+         { weight: '700', mid: 1, glow: it.col, glowSize: 10 + 14 * t, track: 0.05 });
+    wrapped(it.d[Math.min(lv, 1)], x + CW / 2, y + 88, CW - 22, '#c8bba8', 7.5);
+
+    if (lv) {
+      ctx.fillStyle = it.col; ctx.globalAlpha = 0.10;
+      ctx.fillRect(x + 6, y + CH - 22, CW - 12, 16);
+      ctx.globalAlpha = 1;
+      htxt('replaces  ' + it.n[0], x + CW / 2, y + CH - 14, 'rgba(170,152,136,0.85)', 'center', 6.5,
+           { track: 0.04, mid: 1, noShadow: true });
+    }
+    S.ui.push({ x, y: cy - 6, w: CW, h: CH + 6, fn: () => takeSig(k) });
+  });
+
+  htxt('there is no walking out of here empty-handed.', W / 2, H - 10, 'rgba(126,114,124,0.6)', 'center', 7,
+       { track: 0.10, mid: 1, noShadow: true });
+  crosshair();
+}
+
+/* THE MENU, read-only: everything the run has picked up so far, in the order
+   it matters — what you hold, what it does, and which riders are live. A card
+   whose rider is on gets its second line; that is the whole point of the
+   grade, so it has to be visible somewhere you can study it. */
 function drawDeck() {
   S.ui = []; uiWipe();
-  ctx.fillStyle = 'rgba(5,4,7,0.92)'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = 'rgba(5,4,7,0.94)'; ctx.fillRect(0, 0, W, H);
   const bg = ctx.createRadialGradient(W / 2, 16, 6, W / 2, 16, 200);
   bg.addColorStop(0, 'rgba(120,40,150,0.13)'); bg.addColorStop(1, 'rgba(120,40,150,0)');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
-  htxt('THE MENU', 22, 22, '#e8d2a4', 'left', 17, { weight: '700', glow: '#5a2a6a', glowSize: 14, track: 0.22 });
+  htxt('THE MENU', 20, 16, '#e8d2a4', 'left', 16, { weight: '700', mid: 1, glow: '#5a2a6a', glowSize: 14, track: 0.22 });
   htxt('LEVEL ' + S.level + '  ·  ' + S.cardsTaken + ' cards  ·  LUCK ' + (Math.round(S.luck * 10) / 10),
-       W - 22, 22, '#9d8a7a', 'right', 8, { track: 0.10 });
+       W - 20, 16, '#9d8a7a', 'right', 7.5, { track: 0.10, mid: 1 });
+
+  // signatures and off-cuts get a band of their own at the top — they are not
+  // "another card in an aisle" and listing them as one hid them
+  let y = 30;
+  const sigs = SIG_ORDER.filter(k => sigLevel(k) > 0);
+  if (sigs.length || S.fusedOrder.length) {
+    /* Five signatures and a handful of off-cuts is wider than the screen, so
+       the band wraps rather than running off the right edge. */
+    const RIGHT = W - 20;
+    let x = 20;
+    const wrapIf = need => { if (x + need > RIGHT) { x = 20; y += 11; } };
+    for (const k of sigs) {
+      const it = ITEMS[k], nm = it.n[Math.min(sigLevel(k) - 1, 1)];
+      const need = 15 + htxtWidth(nm, 7, 0.04) + 12;
+      wrapIf(need);
+      drawSpr(ctx, it.spr, x + 6, y + 5, 0.9);
+      htxt(nm, x + 15, y + 6, it.col, 'left', 7, { track: 0.04, mid: 1 });
+      x += need;
+    }
+    for (const fid of S.fusedOrder) {
+      const f = FUSION_BY_ID[fid], lbl = '◆ ' + f.name;
+      const need = htxtWidth(lbl, 7, 0.04) + 12;
+      wrapIf(need);
+      htxt(lbl, x, y + 6, GRADE[4].col, 'left', 7,
+           { track: 0.04, mid: 1, glow: GRADE[4].col, glowSize: 8 });
+      x += need;
+    }
+    ctx.fillStyle = 'rgba(157,138,122,0.18)'; ctx.fillRect(20, y + 13, W - 40, 1);
+    y += 20;
+  }
 
   /* Two columns of aisles, each aisle a heading and its cards under it. */
-  let col = 0, y = 38;
-  const colX = [22, 250], colW = 208;
+  let col = 0;
+  const top = y, colX = [20, 246], colW = 214;
   for (const key of AISLE_ORDER) {
     const held = CARDS.filter(c => c.aisle === key && dkr(c.id) > 0);
     if (!held.length) continue;
-    const need = 11 + held.length * 11;
-    if (y + need > H - 24 && col === 0) { col = 1; y = 38; }
-    const ai = AISLES[key], x = colX[col];
-    htxt(ai.n, x, y, ai.col, 'left', 8, { track: 0.26 });
+    let rows = 0;
+    for (const c of held) rows += riderOn(c.id) ? 2 : 1;
+    const need = 11 + rows * 9 + 5;
+    if (y + need > H - 24 && col === 0) { col = 1; y = top; }
+    const ai = AISLES[key], x = colX[col], n = ais(key);
+    htxt(ai.n, x, y, ai.col, 'left', 8, { track: 0.26, mid: 1 });
     const lw = htxtWidth(ai.n, 8, 0.26);
+    const tag = n >= AISLE_T2 ? 'MASTERED' : n >= AISLE_T1 ? 'THE ORDER  ' + n + '/' + AISLE_T2 : n + '/' + AISLE_T1;
+    htxt(tag, x + colW, y, n >= AISLE_T1 ? ai.col : 'rgba(120,108,98,0.7)', 'right', 6,
+         { track: 0.10, mid: 1, noShadow: true });
     ctx.fillStyle = ai.col; ctx.globalAlpha = 0.22;
-    ctx.fillRect(x + lw + 6, y - 3, colW - lw - 6, 1);
+    ctx.fillRect(x + lw + 6, y, colW - lw - 6 - htxtWidth(tag, 6, 0.10) - 6, 1);
     ctx.globalAlpha = 1;
     y += 11;
     for (const c of held) {
-      const d = S.deck[c.id];
-      if (c.sig) drawSpr(ctx, ITEMS[c.sig].spr, x + 6, y - 2, 0.8);
-      htxt(cardName(c), x + (c.sig ? 15 : 4), y + 1, GRADE[d.g | 0].col, 'left', 7.5, { track: 0.04 });
-      htxt(cardLine(c, d.amt), x + colW - 2, y + 1, 'rgba(150,134,120,0.9)', 'right', 6.5,
-           { track: 0.02, noShadow: true });
-      y += 11;
+      if (y > H - 26) break;                 // the second column is the last one there is
+      const d = S.deck[c.id], lit = riderOn(c.id);
+      htxt(cardName(c) + (d.rank > 1 ? ' ×' + d.rank : ''), x + 4, y + 3, GRADE[d.g | 0].col, 'left', 7.5,
+           { track: 0.04, mid: 1 });
+      htxt(cardLine(c, d.amt), x + colW - 2, y + 3, 'rgba(150,134,120,0.9)', 'right', 6.5,
+           { track: 0.02, mid: 1, noShadow: true });
+      y += 9;
+      if (lit) {
+        htxt('◆ ' + c.r.n + ' — ' + c.r.d, x + 10, y + 2, GRADE[d.g | 0].col, 'left', 6,
+             { track: 0.02, mid: 1, alpha: 0.85, noShadow: true });
+        y += 9;
+      }
     }
     y += 5;
   }
-  if (!S.cardsTaken) htxt('nothing yet. go and level up.', 22, 52, '#5f5044', 'left', 8);
+  if (!S.cardsTaken && !sigs.length) htxt('nothing yet. go and level up.', 20, 52, '#5f5044', 'left', 8);
 
   uiBtn(W / 2 - 48, H - 20, 96, 16, 'BACK', '#e8b25a', () => { S.mode = 'pause'; });
   crosshair();
@@ -4410,7 +5315,7 @@ function drawPause() {
     y += 12;
   }
   if (S.god) { drawSpr(ctx, SPR.eye, 38, y - 2, 0.8); htxt('THE THIRD EYE — you cannot die', 50, y + 1, '#ff5b5b', 'left', 8); y += 12; any = true; }
-  if (!any) { htxt('none yet. they are the rarest cards in the deck.', 38, y + 1, '#5f5044', 'left', 7.5); y += 12; }
+  if (!any) { htxt('none yet. put down a floor boss and the cold room opens.', 38, y + 1, '#5f5044', 'left', 7.5); y += 12; }
 
   /* Arsenal in two columns: seven guns stacked in one column ran into the
      footer once you owned them all. */
@@ -4477,6 +5382,7 @@ function frame(now) {
     if (S.mode === 'pause') drawPause();
     if (S.mode === 'deck') drawDeck();
     if (S.mode === 'levelup') drawLevelUp();
+    if (S.mode === 'coldroom') drawColdRoom();
     if (S.mode === 'augment') drawAugments();
     if (S.mode === 'dead') drawDead();
   }
@@ -4530,7 +5436,10 @@ window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantItem, grantG
                 gainXP, openLevelUp, takeCard, dealCards, rerollHand, scarName, scarCol, ST,
                 ITEMS, BOSSES, WEP, WORDER, COSMETICS, frame, nextRoom,
                 enterShop, exitShop, shopStock, shopSlots, roomDef, curRoom, buildRoom,
-                CARDS, CARD_BY_ID, AISLES, GRADE, rollGrade, cardVal, dk, dkr, recalcLuck,
+                CARDS, CARD_BY_ID, AISLES, AISLE_ORDER, GRADE, rollGrade, cardVal, dk, dkr, dkc,
+                riderOn, recalcLuck, recalcAisles, ais, aisleT1, aisleT2, AISLE_T1, AISLE_T2,
+                FUSIONS, FUSION_BY_ID, fz, fusionReady, fusionHint, availableFusions, takeFusion,
+                SIG_ORDER, sigPool, sigLevel, openColdRoom, takeSig, frostPulse, knockRoom,
                 CONTRACTS, cStat, bump, bumpMax, contractDone, checkContracts,
                 AUGMENTS, ag, dealAugments, openAugments, takeAugment, refuseAugments,
                 spawnMini, MINIS, BOSS_WAVE, MINI_WAVES, isApexFloor, bossIndexFor,
