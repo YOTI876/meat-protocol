@@ -3352,6 +3352,17 @@ function recalcLuck() {
          + (aisleT1('expired') ? 1 : 0) + (fz('primecut') ? 1 : 0);
 }
 
+/* Abandon the run and go back to the title. Everything that persists is
+   already persisted continuously (coins, cards, vault, contract counters),
+   so this is the death path minus the death: bank it, wipe the run state,
+   fade the score out. */
+function quitToTitle() {
+  persist();
+  if (A.music) A.music.stop(0.6);
+  A.setDread(0.2);
+  freshState();
+}
+
 function startRun() {
   freshState();
   S.mode = 'play';
@@ -4678,12 +4689,15 @@ function drawTitle() {
          track: trk, font: TITLE_FONT, mid: true });
   htxt('a Damjan situation', W / 2, 66, '#7d6a5c', 'center', 8, { track: 0.30 });
 
-  /* If a requested typeface is not in fonts/, say so here rather than quietly
-     rendering the fallback and letting it pass for the real thing. */
-  const missing = fontMissing();
-  if (missing.length)
-    htxt('typeface not found in fonts/ — ' + missing.join(', '), W / 2, H - 6,
-         '#6a4a4a', 'center', 6, { track: 0.12 });
+  /* The fonts/ warning used to be drawn here. It was stamped on top of the
+     teaser line at the bottom edge — two strings occupying the same pixels —
+     and it is a developer's message, not a player's. It lives in the console
+     now, once, where developers look. */
+  if (!S.fontWarned && FONT_PROBED) {
+    S.fontWarned = true;
+    const missing = fontMissing();
+    if (missing.length) console.info('[MEAT] typeface not found in fonts/: ' + missing.join(', ') + ' — using the embedded fallback.');
+  }
 
   // the title screen shows him before any of it happened
   drawSpr(ctx, bodySprite(0), W / 2, 104, 2.2);
@@ -4695,8 +4709,6 @@ function drawTitle() {
   ctx.globalAlpha = 1;
   updateParticles(1 / 60);
 
-  const evoCost = EVO_COST(S.evo | 0);
-  const signed = CONTRACTS.filter(c => contractDone(c.id)).length;
   uiBtn(W / 2 - 150, 150, 96, 22, 'PLAY', '#e8b25a', () => startRun());
   uiBtn(W / 2 - 48, 150, 96, 22, 'COSMETICS', '#b558ff', () => { S.cosReturn = 'title'; S.mode = 'cos'; });
   uiBtn(W / 2 + 54, 150, 96, 22, 'EVOLVE ' + (S.evo | 0), '#ff4a54', () => evolve(), !canEvolve());
@@ -4707,24 +4719,11 @@ function drawTitle() {
     uiBtn(W / 2 - 48, 176, 96, 16, 'CONTRACTS', '#f0c65a', () => { S.cosReturn = 'title'; S.mode = 'contracts'; });
   }
 
-  statRow([
-    { spr: SPR.coin, v: String(S.coins), col: '#f5c518' },
-    { spr: SPR.card, v: S.cards + '/' + OMEGA_CARDS, sc: 0.6, col: '#d8b8b8' },
-    { v: 'CONTRACTS ' + signed + '/' + CONTRACTS.length, col: signed ? '#ffb03a' : '#6b5a4e' },
-    { v: 'EVO ' + (S.evo | 0) + ' / NEXT ' + evoCost, col: canEvolve() ? '#ff6a72' : '#6b5a4e' }
-  ], 204);
-
-  const sv = loadSave();
-  const y0 = 218;
-  htxt('BEST ' + (sv.best || 0) + '   ·   DEEPEST FLOOR ' + (sv.deep || 1) +
-       (sv.godFound ? '   ·   EYE' : '') + (sv.modagaz ? '   ·   MODAGAZ x' + sv.modagaz : '') +
-       (sv.goro ? '   ·   GOROMANIA' : ''), W / 2, y0, '#6d5c4e', 'center', 7.5, { track: 0.12 });
-  htxt('WASD move · MOUSE aim · LMB fire · RMB frag · WHEEL swap · R reload · E buy',
-       W / 2, y0 + 13, '#7e6d5f', 'center', 7.5, { track: 0.06 });
-  htxt('ENTER play · C cosmetics · B the menu · ESC pause · M mute',
-       W / 2, y0 + 23, '#6b5c50', 'center', 7.5, { track: 0.06 });
-  htxt('one thing is hidden on floor 1.  one in every corner.  one behind a door that is shut.',
-       W / 2, H - 8, 'rgba(126,86,86,0.55)', 'center', 7, { track: 0.10, noShadow: true });
+  /* Below the buttons: nothing. The wallet, the contract count, the best
+     score, the control listing, the secrets teaser and the font warning all
+     lived down here at one point or another — a title screen is a poster,
+     not a ledger. The wallet is on the pause screen, the records are on the
+     death screen, the contracts have their own board. */
   post();
   crosshair();
 }
@@ -5169,10 +5168,13 @@ function drawColdRoom() {
   crosshair();
 }
 
-/* THE MENU, read-only: everything the run has picked up so far, in the order
-   it matters — what you hold, what it does, and which riders are live. A card
-   whose rider is on gets its second line; that is the whole point of the
-   grade, so it has to be visible somewhere you can study it. */
+/* THE MENU, read-only: everything the run has picked up so far.
+
+   Each aisle is a PANEL — a boxed section with its own header bar — instead
+   of a loose heading floating over loose rows. The old layout put the card
+   name hard left and its effect hard right across a 214px column, which left
+   a void in the middle of every line and no visible grouping; it read as two
+   unrelated lists that happened to share a screen. */
 function drawDeck() {
   S.ui = []; uiWipe();
   ctx.fillStyle = 'rgba(5,4,7,0.94)'; ctx.fillRect(0, 0, W, H);
@@ -5180,77 +5182,98 @@ function drawDeck() {
   bg.addColorStop(0, 'rgba(120,40,150,0.13)'); bg.addColorStop(1, 'rgba(120,40,150,0)');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
-  htxt('THE MENU', 20, 16, '#e8d2a4', 'left', 16, { weight: '700', mid: 1, glow: '#5a2a6a', glowSize: 14, track: 0.22 });
+  htxt('THE DECK', 14, 15, '#e8d2a4', 'left', 15, { weight: '700', mid: 1, glow: '#5a2a6a', glowSize: 14, track: 0.22 });
   htxt('LEVEL ' + S.level + '  ·  ' + S.cardsTaken + ' cards  ·  LUCK ' + (Math.round(S.luck * 10) / 10),
-       W - 20, 16, '#9d8a7a', 'right', 7.5, { track: 0.10, mid: 1 });
+       W - 14, 15, '#9d8a7a', 'right', 7.5, { track: 0.10, mid: 1 });
 
-  // signatures and off-cuts get a band of their own at the top — they are not
-  // "another card in an aisle" and listing them as one hid them
-  let y = 30;
+  /* Signatures and off-cuts as chips — boxed, so they read as things you own
+     rather than stray words. They wrap; five signatures plus off-cuts is
+     wider than the screen. */
+  let y = 27;
   const sigs = SIG_ORDER.filter(k => sigLevel(k) > 0);
   if (sigs.length || S.fusedOrder.length) {
-    /* Five signatures and a handful of off-cuts is wider than the screen, so
-       the band wraps rather than running off the right edge. */
-    const RIGHT = W - 20;
-    let x = 20;
-    const wrapIf = need => { if (x + need > RIGHT) { x = 20; y += 11; } };
+    let x = 14;
+    const chip = (w, draw) => {
+      if (x + w > W - 14) { x = 14; y += 15; }
+      ctx.fillStyle = 'rgba(14,11,17,0.9)'; ctx.fillRect(x, y, w, 13);
+      ctx.globalAlpha = 0.3; ctx.fillStyle = '#9d8a7a';
+      ctx.fillRect(x, y, w, 1); ctx.fillRect(x, y + 12, w, 1);
+      ctx.fillRect(x, y, 1, 13); ctx.fillRect(x + w - 1, y, 1, 13);
+      ctx.globalAlpha = 1;
+      draw(x);
+      x += w + 5;
+    };
     for (const k of sigs) {
       const it = ITEMS[k], nm = it.n[Math.min(sigLevel(k) - 1, 1)];
-      const need = 15 + htxtWidth(nm, 7, 0.04) + 12;
-      wrapIf(need);
-      drawSpr(ctx, it.spr, x + 6, y + 5, 0.9);
-      htxt(nm, x + 15, y + 6, it.col, 'left', 7, { track: 0.04, mid: 1 });
-      x += need;
+      chip(16 + htxtWidth(nm, 6.5, 0.04) + 7, cx => {
+        drawSpr(ctx, it.spr, cx + 8, y + 6, 0.85);
+        htxt(nm, cx + 16, y + 6.5, it.col, 'left', 6.5, { track: 0.04, mid: 1 });
+      });
     }
     for (const fid of S.fusedOrder) {
       const f = FUSION_BY_ID[fid], lbl = '◆ ' + f.name;
-      const need = htxtWidth(lbl, 7, 0.04) + 12;
-      wrapIf(need);
-      htxt(lbl, x, y + 6, GRADE[4].col, 'left', 7,
-           { track: 0.04, mid: 1, glow: GRADE[4].col, glowSize: 8 });
-      x += need;
+      chip(htxtWidth(lbl, 6.5, 0.04) + 12, cx => {
+        htxt(lbl, cx + 6, y + 6.5, GRADE[4].col, 'left', 6.5,
+             { track: 0.04, mid: 1, glow: GRADE[4].col, glowSize: 7 });
+      });
     }
-    ctx.fillStyle = 'rgba(157,138,122,0.18)'; ctx.fillRect(20, y + 13, W - 40, 1);
     y += 20;
   }
 
-  /* Two columns of aisles, each aisle a heading and its cards under it. */
+  /* Aisle panels, two columns, flowed left column first. */
   let col = 0;
-  const top = y, colX = [20, 246], colW = 214;
+  const top = y, colX = [14, 244], colW = 222;
+  const colY = [y, y];
   for (const key of AISLE_ORDER) {
     const held = CARDS.filter(c => c.aisle === key && dkr(c.id) > 0);
     if (!held.length) continue;
-    let rows = 0;
-    for (const c of held) rows += riderOn(c.id) ? 2 : 1;
-    const need = 11 + rows * 9 + 5;
-    if (y + need > H - 24 && col === 0) { col = 1; y = top; }
-    const ai = AISLES[key], x = colX[col], n = ais(key);
-    htxt(ai.n, x, y, ai.col, 'left', 8, { track: 0.26, mid: 1 });
-    const lw = htxtWidth(ai.n, 8, 0.26);
-    const tag = n >= AISLE_T2 ? 'MASTERED' : n >= AISLE_T1 ? 'THE ORDER  ' + n + '/' + AISLE_T2 : n + '/' + AISLE_T1;
-    htxt(tag, x + colW, y, n >= AISLE_T1 ? ai.col : 'rgba(120,108,98,0.7)', 'right', 6,
-         { track: 0.10, mid: 1, noShadow: true });
-    ctx.fillStyle = ai.col; ctx.globalAlpha = 0.22;
-    ctx.fillRect(x + lw + 6, y, colW - lw - 6 - htxtWidth(tag, 6, 0.10) - 6, 1);
+    const riders = held.filter(c => riderOn(c.id)).length;
+    const need = 14 + held.length * 10 + riders * 9 + 6;
+    // place the panel in whichever column it fits; prefer the emptier one
+    col = colY[0] <= colY[1] ? 0 : 1;
+    if (colY[col] + need > H - 26 && colY[1 - col] + need <= H - 26) col = 1 - col;
+    const ai = AISLES[key], x = colX[col];
+    let py = colY[col];
+    const h = Math.min(need, H - 26 - py);
+    if (h < 24) continue;                       // no room left at all — skip, don't smear
+
+    // panel: body, hairline frame, aisle-coloured left edge and header bar
+    ctx.fillStyle = 'rgba(12,10,15,0.9)'; ctx.fillRect(x, py, colW, h);
+    ctx.fillStyle = ai.col;
+    ctx.globalAlpha = 0.13; ctx.fillRect(x, py, colW, 12);
+    ctx.globalAlpha = 0.9;  ctx.fillRect(x, py, 2, h);
+    ctx.globalAlpha = 0.22;
+    ctx.fillRect(x, py, colW, 1); ctx.fillRect(x, py + h - 1, colW, 1); ctx.fillRect(x + colW - 1, py, 1, h);
     ctx.globalAlpha = 1;
-    y += 11;
+
+    const n = ais(key);
+    const tag = n >= AISLE_T2 ? 'MASTERED' : n >= AISLE_T1 ? 'ORDER ' + n + '/' + AISLE_T2 : n + '/' + AISLE_T1;
+    htxt(ai.n, x + 7, py + 6, ai.col, 'left', 7, { track: 0.24, mid: 1 });
+    htxt(tag, x + colW - 6, py + 6, n >= AISLE_T1 ? ai.col : 'rgba(130,118,108,0.75)', 'right', 6,
+         { track: 0.08, mid: 1, noShadow: true });
+
+    let ry = py + 14, row = 0;
     for (const c of held) {
-      if (y > H - 26) break;                 // the second column is the last one there is
+      if (ry + 9 > py + h - 2) break;
       const d = S.deck[c.id], lit = riderOn(c.id);
-      htxt(cardName(c) + (d.rank > 1 ? ' ×' + d.rank : ''), x + 4, y + 3, GRADE[d.g | 0].col, 'left', 7.5,
-           { track: 0.04, mid: 1 });
-      htxt(cardLine(c, d.amt), x + colW - 2, y + 3, 'rgba(150,134,120,0.9)', 'right', 6.5,
-           { track: 0.02, mid: 1, noShadow: true });
-      y += 9;
+      // alternate row wash, so a long panel stays scannable
+      if (row % 2) { ctx.fillStyle = 'rgba(255,255,255,0.022)'; ctx.fillRect(x + 2, ry - 4, colW - 3, lit ? 19 : 10); }
+      htxt(cardName(c) + (d.rank > 1 ? ' ×' + d.rank : ''), x + 8, ry + 1, GRADE[d.g | 0].col, 'left', 7,
+           { track: 0.03, mid: 1 });
+      htxt(cardLine(c, d.amt), x + colW - 6, ry + 1, 'rgba(158,142,126,0.9)', 'right', 6,
+           { track: 0.01, mid: 1, noShadow: true });
+      ry += 10;
       if (lit) {
-        htxt('◆ ' + c.r.n + ' — ' + c.r.d, x + 10, y + 2, GRADE[d.g | 0].col, 'left', 6,
-             { track: 0.02, mid: 1, alpha: 0.85, noShadow: true });
-        y += 9;
+        htxt('◆ ' + c.r.n + ' — ' + c.r.d, x + 14, ry, GRADE[d.g | 0].col, 'left', 5.5,
+             { track: 0.01, mid: 1, alpha: 0.8, noShadow: true });
+        ry += 9;
       }
+      row++;
     }
-    y += 5;
+    colY[col] = py + h + 7;
   }
-  if (!S.cardsTaken && !sigs.length) htxt('nothing yet. go and level up.', 20, 52, '#5f5044', 'left', 8);
+  if (!S.cardsTaken && !sigs.length)
+    htxt('nothing yet. go and level up.', W / 2, 120, '#5f5044', 'center', 8, { mid: 1 });
 
   uiBtn(W / 2 - 48, H - 20, 96, 16, 'BACK', '#e8b25a', () => { S.mode = 'pause'; });
   crosshair();
@@ -5370,12 +5393,18 @@ function drawPause() {
 
   htxt('PAUSED', W / 2, 26, '#e8d2a4', 'center', 20, { weight: '700', glow: '#4a2a10', glowSize: 16, track: 0.24 });
 
-  /* Buttons live in a centred row under the title. Cornering them put the wide
-     ones straight through PAUSED, and the keyboard hints they used to sit
-     beside are on the title screen where you actually read them. */
-  const btns = [['THE MENU', '#f0c65a', () => { S.mode = 'deck'; }],
+  /* Buttons live in a centred row under the title. MAIN MENU abandons the
+     run: coins, cards and the vault are already banked continuously, so the
+     only thing lost is the floor you are standing on — same as dying, minus
+     the death. */
+  /* "THE DECK", not "THE MENU": with MAIN MENU sitting two buttons away on
+     the same row, two buttons both called menu read as the same door. THE
+     MENU stays the name of the level-up screen — the supermarket you pick
+     from — and this button is the deck you picked, so it says so. */
+  const btns = [['THE DECK', '#f0c65a', () => { S.mode = 'deck'; }],
                 ['COSMETICS', '#b558ff', () => { S.cosReturn = 'pause'; S.mode = 'cos'; }]];
   if (S.evo | 0) btns.push(['RESET EVO', '#7fe08a', () => resetEvolution()]);
+  btns.push(['MAIN MENU', '#ff6a72', () => quitToTitle()]);
   const bw = 96, gap = 8, rowW = btns.length * bw + (btns.length - 1) * gap;
   btns.forEach((b, i) => uiBtn(W / 2 - rowW / 2 + i * (bw + gap), 40, bw, 18, b[0], b[1], b[2]));
 
@@ -5527,6 +5556,6 @@ window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantItem, grantG
                 AUGMENTS, ag, dealAugments, openAugments, takeAugment, refuseAugments,
                 spawnMini, MINIS, BOSS_WAVE, MINI_WAVES, isApexFloor, bossIndexFor,
                 magCap, fireNova, SHOP_EVERY, diff, killEnemy, damageEnemy,
-                angerPaci, hurtStage, bodySprite, legSprite, shred, hurtPlayer, RS };
+                angerPaci, hurtStage, bodySprite, legSprite, shred, hurtPlayer, RS, quitToTitle };
 
 })();
