@@ -220,7 +220,15 @@ const SHOP_ROOM = {
   wall: ['#5a4a64', '#332a3c', '#75608a'], fog: 'rgba(70,25,95,0.09)', dark: 0.52
 };
 function curRoom() { return S.inShop ? SHOP_ROOM : roomDef(S.room); }
-const SHOP_EVERY = 3;      // one back room per three bosses put down
+/* PACI now keeps wave hours, not boss hours.
+
+   The old rule was one back room per three boss-class kills, which worked out
+   to exactly one shop a floor, always after the wave-10 boss — so every gun
+   purchase happened on the way out of a floor and you spent the whole floor
+   holding money you could not put down. Twice a floor, on the fives, means the
+   half-time shop actually changes how you fight waves 6-10. */
+const SHOP_WAVES = [5, 10];
+const shopDueAfter = w => SHOP_WAVES.indexOf(w) >= 0;
 
 /* Individual hits land much harder than they used to. Balanced back by a slower
    contact rate, longer i-frames and better healing — spikier, not just meaner. */
@@ -241,23 +249,57 @@ const ETYPE = {
               tint: 'rgba(150,210,70,0.42)', scale: 1.12, nest: 1 }
 };
 const CONTACT_CD = 0.74;   // still a shorter fuse than the 0.78 it used to be
-const OMEGA_CARDS = 50;    // the beam is the long game now
+/* Every coin that reaches your pocket goes through this, from any source —
+   drops, boss piles, the lot. `S.coinFrac` was already accumulating
+   remainders for THE DEBT, so a non-integer global rate costs nothing and
+   nothing gets silently rounded away.
+
+   0.70 is a flat 30% cut. It is what makes THE FISH's 500 a real target
+   rather than a number you pass on the way to floor 6. */
+const COIN_RATE = 0.70;
+const OMEGA_COINS = 500;   // THE FISH is the long game now
 const EVO_COST = ev => 100 * Math.pow(2, ev);   // 100, 200, 400, 800 ...
 
+/* THE WAVE-TEN ROSTER.
+
+   Ten of them, one per floor, cycling forever. Five is not enough variety for
+   a run that never ends: with the old roster you had met everything the game
+   had by floor 5 and floors 6-10 were the same five fights with bigger
+   numbers.
+
+   Every one of these has TWO PHASES. `pat` is how it opens; at half health it
+   breaks and switches to `pat2`, faster and angrier — see enterPhase2(). A
+   boss that does one thing for its whole bar is a health sponge; a boss that
+   changes its mind halfway is a fight you have to re-read.
+
+   The HP band is deliberately narrow (1400 → 3000 across ten). Floor scaling
+   does the escalating; the roster does the variety. A steep roster ramp only
+   buys a sawtooth, because floor 11 wraps back to the first entry.
+
+   addT/addN: how often each boss calls for help, and how much. Every boss
+   summons, but the cap in updateBoss keeps the arena from silting up. */
 const BOSSES = [
-  // addT/addN: how often each boss calls for help, and how much. Every boss
-  // summons now, but the cap in updateBoss keeps the arena from silting up.
-  { key: 'butcher', name: 'THE BUTCHER',      bank: SPR.anim.bossA, tint: null,                     hp: 850,  spd: 40, r: 15, item: 'banana',  pat: 'charge',  addT: 6.5, addN: 3, adds: ['crawler'],                        cry: 'IT REMEMBERS YOUR NAME' },
-  { key: 'mother',  name: 'MOTHER OF MELONS', bank: SPR.anim.bossB, tint: null,                     hp: 1100, spd: 26, r: 15, item: 'melon',   pat: 'spawner', addT: 4.2, addN: 4, adds: ['crawler', 'crawler', 'shrieker'], cry: 'SHE IS FULL OF CHILDREN' },
-  { key: 'pitcher', name: 'THE PITCHER',      bank: SPR.anim.bossA, tint: 'rgba(224,40,50,0.55)',   hp: 1450, spd: 46, r: 15, item: 'coolade', pat: 'blink',   addT: 7.0, addN: 3, adds: ['stalker', 'crawler'],            cry: 'IT CAME THROUGH THE WALL' },
-  { key: 'hog',     name: 'THE HOGFATHER',    bank: SPR.anim.bossB, tint: 'rgba(255,130,142,0.55)', hp: 1850, spd: 32, r: 15, item: 'glock',   pat: 'burst',   addT: 6.0, addN: 4, adds: ['crawler', 'shrieker', 'bloater'], cry: 'HE IS CARRYING SOMETHING' },
-  { key: 'courier', name: 'THE COURIER',      bank: SPR.anim.bossA, tint: 'rgba(90,200,255,0.5)',   hp: 2400, spd: 62, r: 15, item: 'bike',    pat: 'circle',  addT: 6.8, addN: 4, adds: ['stalker', 'stalker', 'crawler'],  cry: 'IT HAS BEEN CIRCLING FOR HOURS' }
+  { key: 'butcher', name: 'THE BUTCHER',      bank: SPR.anim.bossA, tint: null,                     hp: 1400, spd: 40, r: 15, item: 'banana',  pat: 'charge',  pat2: 'burst',   addT: 6.5, addN: 3, adds: ['crawler'],                        cry: 'IT REMEMBERS YOUR NAME',              cry2: 'IT HAS STOPPED BEING CAREFUL' },
+  { key: 'mother',  name: 'MOTHER OF MELONS', bank: SPR.anim.bossB, tint: null,                     hp: 1550, spd: 26, r: 15, item: 'melon',   pat: 'spawner', pat2: 'nova',    addT: 4.2, addN: 4, adds: ['crawler', 'crawler', 'shrieker'], cry: 'SHE IS FULL OF CHILDREN',             cry2: 'SHE IS EMPTYING HERSELF' },
+  { key: 'pitcher', name: 'THE PITCHER',      bank: SPR.anim.bossA, tint: 'rgba(224,40,50,0.55)',   hp: 1700, spd: 46, r: 15, item: 'coolade', pat: 'blink',   pat2: 'rush',    addT: 7.0, addN: 3, adds: ['stalker', 'crawler'],            cry: 'IT CAME THROUGH THE WALL',            cry2: 'IT IS NOT BOTHERING WITH WALLS NOW' },
+  { key: 'hog',     name: 'THE HOGFATHER',    bank: SPR.anim.bossB, tint: 'rgba(255,130,142,0.55)', hp: 1900, spd: 32, r: 15, item: 'glock',   pat: 'burst',   pat2: 'spiral',  addT: 6.0, addN: 4, adds: ['crawler', 'shrieker', 'bloater'], cry: 'HE IS CARRYING SOMETHING',            cry2: 'HE PUT IT DOWN. IT IS FOR YOU.' },
+  { key: 'courier', name: 'THE COURIER',      bank: SPR.anim.bossA, tint: 'rgba(90,200,255,0.5)',   hp: 2100, spd: 62, r: 15, item: 'bike',    pat: 'circle',  pat2: 'rush',    addT: 6.8, addN: 4, adds: ['stalker', 'stalker', 'crawler'],  cry: 'IT HAS BEEN CIRCLING FOR HOURS',      cry2: 'THE ROUND IS OVER. DELIVERY.' },
+  /* ---- the second five: everything past floor 5 used to be a repeat ---- */
+  { key: 'fishwife',name: 'THE FISHWIFE',     bank: SPR.anim.bossB, tint: 'rgba(90,220,210,0.5)',   hp: 2300, spd: 38, r: 15, item: 'coolade', pat: 'blink',   pat2: 'spiral',  addT: 5.4, addN: 4, adds: ['shrieker', 'crawler', 'husk'],    cry: 'SHE HAS BEEN ON ICE SINCE FRIDAY',    cry2: 'SHE HAS THAWED ALL THE WAY THROUGH' },
+  { key: 'trim',    name: 'THE TRIMMINGS',    bank: SPR.anim.bossA, tint: 'rgba(200,150,160,0.5)',  hp: 2500, spd: 30, r: 15, item: 'melon',   pat: 'spawner', pat2: 'rush',    addT: 3.6, addN: 5, adds: ['crawler', 'husk', 'husk'],        cry: 'IT IS EVERY PART THEY DID NOT SELL',  cry2: 'ALL OF IT AT ONCE, THEN' },
+  { key: 'roast',   name: 'SUNDAY ROAST',     bank: SPR.anim.bossB, tint: 'rgba(255,150,50,0.55)',  hp: 2650, spd: 34, r: 15, item: 'banana',  pat: 'burst',   pat2: 'nova',    addT: 5.8, addN: 4, adds: ['bloater', 'crawler', 'shrieker'], cry: 'IT HAS BEEN IN THERE SINCE SUNDAY',   cry2: 'IT IS DONE. IT IS VERY DONE.' },
+  { key: 'shelf',   name: 'THE NIGHT SHELF',  bank: SPR.anim.bossA, tint: 'rgba(70,90,200,0.55)',   hp: 2800, spd: 54, r: 15, item: 'glock',   pat: 'circle',  pat2: 'spiral',  addT: 6.2, addN: 5, adds: ['stalker', 'stalker', 'husk'],     cry: 'IT ONLY RESTOCKS AFTER CLOSING',      cry2: 'IT IS PUTTING YOU OUT ON THE FRONT' },
+  { key: 'bestby',  name: 'THE BEST BEFORE',  bank: SPR.anim.bossB, tint: 'rgba(150,230,60,0.55)',  hp: 3000, spd: 44, r: 15, item: 'bike',    pat: 'rush',    pat2: 'nova',    addT: 5.0, addN: 5, adds: ['bloater', 'cyst', 'husk'],        cry: 'THE DATE PASSED AND IT KEPT GOING',   cry2: 'THERE IS NO DATE LEFT TO PASS' }
 ];
 /* Bosses used to land on five of the ten waves, which made them furniture.
    One floor boss on wave 10, two elites on the way there, and every fifth
    floor the boss comes up as an APEX instead. */
 const BOSS_WAVE = 10;
 const MINI_WAVES = [4, 8];
+/* What fraction of the floor's boss an elite is worth, before the build
+   multiplier. See spawnMini — this is what keeps a wave-8 elite from
+   outlasting the wave-10 boss at depth. */
+const ELITE_SHARE = 0.22;
 const APEX_EVERY = 5;                       // floors 5, 10, 15 ... are apex floors
 function bossIndexFor(floor) { return floor % BOSSES.length; }
 function isApexFloor(floor) { return (floor + 1) % APEX_EVERY === 0; }
@@ -324,19 +366,35 @@ function rollGrade(luck, cap) {
 
 /* ---- THE ARSENAL. price 0 = you start with it. ----
    Damjan starts with a pistol now and nothing else. Everything above it is
-   bought from PACI, and `gr` is the grade it shines at on his pedestals. */
+   bought from PACI, and `gr` is the grade it shines at on his pedestals.
+
+   `floor` is the depth PACI will first carry it at (0 = floor 1). Price alone
+   was never a gate: a lucky floor-1 boss plus a CLEARANCE card could put GOD
+   FINGER in your hands before you had met a bloater, and the rest of the run
+   had nothing left to give you. Now the crate opens one rung at a time and
+   money is a question of *which* of the two or three things on offer, not of
+   whether you can skip five floors of progression. */
 const WEP = {
-  pistol:{ id: 'pistol',name: 'THE SIDEARM',   spr: SPR.pistol,gr: 0, price: 0,   mag: 18,  rate: 0.155, dmg: 21, spread: 0.020, spd: 470, pellets: 1, reload: 1.15, sfx: 'shoot',    col: '#c8ccd4', evolve: 1, tag: 'it was in the drawer. it will do.' },
-  scar:  { id: 'scar',  name: 'SCAR-L',        spr: SPR.scar,  gr: 0, price: 20,  mag: 30,  rate: 0.088, dmg: 13, spread: 0.026, spd: 430, pellets: 1, reload: 1.45, sfx: 'shoot',    col: '#ffe9a8', tag: 'reliable. boring. yours.' },
-  saw:   { id: 'saw',   name: 'MEAT SPLITTER', spr: SPR.saw,   gr: 0, price: 30,  mag: 2,   rate: 0.62,  dmg: 12, spread: 0.24,  spd: 380, pellets: 9, reload: 1.9,  sfx: 'shotgun',  col: '#ffcf8a', knock: 300, tag: 'nine reasons to stand still' },
-  price: { id: 'price', name: 'THE PRICE GUN', spr: SPR.price, gr: 1, price: 45,  mag: 40,  rate: 0.070, dmg: 7,  spread: 0.06,  spd: 560, pellets: 1, reload: 1.6,  sfx: 'nailgun',  col: '#ff4ab0', mark: 6, tag: 'everything it tags is on sale' },
-  nail:  { id: 'nail',  name: 'THE STAPLER',   spr: SPR.nail,  gr: 1, price: 55,  mag: 60,  rate: 0.045, dmg: 8,  spread: 0.10,  spd: 540, pellets: 1, reload: 2.0,  sfx: 'nailgun',  col: '#f2d14a', pin: 0.45, tag: 'pins them to the floor' },
-  micro: { id: 'micro', name: 'MICROWAVE',     spr: SPR.micro, gr: 2, price: 80,  mag: 16,  rate: 0.24,  dmg: 34, spread: 0.02,  spd: 270, pellets: 1, reload: 2.1,  sfx: 'plasma',   col: '#4fd6e8', bounce: 3, burn: 16, size: 3, tag: 'reheats the dead' },
-  chill: { id: 'chill', name: 'FREEZER BURN',  spr: SPR.chill, gr: 2, price: 95,  mag: 55,  rate: 0.055, dmg: 9,  spread: 0.14,  spd: 400, pellets: 1, reload: 2.2,  sfx: 'plasma',   col: '#9fe4ff', chill: 2.2, size: 2, tag: 'the cold aisle, weaponised' },
-  hog:   { id: 'hog',   name: 'THE HOG',       spr: SPR.hog,   gr: 2, price: 120, mag: 120, rate: 0.032, dmg: 10, spread: 0.13,  spd: 500, pellets: 1, reload: 3.4,  sfx: 'minigun',  col: '#ffd28a', spin: 1, slow: 0.45, tag: 'spins up. never stops.' },
-  rot:   { id: 'rot',   name: 'THE ROTISSERIE',spr: SPR.rot,   gr: 3, price: 165, mag: 70,  rate: 0.050, dmg: 14, spread: 0.05,  spd: 330, pellets: 1, reload: 2.6,  sfx: 'plasma',   col: '#ff9a3a', radial: 0.55, burn: 10, size: 2, lock: 'seal', tag: 'it does not care where you point it' },
-  rail:  { id: 'rail',  name: 'GOD FINGER',    spr: SPR.rail,  gr: 3, price: 190, mag: 5,   rate: 0.55,  dmg: 165, spread: 0,    spd: 950, pellets: 1, reload: 2.4,  sfx: 'railgun',  col: '#a8e8ff', charge: 0.5, pierce: 99, size: 3, knock: 200, tag: 'points. things stop existing.' },
-  omega: { id: 'omega', name: 'OMEGA BEAM',    spr: SPR.omega, gr: 4, price: 0, cards: OMEGA_CARDS, mag: 300, rate: 0.02, dmg: 720, spread: 0, spd: 0, pellets: 0, reload: 2.6, sfx: 'beam', col: '#c05cff', beam: 1, girth: 11, tag: 'fifty cards. one very wide line.' }
+  // rate is the delay between shots, so 0.155 -> 0.178 is 15% SLOWER. The gun
+  // you are given free should be the one you are trying to stop needing.
+  pistol:{ id: 'pistol',name: 'THE SIDEARM',   spr: SPR.pistol,gr: 0, price: 0,   mag: 18,  rate: 0.178, dmg: 21, spread: 0.020, spd: 470, pellets: 1, reload: 1.15, sfx: 'shoot',    col: '#c8ccd4', evolve: 1, tag: 'it was in the drawer. it will do.' },
+  scar:  { id: 'scar',  name: 'SCAR-L',        spr: SPR.scar,  gr: 0, floor: 0, price: 20,  mag: 30,  rate: 0.088, dmg: 13, spread: 0.026, spd: 430, pellets: 1, reload: 1.45, sfx: 'shoot',    col: '#ffe9a8', tag: 'reliable. boring. yours.' },
+  // knock was 300: it threw the room across the arena and shoved Damjan back
+  // hard enough that a point-blank shot was a retreat you did not ask for.
+  saw:   { id: 'saw',   name: 'MEAT SPLITTER', spr: SPR.saw,   gr: 0, floor: 0, price: 30,  mag: 2,   rate: 0.62,  dmg: 12, spread: 0.24,  spd: 380, pellets: 9, reload: 1.9,  sfx: 'shotgun',  col: '#ffcf8a', knock: 140, tag: 'nine reasons to stand still' },
+  // 45 -> 80. It does almost no damage itself and then multiplies everything
+  // else you own by 1.6x on a marked target, which made it the strongest coin
+  // in the game at the cheapest tier — a floor-1 no-brainer rather than a buy.
+  price: { id: 'price', name: 'THE PRICE GUN', spr: SPR.price, gr: 1, floor: 0, price: 80,  mag: 40,  rate: 0.070, dmg: 7,  spread: 0.06,  spd: 560, pellets: 1, reload: 1.6,  sfx: 'nailgun',  col: '#ff4ab0', mark: 6, tag: 'everything it tags is on sale' },
+  nail:  { id: 'nail',  name: 'THE STAPLER',   spr: SPR.nail,  gr: 1, floor: 1, price: 55,  mag: 60,  rate: 0.045, dmg: 8,  spread: 0.10,  spd: 540, pellets: 1, reload: 2.0,  sfx: 'nailgun',  col: '#f2d14a', pin: 0.45, tag: 'pins them to the floor' },
+  micro: { id: 'micro', name: 'MICROWAVE',     spr: SPR.micro, gr: 2, floor: 2, price: 80,  mag: 16,  rate: 0.24,  dmg: 34, spread: 0.02,  spd: 270, pellets: 1, reload: 2.1,  sfx: 'plasma',   col: '#4fd6e8', bounce: 3, burn: 16, size: 3, tag: 'reheats the dead' },
+  chill: { id: 'chill', name: 'FREEZER BURN',  spr: SPR.chill, gr: 2, floor: 3, price: 95,  mag: 55,  rate: 0.055, dmg: 9,  spread: 0.14,  spd: 400, pellets: 1, reload: 2.2,  sfx: 'plasma',   col: '#9fe4ff', chill: 2.2, size: 2, tag: 'the cold aisle, weaponised' },
+  hog:   { id: 'hog',   name: 'THE HOG',       spr: SPR.hog,   gr: 2, floor: 4, price: 120, mag: 120, rate: 0.032, dmg: 10, spread: 0.13,  spd: 500, pellets: 1, reload: 3.4,  sfx: 'minigun',  col: '#ffd28a', spin: 1, slow: 0.45, tag: 'spins up. never stops.' },
+  rot:   { id: 'rot',   name: 'THE ROTISSERIE',spr: SPR.rot,   gr: 3, floor: 5, price: 165, mag: 70,  rate: 0.050, dmg: 14, spread: 0.05,  spd: 330, pellets: 1, reload: 2.6,  sfx: 'plasma',   col: '#ff9a3a', radial: 0.55, burn: 10, size: 2, lock: 'seal', tag: 'it does not care where you point it' },
+  rail:  { id: 'rail',  name: 'GOD FINGER',    spr: SPR.rail,  gr: 3, floor: 6, price: 190, mag: 5,   rate: 0.55,  dmg: 165, spread: 0,    spd: 950, pellets: 1, reload: 2.4,  sfx: 'railgun',  col: '#a8e8ff', charge: 0.5, pierce: 99, size: 3, knock: 200, tag: 'points. things stop existing.' },
+  // THE FISH. Coins, not cards — 500 of them, which at COIN_RATE is most of a
+  // deep run. `prism: 1` is what makes its beam cycle colour; see drawWorld.
+  omega: { id: 'omega', name: 'THE FISH',      spr: SPR.omega, gr: 4, floor: 4, price: OMEGA_COINS, mag: 300, rate: 0.02, dmg: 720, spread: 0, spd: 0, pellets: 0, reload: 2.6, sfx: 'beam', col: '#c05cff', beam: 1, prism: 1, girth: 11, tag: 'it is a fish. it fires a laser. do not ask.' }
 };
 const WORDER = ['pistol', 'scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot', 'rail', 'omega'];
 /* Two of these are behind contracts and simply are not in PACI's crate until
@@ -425,7 +483,7 @@ function freshState() {
     /* THE MENU. `deck` is the run's whole build; `luck` tilts every hand.
        `aisle` is the per-aisle rank tally THE ORDER reads, `fused` the
        off-cuts taken, and handTop/handIn drive how loudly a hand arrives. */
-    xp: 0, level: 1, xpNext: 48, upgPts: 0,
+    xp: 0, level: 1, xpNext: 80, upgPts: 0,
     deck: {}, hand: null, lvlLuck: 0, rerolls: 0, cardsTaken: 0, luck: 0,
     aisle: {}, fused: {}, fusedOrder: [], dealt: 0, handTop: 0, handIn: 0,
     sigOffer: null, sigDue: false, orbs: [], pools: [], arcs: [],
@@ -538,7 +596,7 @@ function ST() {
     /* ---- TOMCE's side of the ledger ---- */
     xpMul: Math.max(0.3, (1 + dkc('ripe') / 100)
               * (1 - ag('debt') * 0.14 - ag('feeder') * 0.18 + ag('loudmouth') * 0.45)),
-    coinMul: (1 + ag('debt') * 0.40) * (rd('clearance') ? 2 : 1),
+    coinMul: COIN_RATE * (1 + ag('debt') * 0.40) * (rd('clearance') ? 2 : 1),
     sight: clamp(1 - ag('cataract') * 0.11 - ag('sleepless') * 0.10, 0.5, 1),
     magnet: clamp((1 + dkc('ripe') / 100) * (1 - ag('coldblood') * 0.30), 0.3, 3),
     swarm: 1 + ag('loudmouth') * 0.18,
@@ -664,8 +722,18 @@ const CARDS = [
   /* ---- HARDWARE: whatever you are holding ---- */
   { id: 'cycle',     name: 'CYCLE',         aisle: 'hardware', max: 5, b: 0, v: 6, cap: 45, d: v => '+' + v + '% fire rate',
     r: { n: 'WOUND UP', d: 'holding the trigger winds to another +25%' } },
-  { id: 'split',     name: 'SPLIT',         aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 2, d: v => 'shot forks ' + (v * 2 + 1) + ' ways at half power',
-    r: { n: 'CROSSFIRE', d: 'the outer forks steer themselves in' } },
+  /* SPLIT. Was rank 2, dealt like anything else, and turned every gun in the
+     game into five guns — one pick roughly tripled crowd output, which meant
+     every other HARDWARE card was a worse SPLIT. It is now one rank, two
+     rounds, no centre shot, and it does not turn up until floor 3. See `leg`
+     and `w` below: it is the one card in the deck that always deals
+     LEGENDARY, and at w 0.30 against everything else's 1 it turns up in
+     roughly one hand in forty — about once in a deep run. Rarer than that
+     (0.08, where this landed first) is not rare, it is removed: CROSS-CUT
+     needs a rank of it and nobody would ever build one. */
+  { id: 'split',     name: 'SPLIT',         aisle: 'hardware', max: 1, b: 1, floor: 2, leg: 1, w: 0.30,
+    v: 1, int: 1, cap: 1, d: () => 'your shot becomes two, each at 65% power',
+    r: { n: 'CROSSFIRE', d: 'and both of them steer themselves in' } },
   { id: 'caliber',   name: 'CALIBER',       aisle: 'hardware', max: 5, b: 0, v: 1.2, dec: 1, cap: 12, d: v => '+' + v + ' flat damage a shot',
     r: { n: 'OVERBORE', d: 'and the rounds come out visibly bigger' } },
   { id: 'hopper',    name: 'HOPPER',        aisle: 'hardware', max: 3, b: 0, v: 22, cap: 90, d: v => '+' + v + '% magazine',
@@ -702,6 +770,8 @@ const CARDS = [
    on plain numbers, which is not difficulty, it is a flat line. */
 const BOSS_GATE = ['from the start', 'once you have killed an elite', 'once you have killed a floor boss'];
 function cardUnlocked(c) {
+  // `floor` is the second gate: some cards are not a floor-1 answer at any grade.
+  if (c.floor !== undefined && S.room < c.floor) return false;
   const b = c.b | 0;
   return b === 0 || (b === 1 ? S.bossKills >= 1 : S.floorBosses >= 1);
 }
@@ -793,10 +863,23 @@ function dealCards(n, luckBonus) {
   }
   const pool = CARDS.filter(c => dkr(c.id) < c.max && cardUnlocked(c));
   while (out.length < n && pool.length) {
-    const c = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
-    let g = rollGrade(luck);
+    /* Weighted rather than uniform. `w` defaults to 1 and only SPLIT sets it
+       low: it is a LEGENDARY that has to stay an event, and a uniform pool of
+       ~38 would still have offered it in most hands. */
+    let total = 0;
+    for (const c of pool) total += c.w === undefined ? 1 : c.w;
+    let r = Math.random() * total, idx = pool.length - 1;
+    for (let i = 0; i < pool.length; i++) { r -= pool[i].w === undefined ? 1 : pool[i].w; if (r <= 0) { idx = i; break; } }
+    const c = pool.splice(idx, 1)[0];
     S.dealt = (S.dealt | 0) + 1;
-    if (aisleT2('expired') && S.dealt % 4 === 0) g = Math.min(3, g + 1);
+    /* `leg` cards do not roll — they are LEGENDARY or they are not dealt, and
+       the EXPIRED mastery has nothing above LEGENDARY to bump them to. */
+    let g;
+    if (c.leg) g = 4;
+    else {
+      g = rollGrade(luck);
+      if (aisleT2('expired') && S.dealt % 4 === 0) g = Math.min(3, g + 1);
+    }
     out.push({ c, g, val: cardVal(c, g) });
   }
   return out;
@@ -869,15 +952,22 @@ function refuseAugments() {
 }
 
 /* ---------- XP & the level-up hand ---------- */
-/* Levels come roughly twice as fast as they used to: the deck is now the whole
-   progression, so waiting four waves for one card made a floor feel flat. */
+/* The curve went 48 / x1.23 -> 80 / x1.30, and a kill pays 0.42 of its score
+   instead of 0.55.
+
+   Levels had been pulled fast on purpose, back when the deck was new and a
+   floor could go by without one. It overshot: three boss-class kills a floor
+   each hand you a free pick on top, so a floor was paying out seven or eight
+   cards and the hand stopped being a decision — you were going to be offered
+   everything anyway. Slower levels make a pick worth reading, and they make
+   the bosses' guaranteed hands feel like the reward they are. */
 function gainXP(n) {
   S.xp += Math.round(n * (1 + dkc('pricehike') / 100) * ST().xpMul);
   while (S.xp >= S.xpNext) {
     S.xp -= S.xpNext;
     S.level++;
     S.upgPts++;
-    S.xpNext = Math.round(S.xpNext * 1.23);
+    S.xpNext = Math.round(S.xpNext * 1.30);
     A.bigpickup();
     S.flash = Math.max(S.flash, 0.4); S.flashCol = '#9fe08a';
     ring(S.p.x, S.p.y, 46, '#9fe08a', 0.5, 2);
@@ -1217,9 +1307,17 @@ function buildRoom(idx) {
    are signed. REGULAR buys a fourth pedestal. */
 function shopSlots() { return contractDone('reg') ? 4 : 3; }
 function shopStock() {
+  /* Three gates, and they are not the same gate. `lock` is a contract you
+     signed, `floor` is how deep you are, and price is whether you can afford
+     what is actually on the pallet. The beam ignores depth entirely — it costs
+     cards, which are their own long game. */
   const pool = BUYABLE.filter(id => S.p.owned.indexOf(id) < 0 &&
-                                    (!WEP[id].lock || contractDone(WEP[id].lock)));
-  if (S.p.owned.indexOf('omega') < 0) pool.push('omega');
+                                    (!WEP[id].lock || contractDone(WEP[id].lock)) &&
+                                    S.room >= (WEP[id].floor | 0));
+  // THE FISH goes through the same three gates as everything else now that it
+  // costs coins. It used to be appended unconditionally because cards were its
+  // gate; 500 coins and floor 5 are its gate instead.
+  if (S.p.owned.indexOf('omega') < 0 && S.room >= (WEP.omega.floor | 0)) pool.push('omega');
   const offer = [];
   const n = shopSlots();
   while (offer.length < n && pool.length) offer.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
@@ -1269,8 +1367,8 @@ function enterShop() {
     S.pendingKick = 0;
     S.shops = shopStock().map((id, i, arr) => ({
       x: R.aw / 2 + (i - (arr.length - 1) / 2) * (arr.length > 3 ? 84 : 96), y: 196, id,
-      price: id === 'omega' ? 0 : WEP[id].price,
-      cards: id === 'omega' ? OMEGA_CARDS : 0,
+      price: WEP[id].price,
+      cards: 0,                        // nothing costs cards any more
       bought: false, bob: rnd(0, TAU)
     }));
 
@@ -1502,7 +1600,8 @@ function spawnBoss(idx, apex) {
     dmg: 26 * D.dmg * (apex ? 1.45 : 1), score: apex ? 1400 : 500,
     gib: '#8a3540', hit: 0, phase: 'idle', pt: 1.2, wob: 0, bob: 0, sq: 0, orbit: rnd(0, TAU),
     stun: 0, burn: 0, burnT: 0, flip: false, boss: true, dead: false, chargeDir: 0, spawnT: 4,
-    twitch: 0, twx: 0, twy: 0, trail: []
+    twitch: 0, twx: 0, twy: 0, trail: [],
+    ph: 1, phaseT: 0, spitAng: rnd(0, TAU)      // two phases: see enterPhase2()
   };
   S.en.push(b); S.boss = b;
   A.roar();
@@ -1514,16 +1613,67 @@ function spawnBoss(idx, apex) {
   return b;
 }
 
+/* ---------- how strong the run has actually got ----------
+
+   `diff()` scales the floor by *depth*. That is only half the story: two runs
+   on floor 6 can be five minutes and forty minutes apart in power, because one
+   of them found an off-cut and three guns and the other did not. Depth-only
+   scaling means a good run trivialises its own elites and a bad run gets
+   flattened by the same numbers.
+
+   So the elites read the build instead. Every term is something you chose to
+   pick up, weighted by roughly how much it moved your damage:
+
+     levels            +5%  each   — the broadest signal, and the slowest
+     cards taken       +3%  each   — deck ranks, the main track
+     guns owned        +7%  each   — a new gun is a whole new output curve
+     signature levels  +14% each   — the biggest single power spikes in a run
+     off-cuts built    +18% each   — LEGENDARY by definition
+
+   Capped at 3.2x. Uncapped, a very long run's elites outgrow its floor boss,
+   which inverts the shape of a floor. Deliberately NOT applied to floor
+   bosses: they have a roster HP band and a phase break doing that job, and
+   stacking a build multiplier on top of both would make wave 10 the only wave
+   that matters. */
+function powerMul() {
+  let n = 1;
+  n += Math.max(0, S.level - 1) * 0.05;
+  n += (S.cardsTaken | 0) * 0.03;
+  n += Math.max(0, (S.p ? S.p.owned.length : 1) - 1) * 0.07;
+  for (const k of SIG_ORDER) n += sigLevel(k) * 0.14;
+  for (const f of FUSIONS) if (fz(f.id)) n += 0.18;
+  return Math.min(3.2, n);
+}
+
 /* An elite: a regular horror that got too big for the aisle. Uses the ordinary
    enemy AI, wears a boss health bar, and is worth a card. */
 function spawnMini(idx) {
   const M = MINIS[idx % MINIS.length], D = diff();
   const e = spawnEnemy(M.key, S.aw / 2, 92);
-  /* These were a slightly chunky crawler. They are a fight now: seven times
-     the meat, twice the bite, and they shell the room and call for help. */
-  const k = 5 + S.room * 1.6;
-  e.hp = e.max = ETYPE[M.key].hp * D.hp * k;
-  e.dmg *= 1.9;
+  /* ---- an elite is priced off the floor's boss, not off its species ----
+
+     It used to be `speciesHP * (5 + floor*1.6)`, and that was quietly broken:
+     the species table spans 26 (CRAWLER) to 170 (CYST), a **6.5x** swing, and
+     the depth term multiplied straight through it. Meanwhile a floor boss is a
+     fixed roster number. So on any floor whose elite slots landed on HUSK/CYST
+     the wave-8 elite outlasted the wave-10 boss — measured at 1.93x on floor 6
+     in the original build, and every buff since has widened it.
+
+     Species should decide how a thing *fights*, not how big its bar is. So the
+     bar is a share of what the floor boss is worth, which makes the ordering
+     true by construction at every depth:
+
+       0.22 share x 3.2 powerMul cap = 0.70x the boss, worst case
+
+     `flavour` keeps a CYST elite chunkier than a CRAWLER elite — but 1.45x
+     chunkier, not 6.5x. */
+  const bossHp = BOSSES[bossIndexFor(S.room)].hp * D.hp * 1.35;
+  const flavour = 0.85 + 0.5 * (ETYPE[M.key].hp / 170);   // 0.93 crawler .. 1.35 cyst
+  e.hp = e.max = bossHp * ELITE_SHARE * flavour * powerMul();
+  /* Half the build multiplier on the bite as well. Full would make a strong
+     run's elites one-shot you through a full FROZEN stack; none at all makes
+     them a stationary target you out-heal. */
+  e.dmg *= 1.9 * (1 + (powerMul() - 1) * 0.5);
   e.base *= 1.25; e.spd = e.base;
   e.score = 320;
   e.elite = true; e.eliteT = 2.4; e.eliteCol = M.col;
@@ -1725,18 +1875,19 @@ function emit(w) {
   /* THE ROTISSERIE ignores the crosshair entirely and walks its own angle
      around you — that is the whole joke, and the whole reason to own it. */
   const aim = w.radial ? (p.spitAng = (p.spitAng || 0) + w.radial) : p.ang;
-  // SPLIT rank n fires a fan of 2n+1 directions
-  const dirs = st.split ? st.split * 2 + 1 : 1;
-  const fan = 0.20;
+  /* SPLIT: two rounds, and neither of them goes where you pointed.
+     It used to fan 2n+1 with the centre shot at full power, so the card was a
+     free +100% at rank 1 and +200% at rank 2 with no downside at all. Two
+     forks at 0.65 is +30% output traded against never hitting dead centre —
+     which is a real cost on GOD FINGER and a real gift on a shotgun. */
+  const dirs = st.split ? 2 : 1;
+  const fan = 0.26;
   for (let d = 0; d < dirs; d++) {
     const off = dirs === 1 ? 0 : (d - (dirs - 1) / 2) * fan;
-    // CROSSFIRE: the middle shot goes where you pointed, the forks come back in
-    const outer = dirs > 1 && d !== (dirs - 1) / 2;
+    const outer = dirs > 1;
+    // CROSSFIRE: both forks turn back toward whatever you were aiming past
     const homing = (st.home || 0) + (rd('split') && outer ? 3.2 : 0);
-    /* Forks are half-power rounds. At full power one SPLIT pick tripled crowd
-       output, which flattened every other card in the game — the centre shot
-       keeps the number on the gun, the forks are a bonus, not a multiplier. */
-    const fdmg = outer ? dmg * 0.5 : dmg;
+    const fdmg = outer ? dmg * 0.65 : dmg;
     for (let i = 0; i < w.pellets; i++) {
       const a = aim + off + rnd(-base, base);
       S.bul.push({
@@ -1788,9 +1939,11 @@ function updateBeam(dt) {
     ex = nx; ey = ny;
     for (const e of S.en) if (!e.dead && hits.indexOf(e) < 0 && Math.hypot(e.x - nx, e.y - ny) < e.r + girth) hits.push(e);
   }
-  S.beamHit = { x: ox, y: oy, ex, ey, girth };
+  S.beamHit = { x: ox, y: oy, ex, ey, girth, prism: !!w.prism };
   for (const e of hits) damageEnemy(e, (w.dmg + st.flatDmg * 8) * st.dmgMul / st.rateMul * dt, true, p.ang);
-  if (Math.random() < dt * 70) spray(ex, ey, p.ang + Math.PI, '#e0a8ff', 4, 150, 0.35, 1.4);
+  // the spark at the far end wears whatever the beam is currently doing
+  if (Math.random() < dt * 70)
+    spray(ex, ey, p.ang + Math.PI, w.prism ? 'hsl(' + ((S.t * 95) % 360) + ',100%,78%)' : '#e0a8ff', 4, 150, 0.35, 1.4);
   if (Math.random() < dt * 26) A.beam();
   shake(1.2);
 }
@@ -1914,7 +2067,7 @@ function killEnemy(e, ang) {
   const pts = Math.round(e.score * diff().score * S.combo);
   S.score += pts;
   float(e.x, e.y - 10, '+' + pts, '#ffd070');
-  gainXP(e.boss ? 90 : Math.max(3, Math.round(e.score * 0.55)));
+  gainXP(e.boss ? 90 : Math.max(2, Math.round(e.score * 0.42)));
   deathBurst(e, ang);
   S.hitstop = Math.max(S.hitstop, e.boss ? 0.3 : 0.035);
   shake(e.boss ? 18 : 2.5);
@@ -2003,7 +2156,11 @@ function killEnemy(e, ang) {
     /* Elites and floor bosses both pay in a card you get to choose. That is
        the whole reason to fight one now — the groceries live in the deck. */
     const elite = !!e.mini;
-    const coins = elite ? 10 : e.apex ? 38 : 18;
+    /* Up from 10/18/38. Two shops a floor is only a decision if there is money
+       to bring to the second one, and both of these are a much longer fight
+       than they were — elites carry ~50% more meat, floor bosses have a second
+       phase to chew through. */
+    const coins = elite ? 15 : e.apex ? 50 : 26;
     for (let i = 0; i < coins; i++) {
       const a = rnd(0, TAU);
       S.drops.push({ x: e.x, y: e.y, kind: 'coin', t: 0, life: 40, bob: rnd(0, TAU), vx: Math.cos(a) * 70, vy: Math.sin(a) * 70 });
@@ -2018,7 +2175,6 @@ function killEnemy(e, ang) {
     S.lvlDelay = 1.1;
 
     S.bossKills++;
-    if (S.bossKills % SHOP_EVERY === 0) S.shopDue = true;
     /* Only a FLOOR boss opens the top of the deck — elites do not count. It
        also unlocks the cold room, which is where the five signature groceries
        live now. An elite pays a card; a floor boss pays a card and a name. */
@@ -2033,7 +2189,6 @@ function killEnemy(e, ang) {
     msg(e.name + ' IS MEAT', elite ? 'an elite. the deck opens.'
         : S.sigDue ? 'the cold room is unlocked. go and take something.'
         : e.apex ? 'the apex is down. take something obscene.' : 'the floor is yours. pick a card.', 3);
-    if (S.shopDue) float(e.x, e.y - 30, 'A DOOR OPENS SIDEWAYS', '#c05cff', true);
     A.roar();
   } else {
     /* Med kits used to be a 6% drop on top of two guaranteed ones every wave,
@@ -2042,10 +2197,12 @@ function killEnemy(e, ang) {
     if (r < 0.008) dropPickup(e.x, e.y, 'card');        // cards: genuinely rare
     else if (r < 0.021) dropPickup(e.x, e.y, 'nova');   // the rarer of the two new ones
     else if (r < 0.056) dropPickup(e.x, e.y, 'shield');
-    else if (r < 0.216) dropPickup(e.x, e.y, 'coin');   // coins: reasonably common
-    else if (r < 0.276) dropPickup(e.x, e.y, 'ammo');
-    else if (r < 0.308) dropPickup(e.x, e.y, 'med');    // 3.2%, down from 6%
-    else if (r < 0.338) dropPickup(e.x, e.y, 'nade');
+    // 16% -> 19%. PACI turns up twice a floor now and the second visit has to
+    // be able to buy something, or it is just a corridor with a man in it.
+    else if (r < 0.246) dropPickup(e.x, e.y, 'coin');
+    else if (r < 0.306) dropPickup(e.x, e.y, 'ammo');
+    else if (r < 0.338) dropPickup(e.x, e.y, 'med');    // 3.2%, down from 6%
+    else if (r < 0.368) dropPickup(e.x, e.y, 'nade');
   }
   if (S.kills % 25 === 0) { bump('kills', 25); checkContracts(); }
 }
@@ -2332,7 +2489,7 @@ function startWave(n) {
       let r = Math.random() * total;
       for (const c of pool) { r -= c[1]; if (r <= 0) { S.queue.push(c[0]); break; } }
     }
-    msg('WAVE ' + n, S.queue.length + ' SIGNATURES', 1.8);
+    msg('WAVE ' + n, '', 1.8);
   }
   A.wave();
   A.setDread(clamp(n / 10 * 0.6 + S.room * 0.2, 0, 1));
@@ -2379,12 +2536,18 @@ function updateWaves(dt) {
       S.waveHit = false;
       S.score += 100 * S.wave * (S.room + 1);
       persist();
+      // PACI keeps to the fives now — see SHOP_WAVES.
+      if (shopDueAfter(S.wave)) S.shopDue = true;
       if (S.wave >= 10) {
         S.door.open = true;
         msg('THE DOOR IS OPEN', 'go north. it is worse down there.', 4);
         A.doorOpen();
       } else {
         msg('WAVE ' + S.wave + ' CLEARED', '+' + (100 * S.wave * (S.room + 1)) + ' // +' + heal + ' hp // +1 frag', 2.2);
+      }
+      if (S.shopDue) {
+        const q = freeSpot(60);
+        float(q.x, q.y, 'A DOOR OPENS SIDEWAYS', '#c05cff', true);
       }
       /* One parting gift, and it is usually ammo. Two guaranteed drops with a
          coin-flip on health meant a med kit every other wave for free. */
@@ -2396,7 +2559,7 @@ function updateWaves(dt) {
     // already mid-transition has to hold this branch off or it fires again
     // on the very next frame.
     if (S.waveT <= 0 && !S.fadeDir && !S.pending) {
-      // a shop owed by the boss you just killed comes before anything else
+      // a shop owed by the wave you just cleared comes before anything else
       if (S.shopDue) { S.shopDue = false; enterShop(); }
       else if (S.wave < 10) startWave(S.wave + 1);
     }
@@ -2948,7 +3111,7 @@ function update(rdt) {
       else if (d.kind === 'nova') fireNova(p.x, p.y);
       else if (d.kind === 'card') {
         S.cards++;
-        float(p.x, p.y - 18, 'CARD ' + S.cards + '/' + OMEGA_CARDS, '#c0202a', true);
+        float(p.x, p.y - 18, 'CARD ' + S.cards, '#c0202a', true);
         A.card(); S.flash = 0.3; S.flashCol = '#e8dfc8'; shake(4);
       }
       else if (d.kind === 'item') grantItem(d.key);
@@ -3130,11 +3293,59 @@ function updateEnemy(e, dt) {
   }
 }
 
+/* ---------- the break ----------
+   At half health a floor boss stops doing the thing it opened with. It rears
+   up for a beat, knocks the room off itself, and comes back on `pat2` — faster,
+   hitting harder, calling for help more often.
+
+   It is NOT invulnerable during the rear-up. Standing still for a second is
+   the reward for breaking it, and i-frames on a boss you have just earned an
+   opening on reads as the game taking the opening back.
+
+   The bar does not refill. Two phases over one bar is structure; two phases
+   over two bars is just twice the health. */
+function enterPhase2(b) {
+  b.ph = 2;
+  b.phaseT = 1.05;                        // the rear-up
+  b.phase = 'idle'; b.pt = 0.4;
+  b.spd *= 1.28; b.base *= 1.28;
+  b.dmg *= 1.18;
+  b.spawnT = Math.min(b.spawnT, 1.2);
+  b.poseT = 1.05;
+  knockRoom(b.x, b.y, 220, 300, '#ff2b2b');
+  b.vx = b.vy = 0;                        // knockRoom shoves everything, itself included
+  ring(b.x, b.y, 120, '#ff2b2b', 0.7, 3);
+  ring(b.x, b.y, 70, '#ffffff', 0.45, 2);
+  part(b.x, b.y, '#ff5a48', 46, 190, 0.8, 2);
+  blood(b.x, b.y + 8, 26, 'rgba(90,10,16,0.4)');
+  S.flash = Math.max(S.flash, 0.7); S.flashCol = '#ff2b2b';
+  shake(b.apex ? 22 : 15); punch(0.08);
+  S.hitstop = Math.max(S.hitstop, 0.1);
+  A.roar(); A.screech(true);
+  if (A.music) A.music.setIntensity(1);
+  A.setDread(1);
+  msg(b.name, b.def.cry2 || 'IT IS NOT FINISHED', 2.6);
+  float(b.x, b.y - 46, 'SECOND PHASE', '#ff2b2b', true);
+}
+
 function updateBoss(b, dt) {
   const p = S.p;
   const dx = p.x - b.x, dy = p.y - b.y, d = Math.hypot(dx, dy) || 1;
   b.pt -= dt; b.flip = dx < 0;
-  const pat = b.def.pat;
+
+  if (b.ph === 1 && b.hp <= b.max * 0.5) enterPhase2(b);
+  /* The break itself: it holds still, everything else keeps running. Nothing
+     below this point executes until the rear-up is over. */
+  if (b.phaseT > 0) {
+    b.phaseT -= dt;
+    b.vx *= 0.8; b.vy *= 0.8;
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    collideWalls(b);
+    b.x = clamp(b.x, 30, S.aw - 30); b.y = clamp(b.y, 30, S.ah - 30);
+    if (Math.random() < dt * 40) part(b.x, b.y, '#ff2b2b', 2, 70, 0.4);
+    return;
+  }
+  const pat = b.ph === 2 ? (b.def.pat2 || b.def.pat) : b.def.pat;
 
   // Every boss summons, but only up to a ceiling that scales with the floor —
   // so it stays a fight rather than an avalanche.
@@ -3142,7 +3353,7 @@ function updateBoss(b, dt) {
   const addCap = Math.min(30, 14 + S.room * 4 + (S.evo | 0) * 2);
   b.spawnT -= dt;
   if (b.spawnT <= 0 && S.en.length < addCap) {
-    b.spawnT = D2.addT * rnd(0.85, 1.15);
+    b.spawnT = D2.addT * rnd(0.85, 1.15) * (b.ph === 2 ? 0.7 : 1);
     b.poseT = 0.6;                          // bossB splits open to let them out
     const cnt = Math.min(D2.addN + Math.floor(S.room * 0.5), addCap - S.en.length);
     for (let i = 0; i < cnt; i++) {
@@ -3231,6 +3442,88 @@ function updateBoss(b, dt) {
         ring(b.x, b.y, 54, '#5ac8ff', 0.35, 2); shake(6);
         for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; S.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 125, vy: Math.sin(a) * 125, r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.45, life: 2.2, col: '#5ac8ff' }); }
       }
+    }
+
+  /* ---------- the three second-phase patterns ----------
+     These exist because a phase change has to look different, not just harder.
+     Each one asks a different question of the room: spiral asks you to move
+     through a rotating gap, nova asks you to be somewhere else on a beat, rush
+     asks you to stop standing still at all. */
+  } else if (pat === 'spiral') {
+    /* It plants itself and screws a continuous arm of shot outward. The arm
+       rotates slower than you can run, so the fight becomes a chase around a
+       fixed point — the one pattern where the boss stops caring where you are. */
+    b.vx = lerp(b.vx, dx / d * b.spd * 0.35, 1 - Math.pow(0.2, dt));
+    b.vy = lerp(b.vy, dy / d * b.spd * 0.35, 1 - Math.pow(0.2, dt));
+    b.spitAng = (b.spitAng || 0) + dt * 2.1;
+    b.spitT = (b.spitT || 0) - dt;
+    if (b.spitT <= 0) {
+      /* 0.12s x 2.8s life x 4 arms tops out around 90 rounds in the air. At the
+         0.085/3.4 it was first written at it was 146, which on a 480x270 screen
+         is not a pattern, it is a fill. Spacing along an arm grows with radius,
+         so it reads as solid near the boss and as a run-through at the rim —
+         which is the shape the fight wants. */
+      b.spitT = 0.12;
+      const arms = 2 + Math.min(2, Math.floor(S.room / 4));
+      for (let k = 0; k < arms; k++) {
+        const a = b.spitAng + k / arms * TAU;
+        S.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 118, vy: Math.sin(a) * 118, r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.34, life: 2.8, col: '#ffb03a' });
+      }
+      if (Math.random() < 0.14) A.screech();
+    }
+    if (b.pt <= 0) { b.pt = rnd(2.2, 3.2); b.poseT = 0.4; ring(b.x, b.y, 44, '#ffb03a', 0.3, 2); }
+
+  } else if (pat === 'nova') {
+    /* Stands off and detonates on a metronome. Two rings on alternating
+       offsets, so the gap you walked through last time is where the next one
+       lands — the tell is the wind-up particles, not the ring. */
+    const want = 130;                                  // it wants to be at arm's length
+    const push = (d - want) / want;
+    b.vx = lerp(b.vx, dx / d * b.spd * clamp(push, -1, 1), 1 - Math.pow(0.1, dt));
+    b.vy = lerp(b.vy, dy / d * b.spd * clamp(push, -1, 1), 1 - Math.pow(0.1, dt));
+    if (b.pt <= 0.55 && b.pt > 0) {
+      b.poseT = 0.5;                                   // the wind-up IS the tell
+      if (Math.random() < dt * 50) part(b.x, b.y, '#c05cff', 2, 90, 0.45);
+    }
+    if (b.pt <= 0) {
+      b.pt = rnd(1.9, 2.5);
+      b.novaN = (b.novaN | 0) + 1;
+      /* Capped at 30. Uncapped, floor 25 put 66 rounds on a ring whose gaps are
+         narrower than Damjan is — a ring you cannot be outside of is not a
+         dodge, it is a damage tick with extra steps. Depth comes from the
+         boss's damage number instead. */
+      const n = Math.min(30, 16 + S.room * 2), off = (b.novaN & 1) ? Math.PI / n : 0;
+      for (let i = 0; i < n; i++) {
+        const a = off + i / n * TAU;
+        S.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 132, vy: Math.sin(a) * 132, r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.42, life: 3, col: '#c05cff' });
+      }
+      ring(b.x, b.y, 86, '#c05cff', 0.45, 3);
+      part(b.x, b.y, '#e0a8ff', 30, 170, 0.6, 2);
+      A.boom(); shake(7); punch(0.03);
+    }
+
+  } else if (pat === 'rush') {
+    /* No telegraph, no rest. It simply comes, and it is faster than you if you
+       are walking. The only counter is the dash, which is the point: the room
+       stops being somewhere you stand and starts being somewhere you cross. */
+    /* Capped in absolute units, not as a multiple of b.spd: the roster's base
+       speeds run 26 to 62, so a plain multiplier makes THE COURIER unloseable
+       and THE TRIMMINGS a walk. 112 against the player's 94 means it closes on
+       you but overshoots when you juke — the steering below is deliberately
+       lazy so it commits to a heading it then has to correct. */
+    const sp = Math.min(b.spd * 1.75, 112);
+    b.vx = lerp(b.vx, dx / d * sp, 1 - Math.pow(0.35, dt));
+    b.vy = lerp(b.vy, dy / d * sp, 1 - Math.pow(0.35, dt));
+    if (Math.random() < dt * 26) part(b.x, b.y + 8, '#ff6a3a', 1, 40, 0.5);
+    blood(b.x, b.y + 8, 2, 'rgba(80,8,14,0.16)');
+    if (b.pt <= 0) {
+      // it never stops, but it does occasionally shed a wall of shot behind it
+      b.pt = rnd(2.4, 3.4);
+      const aa = Math.atan2(b.vy, b.vx);
+      for (let k = -3; k <= 3; k++)
+        S.eb.push({ x: b.x, y: b.y, vx: Math.cos(aa + k * 0.26) * 140, vy: Math.sin(aa + k * 0.26) * 140, r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.38, life: 2.4, col: '#ff6a3a' });
+      ring(b.x, b.y, 40, '#ff6a3a', 0.28, 2);
+      A.ram();
     }
   }
 
@@ -3911,20 +4204,34 @@ function drawPlayer(p) {
     ctx.restore();
   }
 
-  /* ---- OMEGA beam ---- */
+  /* ---- THE FISH's beam ----
+     Four stacked strokes, widest and dimmest first, so the line reads as a
+     hot core inside a haze rather than as four lines.
+
+     `prism` walks the hue instead of holding violet. The three outer layers
+     are offset around the wheel by 26 degrees each, so the beam is never one
+     colour across its width — it fringes, the way a real prism split would.
+     The core stays white: a beam whose centre changes colour reads as a
+     different weapon every second, and you would stop being able to find it
+     against a floor that is also coloured. */
   if (S.beamHit) {
     const b = S.beamHit, gt = b.girth || 11;
+    const pr = b.prism;
+    const hue = (S.t * 95) % 360;
+    const lay = (i, a, l) => pr
+      ? 'hsla(' + ((hue + i * 26) % 360) + ',100%,' + l + '%,' + a + ')'
+      : ['rgba(120,40,200,', 'rgba(192,92,255,', 'rgba(232,180,255,'][i] + a + ')';
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     ctx.lineCap = 'round';
-    ctx.strokeStyle = 'rgba(120,40,200,0.30)'; ctx.lineWidth = gt * 2.6 + Math.sin(S.t * 30) * 2;
+    ctx.strokeStyle = lay(0, 0.30, 45); ctx.lineWidth = gt * 2.6 + Math.sin(S.t * 30) * 2;
     ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.ex, b.ey); ctx.stroke();
-    ctx.strokeStyle = 'rgba(192,92,255,0.6)'; ctx.lineWidth = gt * 1.5 + Math.sin(S.t * 40) * 1.6;
+    ctx.strokeStyle = lay(1, 0.6, 62); ctx.lineWidth = gt * 1.5 + Math.sin(S.t * 40) * 1.6;
     ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.ex, b.ey); ctx.stroke();
-    ctx.strokeStyle = 'rgba(232,180,255,0.9)'; ctx.lineWidth = gt * 0.6;
+    ctx.strokeStyle = lay(2, 0.9, 80); ctx.lineWidth = gt * 0.6;
     ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.ex, b.ey); ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,1)'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(b.ex, b.ey); ctx.stroke();
-    ctx.fillStyle = 'rgba(255,220,255,0.85)';
+    ctx.fillStyle = pr ? 'hsla(' + hue + ',100%,88%,0.85)' : 'rgba(255,220,255,0.85)';
     ctx.beginPath(); ctx.arc(b.ex, b.ey, gt * 0.9 + Math.sin(S.t * 30) * 2, 0, TAU); ctx.fill();
     ctx.lineCap = 'butt';
     ctx.restore();
@@ -4343,7 +4650,7 @@ function drawHUD() {
     wx += 7 + htxtWidth(val, 8) + 11;
   };
   purse(SPR.coin, 0.9, String(S.coins), '#f5c518');
-  purse(SPR.card, 0.62, S.cards + '/' + OMEGA_CARDS, S.cards >= OMEGA_CARDS ? '#ff5a62' : '#b3a888');
+  purse(SPR.card, 0.62, String(S.cards), '#b3a888');
   purse(SPR.grenade, 0.9, String(p.nades), '#9fc98a');
   if (S.evo) txt('EVO ' + S.evo, wx, 33, '#ff5a62');
   if (S.goro) txt('GOROMANIA', 11, 43, '#b028ff', 'left', 7);
@@ -5443,7 +5750,7 @@ function drawPause() {
 
   statRow([
     { spr: SPR.coin, v: String(S.coins), col: '#f5c518' },
-    { spr: SPR.card, v: S.cards + '/' + OMEGA_CARDS, sc: 0.6, col: '#d8b8b8' },
+    { spr: SPR.card, v: String(S.cards), sc: 0.6, col: '#d8b8b8' },
     { v: 'VAULT ' + S.vault, col: '#9d8a7a' },
     { v: 'EVO ' + (S.evo | 0), col: (S.evo | 0) ? '#ff6a72' : '#6b5a4e' }
   ], H - 12);
@@ -5544,7 +5851,7 @@ requestAnimationFrame(frame);
 // dev hook
 window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantItem, grantGod, breakSecret,
                 giveWeapon, explode, triggerModagaz, triggerGoromania,
-                evolve, resetEvolution, canEvolve, EVO_COST, OMEGA_CARDS,
+                evolve, resetEvolution, canEvolve, EVO_COST, OMEGA_COINS, COIN_RATE, powerMul,
                 gainXP, openLevelUp, takeCard, dealCards, rerollHand, scarName, scarCol, ST,
                 ITEMS, BOSSES, WEP, WORDER, COSMETICS, frame, nextRoom,
                 enterShop, exitShop, shopStock, shopSlots, roomDef, curRoom, buildRoom,
@@ -5555,7 +5862,7 @@ window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantItem, grantG
                 CONTRACTS, cStat, bump, bumpMax, contractDone, checkContracts,
                 AUGMENTS, ag, dealAugments, openAugments, takeAugment, refuseAugments,
                 spawnMini, MINIS, BOSS_WAVE, MINI_WAVES, isApexFloor, bossIndexFor,
-                magCap, fireNova, SHOP_EVERY, diff, killEnemy, damageEnemy,
+                magCap, fireNova, SHOP_WAVES, diff, killEnemy, damageEnemy,
                 angerPaci, hurtStage, bodySprite, legSprite, shred, hurtPlayer, RS, quitToTitle };
 
 })();

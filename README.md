@@ -1,10 +1,10 @@
 # MEAT PROTOCOL
 
 Top-down pixel-art horror wave shooter. You are Damjan. You have a headband, a
-SCAR with a laser sight, and a shopping problem.
+pistol that was in the drawer, and a shopping problem.
 
-Ten waves a floor, a boss every other wave, a shop every third boss, and no
-bottom to the descent.
+Ten waves a floor, two elites and a two-phase boss on the way through, PACI at
+half time and again at the end, and no bottom to it.
 
 ## Run it
 
@@ -12,8 +12,8 @@ bottom to the descent.
 node serve.js
 ```
 
-Then open http://localhost:8123 (or just double-click `index.html` — it works
-over `file://` too, no build step, no dependencies).
+Then open http://localhost:8123. It works over `file://` too — no build step,
+no dependencies — but fonts in `fonts/` won't load that way.
 
 ## Controls
 
@@ -22,115 +22,182 @@ over `file://` too, no build step, no dependencies).
 | WASD / arrows | move |
 | mouse | aim (the laser dot shows exactly where the bullet lands) |
 | left click | fire |
-| **right click** | throw a frag |
-| **mouse wheel / 1-7 / Q** | swap weapon |
-| **E** | buy from a pedestal you're standing at (in PACI's shop) |
+| right click | throw a frag |
+| mouse wheel / 1-0 / Q | swap weapon |
+| **E** | buy from a pedestal, or talk to TOMCE |
 | R | reload |
 | SHIFT / SPACE | dash (i-frames) |
-| **B** | the armory — upgrade guns you own |
+| **B** | THE DECK — everything you're holding |
 | C | cosmetics |
-| ESC / P | pause — full inventory + arsenal list |
+| ESC / P | pause |
 | M | mute |
 
 ## How a run goes
 
-Ten waves per floor. Bosses on waves **3, 5, 7, 9 and 10**. Each boss drops one
-grocery (permanent for the run) and exactly **5 coins**:
+Ten waves per floor. **Elites** on waves 4 and 8, the **floor boss** on wave
+10 — and every fifth floor that boss comes up as an **APEX** instead, at 2.6×
+health and 1.45× damage.
 
-| item | boss | what it does |
-| --- | --- | --- |
-| 🍌 BANANA | THE BUTCHER | +35% speed, you leave peels that make enemies slip |
-| 🍉 MELON | MOTHER OF MELONS | +55 max HP and a regenerating rind shield |
-| 🥤 COOLADE | THE PITCHER | sugar rush: x1.6 damage, bullets pierce |
-| 🔫 GLOCK-18 | THE HOGFATHER | a second gun that aims and fires itself |
-| 🚲 STOLEN BICYCLE | THE COURIER | +25% speed, and your dash becomes a ram |
+**Every floor boss has two phases.** At half health it breaks: rears up, throws
+the room off itself, and comes back faster, angrier, and doing something else
+entirely — a boss that does one thing for its whole bar is a health sponge.
+There are **ten** of them now, one per floor, cycling every ten.
 
-Clear wave 10 and the north door opens. The next floor has stronger enemies but
-you keep everything, and its bosses drop **upgraded** versions (BANANA SPLIT,
-MELON ARMOR, PURPLE COOLADE, AKIMBO GLOCK-18s, STOLEN MOTORCYCLE) that stack.
+All three boss-class kills hand you a card. Only the floor boss opens THE COLD
+ROOM.
 
-Enemies hit hard and their HP scales gently, so deeper floors get lethal rather
-than spongy.
+**PACI turns up twice a floor** — after wave 5 and again after wave 10. Clear
+wave 10, spend what's left, and the north door opens. The next floor has
+stronger enemies but you keep everything.
 
 **There is no last floor.** Past the four hand-built ones the game keeps
-generating them — new names, new palettes, wider arenas, darker rooms — and the
-difficulty keeps climbing with no ceiling. Floor 201 is `THE SALT LINE XXV`.
+generating them — new names, new palettes, wider arenas, darker rooms — and
+the difficulty keeps climbing with no ceiling. Floor 201 is `THE SALT LINE
+XXV`. Every floor also rolls one of five arena layouts, so you're not always
+fighting in the same shape of room.
 
-Every floor also rolls one of five arena layouts (scattered crates, a hall of
-pillars, long corridors, big bunkers, or a broken ring around the middle), so
-you're not always fighting in the same shape of room.
+## THE MENU
 
-## PACI
+Level up and you're dealt a hand of cards. **38 of them**, across five aisles.
 
-Every **third boss** you kill, the next door leads sideways instead of down,
-into a small purple room with an enormous man in it.
+**Rarity is not a multiplier.** Every card carries a **RIDER** — a second,
+qualitative effect that only switches on if you take that card at **RARE or
+better**. A RARE MALICE isn't 1.75 MALICEs, it's a different card: *every 6th
+shot always crits*. That's the whole reason to care what comes up.
 
-> HELLO TRAVELER, WELCOME TO MY SHOP
+```
+COMMON · UNCOMMON · RARE · EPIC · LEGENDARY
+```
 
-He stocks three guns at random from whatever you don't own yet. Buy, or don't,
-then walk out the door at the bottom and the wave picks up where it left off.
-Your first visit is floor 1, wave 7.
+**Aisles commit back.** Four ranks anywhere in one aisle buys a standing perk,
+eight buys a louder one:
+
+| aisle | is | at 4 | at 8 |
+| --- | --- | --- | --- |
+| **BLADES** | hurting things | +12% damage | crits cleave everything behind the target |
+| **FRESH** | health and speed | +20 max health | clearing a wave heals a quarter back |
+| **FROZEN** | armour and slowing | −10% damage taken | anything that dies slowed shatters |
+| **TOOLS** | whatever gun you hold | +15% magazine | finishing a reload throws out a shockwave |
+| **JUNK** | bad for you. worth it. | +1 LUCK | every fourth card comes up a rarity better |
+
+**SPLIT is the one card with its own rules.** LEGENDARY, never dealt before
+floor 3, and about one hand in forty. It makes your shot two rounds, both
+steering themselves in, and neither of them goes where you pointed.
+
+**Ten OFF-CUTS are the thing to go looking for.** Hold two named cards at rank
+and a third thing exists that neither of them was — it's LEGENDARY, it takes
+the first seat in your next hand, and the screen says so. CYCLE 3 + QUICK
+HANDS 2 gives you instant reloads below a quarter mag. The level-up footer
+prints your nearest unbuilt one with its progress.
+
+## THE COLD ROOM
+
+Kill a floor boss and it opens. Two of the five signature groceries, you take
+one, they stack to level 2:
+
+| item | what it does |
+| --- | --- |
+| BANANA | +35% speed, you leave peels that make enemies slip |
+| MELON | +55 max HP and a regenerating rind shield |
+| COOLADE | sugar rush: x1.6 damage, bullets pierce |
+| GLOCK-18 | a second gun that aims and fires itself |
+| STOLEN BICYCLE | +25% speed, and your dash becomes a ram |
+
+These used to be dealt into the level-up hand. A grocery and *+5% move speed*
+are not the same kind of reward and the hand couldn't price one against the
+other, so they got their own door.
+
+## TOMCE
+
+On about 60% of floors, someone is standing in a corner with three trades.
+Every one has a real cost: **+24% damage, −15% max health**. **+45%
+experience, and 18% more of them come.** **+40% coins, −14% experience.**
+
+He's never in the same corner as the MODAGAZ sigil. Press **E**. Or don't —
+he nods, he was not going to insist.
 
 ## Guns
 
-Guns are bought from PACI, not found lying around. Walk onto a pedestal in his
-shop, press **E**, pay. They're yours for the rest of the run. Coins are
-deliberately scarce — bosses are the reliable source, regular enemies drop one
-about one time in six.
+Eleven, bought from PACI, not found lying around. Walk onto a pedestal, press
+**E**, pay. Coins are scarce and bosses are the reliable source.
+
+He will not carry everything from the start: the crate opens one rung a floor,
+so SCAR-L and the MEAT SPLITTER are floor-1 problems and GOD FINGER is a
+floor-7 one. Money decides *which* of the three on the pallet, not whether you
+can skip five floors of progression.
 
 | gun | cost | deal |
 | --- | --- | --- |
-| SCAR-L | free | reliable, boring, yours |
-| MEAT SPLITTER | 15 | 9 pellets and enormous knockback |
-| THE STAPLER | 35 | nailgun, pins enemies in place |
-| MICROWAVE | 60 | plasma orbs that ricochet and set things on fire |
-| THE HOG | 100 | minigun — spins up, slows you down, never stops |
-| GOD FINGER | 175 | railgun, charges, pierces the entire room |
-| **OMEGA BEAM** | **50 cards** | a continuous beam that deletes everything in the line |
+| THE SIDEARM | free | it was in the drawer. slow. it gains a mark every floor |
+| SCAR-L | 20 | reliable, boring, yours |
+| MEAT SPLITTER | 30 | nine pellets, and it shoves |
+| THE PRICE GUN | 80 | tags things ON SALE — everything else hits them 1.6× |
+| THE STAPLER | 55 | nailgun, pins enemies in place |
+| MICROWAVE | 80 | plasma orbs that ricochet and set things on fire |
+| FREEZER BURN | 95 | the cold aisle, weaponised |
+| THE HOG | 120 | minigun — spins up, slows you down, never stops |
+| **THE ROTISSERIE** | 165 | fires in a spinning circle. it does not care where you point it |
+| GOD FINGER | 190 | railgun, charges, pierces the entire room |
+| **THE FISH** | **500 coins** | a fish. it opens its mouth and a laser comes out, and the laser cycles colour |
 
-**Cards** are the rare drop — under one enemy in a hundred. Fifty of them buys
-the OMEGA BEAM, and only when PACI happens to be stocking it, so it is very
-much the long game.
+THE ROTISSERIE isn't in the crate at all until its contract is signed.
 
-## The armory
+**THE FISH is the long game.** 500 coins, floor 5 at the earliest, and coins
+come in at about one per eight kills — you will spend most of a run deciding
+whether to save for it or arm yourself on the way.
 
-Press **B** any time to spend coins improving guns you already own:
+There is no armory. Every weapon modifier is a card now, and it applies to
+whatever you're holding rather than to one gun you paid to improve.
 
-| track | cost | effect |
-| --- | --- | --- |
-| CYCLE ×5 | scales with the gun | +10% fire rate a rank |
-| **SPLIT ×1** | **flat 100 on every gun** | your shots come out as a 3-way fan |
-| POWER ×5 | scales with the gun | +15% damage a rank |
+## PACI
 
-The **OMEGA BEAM takes no upgrades at all** — it's already the ceiling.
+Clear wave 5 or wave 10 and the next door leads sideways instead of down, into
+a small purple room with an enormous man in it. Twice a floor.
+
+> HELLO TRAVELER, WELCOME TO MY SHOP
+
+Three pedestals, four once you're a REGULAR. Buy, or don't, then walk out the
+door at the bottom.
+
+**Do not shoot him.** He doesn't fight back. The first shot gets you a warning
+and a room that will not stop shaking, going redder the longer you stand in
+it. The second gets you *GET OUT* — and whatever was still on the pedestals
+stays on the pedestals.
+
+## Contracts
+
+Eight cross-run objectives, and each one changes what the game does rather
+than adding a number. Take 25 RARE-or-better cards and every hand you're ever
+dealt runs +1 LUCK. Kill an APEX and you're dealt four cards instead of three.
+Put down 8 floor bosses and THE ROTISSERIE joins the crate.
+
+They survive everything, including EVOLVE.
 
 ## Money keeps
 
-**Coins and cards survive death.** Whatever you're holding when you die is
-still in your pocket next run, so the guns are a long game. Every coin is
-*also* banked in a separate permanent **vault** used only for cosmetics, so
-buying guns never costs you cosmetic progress.
+**Coins and cards survive death.** Every coin is *also* banked in a separate
+permanent **vault** used only for cosmetics, so buying guns never costs you
+cosmetic progress.
 
-**Cosmetics** are reachable any time — title screen, pause, or the death
-screen, by button or by pressing **C**. GOLD BAND (1000), TOXIC BAND (2500),
-VOID (5000), BONE MASK (9000), LIVING FLAME (15000, and it actually burns).
-They change how Damjan looks in-game, headband and all.
+Coins come in **30% slower** than they used to, which is what makes THE FISH a
+decision rather than a milestone you walk past.
 
-**EVOLVE** (title or death screen, any time you want) wipes your coins and
-cards to zero and permanently raises the world one notch: +38% enemy HP, +26%
-enemy damage, +5% enemy speed, and +50% score per evolution. It stacks forever
+**Cosmetics**: GOLD BAND (1000), TOXIC BAND (2500), VOID (5000), BONE MASK
+(9000), LIVING FLAME (15000, and it actually burns).
+
+**EVOLVE** wipes your coins and cards and permanently raises the world one
+notch: +38% enemy HP, +26% damage, +5% speed, +50% score. It stacks forever
 and it never resets.
 
 ## The secrets
 
 **The eye.** One hidden item on floor 1 turns on god mode. Nothing tells you
-where it is. Things worth noticing: the floor has a scratch on it that isn't
-decoration, one brick in the north wall doesn't quite match its neighbours, it
-flickers if you're patient, and walls are usually bulletproof. Usually.
+where it is. Things worth noticing: one brick in the north wall doesn't quite
+match its neighbours, it flickers if you're patient, and walls are usually
+bulletproof. Usually.
 
 **MODAGAZ.** Every floor has a mark hidden in one corner — a different corner
-each floor. It is almost invisible until you're nearly standing on it. Step on
-it and something says its name. It gives you a card.
+each floor. Step on it and something says its name.
 
 **GOROMANIA.** There is a third one. It is not in a corner and it is not in a
 wall. Consider what you have never once thought to shoot at.
@@ -138,17 +205,20 @@ wall. Consider what you have never once thought to shoot at.
 ## Files
 
 - `index.html` — shell
-- `js/font.js` — the typeface (VT323, latin subset) embedded as a data
-  URI so it loads identically over `http` and `file://`. Every string in the
-  game — HUD, menus and world labels — resolves through it. See `OFL.txt`.
-- `js/sprites.js` — every sprite, hand-plotted as character grids, baked to canvases
-- `js/audio.js` — all sound synthesized at runtime (WebAudio), zero audio files,
-  including formant speech synthesis for the corner secret
+- `js/font.js` — two typeface slots, with VT323 (latin subset) embedded as a
+  data URI so something always loads, identically over `http` and `file://`.
+  Drop **Melted Monster** / **Ari-W9500** into `fonts/` and they take over —
+  see `fonts/README.md` and `OFL.txt`
+- `js/sprites.js` — every sprite, hand-plotted as character grids, then EPX-
+  upscaled, form-shaded, hand-stamped and antialiased at bake time
+- `js/audio.js` — all sound synthesized at runtime (WebAudio), zero audio
+  files, including formant speech synthesis for the corner secret
 - `js/music.js` — the generative score, also synthesized, keyed per floor
-- `js/game.js` — engine, AI, waves, bosses, weapons, economy, lighting, HUD
-- `serve.js` — 30-line static server
+- `js/game.js` — engine, AI, waves, bosses, the deck, economy, lighting, HUD
+- `serve.js` — 20-line static server
 - `docs/` — an Obsidian vault documenting every system in detail; open the
   folder as a vault and start at `00 START HERE`
 
 `window.MEAT` is exposed in the console for poking at the guts
-(`MEAT.giveWeapon('omega')`, `MEAT.spawnBoss(2)`, `MEAT.triggerModagaz()`, `MEAT.S` …).
+(`MEAT.giveWeapon('omega')`, `MEAT.spawnBoss(2, true)`, `MEAT.openColdRoom()`,
+`MEAT.dealCards(3, 2)`, `MEAT.S` …).

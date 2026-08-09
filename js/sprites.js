@@ -375,12 +375,26 @@ SPR.rail = SPRITE([         // GOD FINGER
   '...GG..GGG......',
   '....GG..........'
 ]);
-SPR.omega = SPRITE([        // OMEGA BEAM
-  '......MMMMMMMM..',
-  '..gggMWMWMWMWMMM',
-  '..gGGGMMMMMMMM..',
-  '..GGgggWWWMM....',
-  '...GG..WWW......',
+/* THE FISH.
+
+   Not a gun. A fish, held by the tail, which opens its mouth and emits a
+   laser. The grip column on the left is the same six-pixel `g/G` gunmetal
+   silhouette every other weapon in the rack uses, so it still reads as
+   "something Damjan is holding" from the hip — everything right of it is
+   fish. The tail fin is the wedge at x2-4, the body swells to the dorsal
+   ridge, and the mouth is the open notch at the muzzle end where the beam
+   comes out.
+
+   `M`/`W` stay the omega violet in the sprite itself. The beam is what cycles
+   colour — see the beam draw in game.js. A fish that strobed through the
+   spectrum in your hand would fight the arena palette every frame; a fish
+   that is one colour firing every colour is the joke. */
+SPR.omega = SPRITE([        // THE FISH
+  '.......M.MMMM...',   // tail tip, dorsal fin
+  '..gggggMMMMMMMM.',
+  '..gGGGgMMMMMeMMM',   // the snout reaches furthest on the centre line
+  '..GGgggMMMMMMMM.',
+  '...GG..M..MM....',   // tail bottom, pelvic fin
   '....GG..........'
 ]);
 

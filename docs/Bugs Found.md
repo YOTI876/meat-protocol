@@ -123,6 +123,71 @@ in the gate too. Live count now holds at 83–87 out to floor 26 while the
 per-wave total keeps climbing past 679 — see the table in
 [[Difficulty Scaling#Concurrent cap]].
 
+---
+
+# Open
+
+Two defects found while re-measuring the docs against the current build. Both
+are recorded here rather than fixed, because they are engine changes.
+
+## A. Elite summons bypass the enemy cap
+
+`updateEnemy()`'s elite branch summons `1 + floor*0.7` reinforcements every
+2.2–3.2s with **neither** of the two guards the floor-boss path has — no
+`S.en.length < addCap` gate, no clamp on the count. The result does not
+plateau: on floor 26, with the spawn queue already empty, the live count
+climbs linearly — 93, 129, 147 … 291 at 30 seconds — for as long as the elite
+lives.
+
+Since the [[Enemies#Shared behaviour|separation pass]] is O(n²), this is
+[[#13. Deep floors overshot the enemy cap|#13]] again through a different
+door. Notably the CYST, added later, *does* gate its own hatching on
+`S.en.length < 70` — the elite branch is the outlier, not the convention.
+
+Measured tables in
+[[Difficulty Scaling#Elite summons are not capped]].
+
+## B. THE FULL MENU contract has no reward
+
+Its unlock reads *"signature cards turn up far more often."* That was the
+signature weight in `dealCards()`:
+
+```js
+const sigW = contractDone('menu') ? 0.9 : 0.4;
+```
+
+Signatures left the deck for [[Groceries#THE COLD ROOM|the cold room]] and the
+weight went with them. `contractDone('menu')` is now referenced **nowhere** in
+`js/game.js`. The contract still tracks, completes, fires its toast and
+displays as signed — and does nothing. The description is doubly stale:
+signatures are not cards any more either.
+
+## C. THE DESCENT's reward has no reward either
+
+Same shape as **B**, different contract. Its unlock line reads *"FREEZER BURN
+joins the crate"* — but `WEP.chill` has never carried a `lock`:
+
+```js
+const BUYABLE = ['scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot', 'rail'];
+//                                                        ^ unconditional
+rot: { ... lock: 'seal' ... }    // the only gun that actually filters
+```
+
+`shopStock()` filters on `WEP[id].lock`, and `chill` doesn't set one, so
+FREEZER BURN has always been buyable from the first shop that rolled it.
+Reaching floor 8 signs the contract, toasts it, and changes nothing.
+
+Two ways to close it, and they are not equivalent:
+
+- give `chill` `lock: 'deep'`, which makes the contract line true and puts
+  FREEZER BURN behind floor 8 on a first run
+- rewrite the contract's reward to something that exists
+
+The [[Weapons#When PACI starts carrying it|depth gate]] added in the balance
+pass masks it slightly — `floor: 3` now holds FREEZER BURN back to floor 4 —
+but that is a different gate with a different number, and the contract still
+claims credit for it.
+
 ## Related
 - [[Changelog]] — which commit each fix landed in
 - [[Difficulty Scaling]] — the formula that replaced bug #5

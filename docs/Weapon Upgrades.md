@@ -1,51 +1,45 @@
 ---
-title: Weapon Upgrades (Armory)
-tags: [reference, systems]
+title: Weapon Upgrades (removed)
+tags: [reference, history, removed]
 ---
 
-# Weapon Upgrades — the Armory
+# The Armory — removed
 
-Opened from pause (**ARMORY** button) or the **B** key mid-run. Every
-[[Weapons|weapon you own]] *except the beam* gets three independent,
-coin-bought tracks (`WTRACKS` in `js/game.js`):
+> [!warning] This system no longer exists
+> Kept because `B` used to open it and half the vault linked here. Everything
+> it did is now [[The Deck|the deck]].
+
+The armory let you spend coins improving guns you already owned, per gun, on
+three tracks:
 
 | track | ranks | effect |
 |---|---|---|
-| **CYCLE** | ×5 | +10% fire rate per rank |
-| **SPLIT** | ×1 | 3-way fan — one flat purchase |
-| **POWER** | ×5 | +15% damage per rank |
+| CYCLE | ×5 | +10% fire rate per rank |
+| SPLIT | ×1 | 3-way fan, flat 100 coins on every weapon |
+| POWER | ×5 | +15% damage per rank |
 
-## Cost formula
+`CYCLE` and `POWER` cost `round((20 + rank * 24) * (1 + price/190))`, so
+improving GOD FINGER cost roughly double what improving the starting rifle
+did. **OMEGA BEAM took no upgrades at all** and its row said so.
 
-```
-SPLIT           → 100 coins, flat, on every weapon
-CYCLE / POWER   → tier = 1 + weapon.price / 190
-                  cost(rank) = round((20 + rank * 24) * tier)
-```
+## Why it went
 
-CYCLE and POWER still cost more on better guns — improving GOD FINGER
-(price 175 → tier ≈ 1.92) costs roughly double what improving SCAR-L
-(price 0 → tier 1) does for the same rank.
+Two systems were charging for the same thing. Coins bought guns *and* gun
+upgrades, and the XP tree handed out a third kind of power on its own
+schedule, so a run's build was split across three currencies that never
+interacted.
 
-**SPLIT deliberately ignores all of that.** It's a single rank at a single
-price on every weapon in the game, so the 3-way fan is a flat decision rather
-than a scaling investment: 100 coins, once, per gun.
+Everything the armory sold is a card now, and the important difference is
+**where it applies**: an armory rank belonged to one gun you paid for, and a
+card applies to whatever you happen to be holding. CYCLE and SPLIT survive by
+name in the **TOOLS** aisle; POWER is MALICE and CALIBER in **BLADES**.
 
-## The beam takes no upgrades
+The beam is no longer excluded. It takes cards like everything else — SPLIT
+widens it rather than forking it.
 
-**OMEGA BEAM cannot be improved.** It still appears in the armory list so you
-can see you own it, but its row shows `CANNOT BE IMPROVED` in place of the
-three track boxes and registers no clickable regions at all. It's already the
-ceiling — see [[Weapons]].
-
-`wupgradable(id)` is the single predicate behind this (`!WEP[id].beam`).
-
-## Where this money comes from
-
-Same wallet as everything else — see [[Economy#Coins]]. Upgrades are bought
-with **run coins** and reset with the run; they are not part of the permanent
-[[Economy#The vault|vault]].
+**`B` now opens [[The Deck|THE DECK]].**
 
 ## Related
-- [[Weapons]] — base stats before any upgrade
-- [[Progression]] — the *other* upgrade tree (XP-based, not coin-based)
+- [[The Deck]] — what replaced this
+- [[Weapons]] — base stats, and what modifies them now
+- [[Economy]] — what coins are for now (guns, rerolls, EVOLVE)

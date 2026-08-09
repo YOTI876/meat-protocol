@@ -6,9 +6,9 @@ tags: [moc, index]
 # MEAT PROTOCOL
 
 A top-down pixel-art horror wave shooter. Zero dependencies, no build step, no
-asset files — every sprite is plotted in code and every sound is synthesized at
-runtime. Ten waves a floor, a boss every other wave, a shop every third boss,
-and no bottom to the descent.
+asset files — every sprite is plotted in code and every sound is synthesized
+at runtime. Ten waves a floor, two elites and a boss on the way through, a
+shop before every descent, and no bottom to it.
 
 > [!info] Live
 > Play: https://meat-protocol.vercel.app
@@ -22,24 +22,28 @@ and no bottom to the descent.
 - [[How A Run Goes]] — the loop, floor by floor
 - [[Secrets]] — the three hidden things (spoilers)
 
+## The build
+
+- [[The Deck]] — cards, rarity, riders, aisle mastery, off-cuts
+- [[Groceries]] — the five signatures, and THE COLD ROOM
+- [[Augments]] — TOMCE, and what he charges
+- [[Contracts]] — the permanent, cross-run track
+- [[Progression]] — XP, levels, the evolving sidearm, the endless descent
+
 ## Systems
 
-- [[Weapons]] — the seven guns
-- [[The Shop]] — PACI, and the only place guns are sold
-- [[Weapon Upgrades]] — the armory, CYCLE / SPLIT / POWER
-- [[Enemies]] — the four types and how they think
-- [[Bosses]] — the five, their patterns and their drops
-- [[Groceries]] — the five boss items
-- [[Pickups]] — everything else that drops
-- [[Progression]] — XP, levels, the upgrade tree, the evolving rifle,
-  the endless descent
+- [[Weapons]] — the eleven guns
+- [[The Shop]] — PACI, the only place guns are sold, and his temper
+- [[Enemies]] — the six types and how they think
+- [[Bosses]] — the five floor bosses, six elites, and the APEX
+- [[Pickups]] — everything that drops
 - [[Economy]] — coins, cards, the vault, evolution
 - [[Cosmetics]] — what the vault buys
 - [[Difficulty Scaling]] — every formula that makes it harder
 
 ## Under the hood
 
-- [[Rendering]] — canvases, lighting, the pixel/crisp split
+- [[Rendering]] — render scale, the sprite pipeline, lighting, the screens
 - [[Audio]] — synthesis, formant speech
 - [[Music]] — the generative score
 - [[File Map]] — what lives where
@@ -47,9 +51,13 @@ and no bottom to the descent.
 ## Records
 
 - [[Changelog]] — every release, in order
-- [[Bugs Found]] — thirteen real defects, what caused each
+- [[Bugs Found]] — real defects, what caused each, and two still open
 - [[Tuning Values]] — the single-number knobs
 - [[Deployment]] — GitHub and Vercel setup
+
+## Removed
+
+- [[Weapon Upgrades]] — the armory, and why it isn't here any more
 
 ---
 
