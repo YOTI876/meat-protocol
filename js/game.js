@@ -6,16 +6,37 @@
 'use strict';
 
 const W = 480, H = 270;
+/* RENDER SCALE.
+   Layout, physics and every coordinate in this file stay on the 480x270 grid
+   the game was designed on. The backing store is RS times that, and the world
+   transform is scaled to match, so nothing in the simulation changes — there
+   are simply four device pixels where there used to be one. That is the room
+   the detailed sprites, the selective outlines and the sub-pixel AA need. */
+const RS = 2;
 const cv = document.getElementById('game');
+cv.width = W * RS; cv.height = H * RS;
 const ctx = cv.getContext('2d');
 ctx.imageSmoothingEnabled = false;
+setSubpix(RS);
+
+/* An offscreen that draws in game coordinates but stores at render scale. */
+function subCanvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = Math.ceil(w * RS); c.height = Math.ceil(h * RS);
+  const g = c.getContext('2d');
+  g.setTransform(RS, 0, 0, RS, 0, 0);
+  g.imageSmoothingEnabled = false;
+  c._gw = w; c._gh = h;                 // its size in game units, for blitting
+  return { can: c, ctx: g };
+}
+/** Blit an offscreen back into game space at 1:1 game units. */
+function blit(g, c, x, y) { g.drawImage(c, x, y, c._gw, c._gh); }
 
 const ov = document.getElementById('overlay');
 const octx = ov.getContext('2d');
 let uiScale = 2;
 
-const lcan = document.createElement('canvas'); lcan.width = W; lcan.height = H;
-const lctx = lcan.getContext('2d');
+const _l = subCanvas(W, H), lcan = _l.can, lctx = _l.ctx;
 
 /* ---------- crisp UI text (drawn on the high-res overlay) ----------
    Coordinates are in game space (480x270) and scaled up, so layout code stays
@@ -24,13 +45,15 @@ const lctx = lcan.getContext('2d');
    letterforms, the legibility comes from rasterising them at device
    resolution instead of at 480x270 and upscaling. */
 const UI_FONT = GAME_FONT;
-const CAP_H = 0.63;         // Pixelify Sans cap height in em — used to centre on a point
 function htxt(s, x, y, col, align, size, opts) {
   const o = opts || {}, k = uiScale, sz = size || 9;
+  const fnt = o.font || UI_FONT;
   // o.mid: treat y as the vertical centre of the cap box rather than the
   // baseline. Canvas' own 'middle' baseline sits low because it splits the em
   // box including descenders; centring on caps is what reads as centred.
-  const by = o.mid ? y + sz * CAP_H / 2 : y;
+  // The ratio is measured off whichever face this string is set in, so the
+  // display face and the body face both land where they are asked to.
+  const by = o.mid ? y + sz * capRatio(fnt) / 2 : y;
   // Canvas puts letter-spacing after the final glyph as well, so the measured
   // run is one gap wider than the ink and centred text lands half a gap left.
   // Give it back, or every centred label sits fractionally off.
@@ -38,7 +61,7 @@ function htxt(s, x, y, col, align, size, opts) {
   const al = align || 'left';
   if (al === 'center') x += trk / 2; else if (al === 'right') x += trk;
   octx.save();
-  octx.font = (o.weight || '600') + ' ' + (sz * k) + 'px ' + UI_FONT;
+  octx.font = (o.weight || '600') + ' ' + (sz * k) + 'px ' + fnt;
   octx.textAlign = al;
   octx.textBaseline = 'alphabetic';
   if (octx.letterSpacing !== undefined) octx.letterSpacing = (trk * k) + 'px';
@@ -52,10 +75,10 @@ function htxt(s, x, y, col, align, size, opts) {
   octx.fillText(s, x * k, by * k);
   octx.restore();
 }
-function htxtWidth(s, size, track) {
+function htxtWidth(s, size, track, font) {
   const k = uiScale;
   octx.save();
-  octx.font = '600 ' + ((size || 9) * k) + 'px ' + UI_FONT;
+  octx.font = '600 ' + ((size || 9) * k) + 'px ' + (font || UI_FONT);
   if (octx.letterSpacing !== undefined) octx.letterSpacing = ((track === undefined ? 0.04 : track) * (size || 9) * k) + 'px';
   const w = octx.measureText(s).width / k;
   octx.restore();
@@ -86,18 +109,20 @@ addEventListener('keydown', e => {
   if (e.code === 'Escape' || e.code === 'KeyP') {
     if (S.mode === 'play') S.mode = 'pause';
     else if (S.mode === 'pause') S.mode = 'play';
-    else if (S.mode === 'armory') S.mode = 'pause';
-    else if (S.mode === 'cos') S.mode = S.cosReturn || 'title';
+    else if (S.mode === 'deck') S.mode = 'pause';
+    else if (S.mode === 'cos' || S.mode === 'contracts') S.mode = S.cosReturn || 'title';
   }
-  if (e.code === 'KeyB' && (S.mode === 'play' || S.mode === 'pause')) S.mode = 'armory';
-  else if (e.code === 'KeyB' && S.mode === 'armory') S.mode = 'play';
+  if (e.code === 'KeyB' && (S.mode === 'play' || S.mode === 'pause')) S.mode = 'deck';
+  if (e.code === 'Escape' && S.mode === 'augment') refuseAugments();
+  else if (e.code === 'KeyB' && S.mode === 'deck') S.mode = 'play';
   // cosmetics are reachable from anywhere that isn't a firefight
   if (e.code === 'KeyC' && S.mode !== 'cos' && S.mode !== 'play') { S.cosReturn = S.mode; S.mode = 'cos'; }
   if (S.mode === 'title' && (e.code === 'Enter' || e.code === 'Space')) startRun();
   if (S.mode === 'dead' && e.code === 'KeyR') startRun();
   if (S.mode === 'play') {
     if (e.code === 'KeyQ') cycleWeapon(-1);
-    const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4, Digit6: 5, Digit7: 6 }[e.code];
+    const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4,
+                Digit6: 5, Digit7: 6, Digit8: 7, Digit9: 8, Digit0: 9 }[e.code];
     if (n !== undefined && S.p.owned[n]) selectWeapon(n);
   }
 });
@@ -180,7 +205,7 @@ const ETYPE = {
   stalker:  { bank: SPR.anim.stalker,  hp: 32,  spd: 84, dmg: 23, r: 6, score: 26, gib: '#9a927e', name: 'STALKER' },
   bloater:  { bank: SPR.anim.bloater,  hp: 105, spd: 25, dmg: 32, r: 9, score: 40, gib: '#9c4049', name: 'BLOATER' }
 };
-const CONTACT_CD = 0.78;   // was 0.70 — bigger bites, taken less often
+const CONTACT_CD = 0.74;   // still a shorter fuse than the 0.78 it used to be
 const OMEGA_CARDS = 50;    // the beam is the long game now
 const EVO_COST = ev => 100 * Math.pow(2, ev);   // 100, 200, 400, 800 ...
 
@@ -193,7 +218,23 @@ const BOSSES = [
   { key: 'hog',     name: 'THE HOGFATHER',    bank: SPR.anim.bossB, tint: 'rgba(255,130,142,0.55)', hp: 1850, spd: 32, r: 15, item: 'glock',   pat: 'burst',   addT: 6.0, addN: 4, adds: ['crawler', 'shrieker', 'bloater'], cry: 'HE IS CARRYING SOMETHING' },
   { key: 'courier', name: 'THE COURIER',      bank: SPR.anim.bossA, tint: 'rgba(90,200,255,0.5)',   hp: 2400, spd: 62, r: 15, item: 'bike',    pat: 'circle',  addT: 6.8, addN: 4, adds: ['stalker', 'stalker', 'crawler'],  cry: 'IT HAS BEEN CIRCLING FOR HOURS' }
 ];
-const BOSS_WAVES = { 3: 0, 5: 1, 7: 2, 9: 3, 10: 4 };
+/* Bosses used to land on five of the ten waves, which made them furniture.
+   One floor boss on wave 10, two elites on the way there, and every fifth
+   floor the boss comes up as an APEX instead. */
+const BOSS_WAVE = 10;
+const MINI_WAVES = [4, 8];
+const APEX_EVERY = 5;                       // floors 5, 10, 15 ... are apex floors
+function bossIndexFor(floor) { return floor % BOSSES.length; }
+function isApexFloor(floor) { return (floor + 1) % APEX_EVERY === 0; }
+
+/* Elites: a regular enemy that came up wrong. Named, tracked on the boss bar,
+   and worth a card. */
+const MINIS = [
+  { key: 'crawler',  name: 'THE FIRSTBORN',   col: '#ff8a6a', tint: 'rgba(255,110,70,0.42)' },
+  { key: 'shrieker', name: 'THE CHOIRMASTER', col: '#a8ff6a', tint: 'rgba(150,255,90,0.42)' },
+  { key: 'stalker',  name: 'THE LONG WALK',   col: '#e8e0c0', tint: 'rgba(240,230,200,0.38)' },
+  { key: 'bloater',  name: 'THE SPOILAGE',    col: '#ff6a8a', tint: 'rgba(255,90,120,0.42)' }
+];
 
 const ITEMS = {
   banana:  { spr: SPR.banana,  col: '#f7dc55', n: ['BANANA', 'BANANA SPLIT'],
@@ -208,18 +249,50 @@ const ITEMS = {
              d: ['+25% speed, your dash RAMS things', 'ram harder, leave a burning trail'] }
 };
 
-/* ---- THE ARSENAL. price 0 = you start with it. ---- */
+/* ============================================================
+   GRADE — one rarity ladder, shared by guns and cards.
+   Butcher's grades, because of course they are. `mul` scales a card's
+   numbers; `glow` is how hard the thing shines on a pedestal.
+   ============================================================ */
+const GRADE = [
+  { n: 'SELECT',      col: '#b0a696', mul: 1.00, w: 100, glow: 0  },
+  { n: 'CHOICE',      col: '#7fe08a', mul: 1.40, w: 34,  glow: 9  },
+  { n: 'PRIME',       col: '#7fd0ff', mul: 1.85, w: 9,   glow: 15 },
+  { n: 'BLACK LABEL', col: '#ffb03a', mul: 2.40, w: 2,   glow: 22 },
+  { n: 'CONDEMNED',   col: '#c05cff', mul: 3.20, w: 0,   glow: 28 }   // never rolled — placed by hand
+];
+/* Luck (from cards and contracts) tilts the weights up the ladder rather than
+   rerolling: every point multiplies the odds of each grade above SELECT. */
+function rollGrade(luck, cap) {
+  const top = cap === undefined ? 3 : cap;
+  let total = 0;
+  const ws = [];
+  for (let i = 0; i <= top; i++) { const v = GRADE[i].w * (i ? 1 + luck * 0.55 * i : 1); ws.push(v); total += v; }
+  let r = Math.random() * total;
+  for (let i = 0; i <= top; i++) { r -= ws[i]; if (r <= 0) return i; }
+  return 0;
+}
+
+/* ---- THE ARSENAL. price 0 = you start with it. ----
+   Damjan starts with a pistol now and nothing else. Everything above it is
+   bought from PACI, and `gr` is the grade it shines at on his pedestals. */
 const WEP = {
-  scar:  { id: 'scar',  name: 'SCAR-L',        spr: SPR.scar,  price: 0,   mag: 30,  rate: 0.088, dmg: 13, spread: 0.026, spd: 430, pellets: 1, reload: 1.45, sfx: 'shoot',    col: '#ffe9a8', tag: 'reliable. boring. yours.' },
-  saw:   { id: 'saw',   name: 'MEAT SPLITTER', spr: SPR.saw,   price: 15,  mag: 2,   rate: 0.62,  dmg: 12, spread: 0.24,  spd: 380, pellets: 9, reload: 1.9,  sfx: 'shotgun',  col: '#ffcf8a', knock: 300, tag: 'nine reasons to stand still' },
-  nail:  { id: 'nail',  name: 'THE STAPLER',   spr: SPR.nail,  price: 35,  mag: 60,  rate: 0.045, dmg: 8,  spread: 0.10,  spd: 540, pellets: 1, reload: 2.0,  sfx: 'nailgun',  col: '#f2d14a', pin: 0.45, tag: 'pins them to the floor' },
-  micro: { id: 'micro', name: 'MICROWAVE',     spr: SPR.micro, price: 60,  mag: 16,  rate: 0.24,  dmg: 34, spread: 0.02,  spd: 270, pellets: 1, reload: 2.1,  sfx: 'plasma',   col: '#4fd6e8', bounce: 3, burn: 16, size: 3, tag: 'reheats the dead' },
-  hog:   { id: 'hog',   name: 'THE HOG',       spr: SPR.hog,   price: 100, mag: 120, rate: 0.032, dmg: 10, spread: 0.13,  spd: 500, pellets: 1, reload: 3.4,  sfx: 'minigun',  col: '#ffd28a', spin: 1, slow: 0.45, tag: 'spins up. never stops.' },
-  rail:  { id: 'rail',  name: 'GOD FINGER',    spr: SPR.rail,  price: 175, mag: 5,   rate: 0.55,  dmg: 165, spread: 0,    spd: 950, pellets: 1, reload: 2.4,  sfx: 'railgun',  col: '#a8e8ff', charge: 0.5, pierce: 99, size: 3, knock: 200, tag: 'points. things stop existing.' },
-  omega: { id: 'omega', name: 'OMEGA BEAM',    spr: SPR.omega, price: 0, cards: OMEGA_CARDS, mag: 300, rate: 0.02, dmg: 720, spread: 0, spd: 0, pellets: 0, reload: 2.6, sfx: 'beam', col: '#c05cff', beam: 1, girth: 11, tag: 'fifty cards. one very wide line.' }
+  pistol:{ id: 'pistol',name: 'THE SIDEARM',   spr: SPR.pistol,gr: 0, price: 0,   mag: 18,  rate: 0.155, dmg: 21, spread: 0.020, spd: 470, pellets: 1, reload: 1.15, sfx: 'shoot',    col: '#c8ccd4', evolve: 1, tag: 'it was in the drawer. it will do.' },
+  scar:  { id: 'scar',  name: 'SCAR-L',        spr: SPR.scar,  gr: 0, price: 20,  mag: 30,  rate: 0.088, dmg: 13, spread: 0.026, spd: 430, pellets: 1, reload: 1.45, sfx: 'shoot',    col: '#ffe9a8', tag: 'reliable. boring. yours.' },
+  saw:   { id: 'saw',   name: 'MEAT SPLITTER', spr: SPR.saw,   gr: 0, price: 30,  mag: 2,   rate: 0.62,  dmg: 12, spread: 0.24,  spd: 380, pellets: 9, reload: 1.9,  sfx: 'shotgun',  col: '#ffcf8a', knock: 300, tag: 'nine reasons to stand still' },
+  price: { id: 'price', name: 'THE PRICE GUN', spr: SPR.price, gr: 1, price: 45,  mag: 40,  rate: 0.070, dmg: 7,  spread: 0.06,  spd: 560, pellets: 1, reload: 1.6,  sfx: 'nailgun',  col: '#ff4ab0', mark: 6, tag: 'everything it tags is on sale' },
+  nail:  { id: 'nail',  name: 'THE STAPLER',   spr: SPR.nail,  gr: 1, price: 55,  mag: 60,  rate: 0.045, dmg: 8,  spread: 0.10,  spd: 540, pellets: 1, reload: 2.0,  sfx: 'nailgun',  col: '#f2d14a', pin: 0.45, tag: 'pins them to the floor' },
+  micro: { id: 'micro', name: 'MICROWAVE',     spr: SPR.micro, gr: 2, price: 80,  mag: 16,  rate: 0.24,  dmg: 34, spread: 0.02,  spd: 270, pellets: 1, reload: 2.1,  sfx: 'plasma',   col: '#4fd6e8', bounce: 3, burn: 16, size: 3, tag: 'reheats the dead' },
+  chill: { id: 'chill', name: 'FREEZER BURN',  spr: SPR.chill, gr: 2, price: 95,  mag: 55,  rate: 0.055, dmg: 9,  spread: 0.14,  spd: 400, pellets: 1, reload: 2.2,  sfx: 'plasma',   col: '#9fe4ff', chill: 2.2, size: 2, tag: 'the cold aisle, weaponised' },
+  hog:   { id: 'hog',   name: 'THE HOG',       spr: SPR.hog,   gr: 2, price: 120, mag: 120, rate: 0.032, dmg: 10, spread: 0.13,  spd: 500, pellets: 1, reload: 3.4,  sfx: 'minigun',  col: '#ffd28a', spin: 1, slow: 0.45, tag: 'spins up. never stops.' },
+  rot:   { id: 'rot',   name: 'THE ROTISSERIE',spr: SPR.rot,   gr: 3, price: 165, mag: 70,  rate: 0.050, dmg: 14, spread: 0.05,  spd: 330, pellets: 1, reload: 2.6,  sfx: 'plasma',   col: '#ff9a3a', radial: 0.55, burn: 10, size: 2, lock: 'seal', tag: 'it does not care where you point it' },
+  rail:  { id: 'rail',  name: 'GOD FINGER',    spr: SPR.rail,  gr: 3, price: 190, mag: 5,   rate: 0.55,  dmg: 165, spread: 0,    spd: 950, pellets: 1, reload: 2.4,  sfx: 'railgun',  col: '#a8e8ff', charge: 0.5, pierce: 99, size: 3, knock: 200, tag: 'points. things stop existing.' },
+  omega: { id: 'omega', name: 'OMEGA BEAM',    spr: SPR.omega, gr: 4, price: 0, cards: OMEGA_CARDS, mag: 300, rate: 0.02, dmg: 720, spread: 0, spd: 0, pellets: 0, reload: 2.6, sfx: 'beam', col: '#c05cff', beam: 1, girth: 11, tag: 'fifty cards. one very wide line.' }
 };
-const WORDER = ['scar', 'saw', 'nail', 'micro', 'hog', 'rail', 'omega'];
-const BUYABLE = ['saw', 'nail', 'micro', 'hog', 'rail'];
+const WORDER = ['pistol', 'scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot', 'rail', 'omega'];
+/* Two of these are behind contracts and simply are not in PACI's crate until
+   you have earned them — see CONTRACTS. */
+const BUYABLE = ['scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot', 'rail'];
 
 /* ---- COSMETICS. bought from the vault, kept forever. ---- */
 const COSMETICS = [
@@ -300,10 +373,16 @@ function freshState() {
     coins: sv.coins || 0, cards: sv.cards || 0, vault: sv.vault || 0,
     evo: sv.evo || 0, modagazFound: sv.modagaz || 0,
     goro: false, goroHits: 0, goroT: 0, vacuum: 0,
-    xp: 0, level: 1, xpNext: 65, upgPts: 0, upg: { spd: 0, dmg: 0, def: 0 },
-    scarLv: 1, lvlChoices: null, wupg: {}, glusec: 0, armorySel: 0,
+    /* THE MENU. `deck` is the run's whole build; `luck` tilts every hand. */
+    xp: 0, level: 1, xpNext: 48, upgPts: 0,
+    deck: {}, hand: null, lvlLuck: 0, rerolls: 0, cardsTaken: 0, luck: 0,
+    augs: {}, augOffer: null, tomce: null,
+    floorBosses: 0, apexKills: 0, fx: [], coinFrac: 0,
+    killsSinceNova: 0, savesLeft: 0, regenT: 0, pendingLuck: 0, lvlDelay: 0, pendingKick: 0,
+    scarLv: 1, glusec: 0,
     layout: 'scatter',
     bossKills: 0, shopDue: false, shopsSeen: 0, inShop: false, shopStash: null, paci: null,
+    apex: false, mini: null,
     score: 0, combo: 1, comboT: 0, kills: 0, streak: 0,
     flash: 0, flashCol: '#fff', hitstop: 0, slow: 0, redness: 0, modT: 0,
     jump: 0, jumpSpr: null, muzzle: null, beamHit: null,
@@ -323,16 +402,27 @@ freshState();
 function ST() {
   const it = S.items;
   const b = it.banana | 0, m = it.melon | 0, k = it.coolade | 0, g = it.glock | 0, bk = it.bike | 0;
-  const u = S.upg;
+  const maxhp = Math.max(30, Math.round((100 + (m === 1 ? 38 : m >= 2 ? 76 : 0) + dk('roughage'))
+                           * (1 - Math.min(0.24, dkr('pricehike') * 0.08))
+                           * (1 - ag('glass') * 0.15 - ag('hollow') * 0.10 + ag('ballast') * 0.22)));
+  /* Missing health feeds RAW NERVE. Guarded because ST() is called before the
+     player exists during boot. */
+  const hurt = S.p ? clamp(1 - S.p.hp / Math.max(1, maxhp), 0, 1) : 0;
   return {
     speed: 94 * (1 + (b === 1 ? 0.22 : b >= 2 ? 0.44 : 0) + (bk === 1 ? 0.16 : bk >= 2 ? 0.30 : 0))
-              * (1 + u.spd * 0.06),
-    maxhp: 100 + (m === 1 ? 38 : m >= 2 ? 76 : 0),
+              * (1 + dk('adrenaline') / 100)
+              * clamp(1 - ag('tinnitus') * 0.09 - ag('ballast') * 0.08 + ag('sleepless') * 0.14, 0.4, 2),
+    maxhp,
     dmgMul: (k === 1 ? 1.38 : k >= 2 ? 1.85 : 1) * (S.god ? 3 : 1) * (S.goro ? 1.25 : 1)
-              * (1 + u.dmg * 0.08),
-    /* every point of DEFENCE shaves damage taken, with diminishing returns */
-    resist: 1 - Math.min(0.60, u.def * 0.07),
-    pierce: k === 1 ? 1 : k >= 2 ? 2 : 0,
+              * (1 + dkc('malice') / 100)
+              * (1 + dkc('nerve') / 100 * hurt)
+              * (1 + ag('cataract') * 0.15 + ag('glass') * 0.24 + ag('thinskin') * 0.30),
+    flatDmg: dkc('caliber'),
+    crit: dkc('cleaver') / 100 + ag('coldblood') * 0.09,
+    critMul: 2.0 + dkc('deepcut') / 100,
+    resist: (1 - dkc('callus') / 100) * (1 + ag('thinskin') * 0.22 + ag('grease') * 0.11),
+    dodge: dkc('aegis') / 100,
+    pierce: (k === 1 ? 1 : k >= 2 ? 2 : 0) + dkc('carve'),
     shieldMax: m === 1 ? 2 : m >= 2 ? 4 : 0,
     shieldCd: m >= 2 ? 8 : 14,
     peel: b > 0, peelBoom: b >= 2,
@@ -341,33 +431,152 @@ function ST() {
     glockDmg: 13,
     ram: bk === 1 ? 40 : bk >= 2 ? 95 : 0,
     ramFire: bk >= 2,
-    dashCd: bk ? 0.45 : (b ? 0.58 : 0.85),
-    /* the base rifle gains a mark every FLOOR: new colour, new voice, +20% each.
-       (Per-floor means far fewer marks than the old per-wave cadence, so each
-       one has to be worth something.) */
+    dashCd: (bk ? 0.45 : (b ? 0.58 : 0.85)) * (1 - ag('grease') * 0.30),
+    /* ---- deck-driven weapon mods. These used to be bought per gun in the
+       armory; they are cards now and they apply to whatever you are holding. */
+    rateMul: 1 / (1 + dkc('cycle') / 100 + ag('tinnitus') * 0.16),
+    split: dkc('split'),
+    magMul: Math.max(0.35, 1 + dkc('hopper') / 100 - ag('shortfuse') * 0.16),
+    reloadMul: Math.max(0.2, 1 - dkc('quick') / 100 - ag('shortfuse') * 0.22),
+    bounce: dkc('ricochet'),
+    home: dkc('guidance'),
+    burn: dkc('spoiled'),
+    slowHit: dkc('coldsnap') / 100,
+    freeze: dkc('frostbite') / 100,
+    aura: dkc('walkin') / 100,
+    overkill: dkc('overkill'),
+    graze: dkc('grazing') + ag('feeder') * 1.5,
+    regen: dkc('regrowth'),
+    lootMul: 1 + dkc('clearance') / 100,
+    novaEvery: dkr('flashpoint') ? Math.max(8, 22 - dkc('flashpoint') * 5) : 0,
+    /* ---- TOMCE's side of the ledger ---- */
+    xpMul: Math.max(0.3, 1 - ag('debt') * 0.14 - ag('feeder') * 0.18 + ag('loudmouth') * 0.45),
+    coinMul: 1 + ag('debt') * 0.40,
+    sight: clamp(1 - ag('cataract') * 0.11 - ag('sleepless') * 0.10, 0.5, 1),
+    magnet: clamp(1 - ag('coldblood') * 0.30, 0.3, 1),
+    swarm: 1 + ag('loudmouth') * 0.18,
+    /* the sidearm gains a mark every FLOOR: new colour, new voice, +20% each */
     scarMul: 1 + 0.20 * (S.scarLv - 1)
   };
 }
 
-/* ---------- per-weapon upgrades, bought with coins ---------- */
-const SPLIT_COST = 100;    // flat, one rank, identical on every gun
-const WTRACKS = [
-  { id: 'rate',  name: 'CYCLE',  col: '#f5c518', max: 5, d: r => '+' + (r * 10) + '% fire rate' },
-  { id: 'split', name: 'SPLIT',  col: '#7fd0ff', max: 1, d: r => r ? '3-way fan' : 'single shot' },
-  { id: 'pow',   name: 'POWER',  col: '#ff6a72', max: 5, d: r => '+' + (r * 15) + '% damage' }
+/* ============================================================
+   THE MENU — the card deck.
+
+   There is no armory and there are no grocery drops any more; everything
+   that used to be bought with coins or dropped by a boss is a card you pick
+   on level-up. Five aisles, one grade ladder, and the five groceries sit at
+   the top of the deck as CONDEMNED signature cards.
+
+   A card holds { rank, amt }: rank is how many times you took it, amt is the
+   accumulated number, which is what the game actually reads. Grade scales
+   what a single pick is worth, so a PRIME MALICE is worth two SELECT ones.
+   ============================================================ */
+const AISLES = {
+  butchery: { n: 'BUTCHERY', col: '#ff5a62' },
+  produce:  { n: 'PRODUCE',  col: '#7fe08a' },
+  frozen:   { n: 'FROZEN',   col: '#7fd0ff' },
+  hardware: { n: 'HARDWARE', col: '#f5c518' },
+  expired:  { n: 'EXPIRED',  col: '#c05cff' }
+};
+const AISLE_ORDER = ['butchery', 'produce', 'frozen', 'hardware', 'expired'];
+
+const CARDS = [
+  /* ---- BUTCHERY: hurting things ---- */
+  { id: 'malice',    name: 'MALICE',        aisle: 'butchery', max: 6, b: 0, v: 6,   d: v => '+' + v + '% damage' },
+  { id: 'cleaver',   name: 'CLEAVER',       aisle: 'butchery', max: 5, b: 0, v: 4,  cap: 60,  d: v => '+' + v + '% critical chance' },
+  { id: 'deepcut',   name: 'DEEP CUT',      aisle: 'butchery', max: 4, b: 1, v: 18,  d: v => '+' + v + '% critical damage' },
+  { id: 'overkill',  name: 'OVERKILL',      aisle: 'butchery', max: 3, b: 2, v: 18,  d: v => 'kills burst for ' + v + ' damage' },
+  { id: 'nerve',     name: 'RAW NERVE',     aisle: 'butchery', max: 3, b: 1, v: 15, cap: 80,  d: v => 'up to +' + v + '% damage as you bleed' },
+  { id: 'carve',     name: 'CARVE',         aisle: 'butchery', max: 2, b: 0, v: 1, int: 1, cap: 2, d: v => 'shots pass through ' + v + ' more' },
+  /* ---- PRODUCE: staying alive and moving ---- */
+  { id: 'adrenaline',name: 'ADRENALINE',    aisle: 'produce', max: 6, b: 0, v: 5,    d: v => '+' + v + '% move speed' },
+  { id: 'roughage',  name: 'ROUGHAGE',      aisle: 'produce', max: 6, b: 0, v: 15,   d: v => '+' + v + ' max health' },
+  { id: 'regrowth',  name: 'REGROWTH',      aisle: 'produce', max: 4, b: 0, v: 0.4, dec: 1, cap: 3, d: v => '+' + v + ' health a second' },
+  { id: 'grazing',   name: 'GRAZING',       aisle: 'produce', max: 4, b: 0, v: 0.6, dec: 1, cap: 4, d: v => '+' + v + ' health a kill' },
+  { id: 'banana',    name: 'BANANA',        aisle: 'produce', max: 2, b: 2, sig: 'banana', fixed: 4 },
+  { id: 'bike',      name: 'STOLEN BICYCLE',aisle: 'produce', max: 2, b: 2, sig: 'bike',   fixed: 4 },
+  /* ---- FROZEN: taking less, slowing them down ---- */
+  { id: 'callus',    name: 'CALLUS',        aisle: 'frozen', max: 6, b: 0, v: 5, cap: 45,  d: v => '-' + v + '% damage taken' },
+  { id: 'aegis',     name: 'AEGIS PLATING', aisle: 'frozen', max: 3, b: 0, v: 7, cap: 32,  d: v => v + '% chance a hit does nothing' },
+  { id: 'coldsnap',  name: 'COLD SNAP',     aisle: 'frozen', max: 3, b: 0, v: 11, cap: 50, d: v => 'your hits slow by ' + v + '%' },
+  { id: 'frostbite', name: 'FROSTBITE',     aisle: 'frozen', max: 3, b: 1, v: 4, cap: 20,  d: v => v + '% chance to freeze solid' },
+  { id: 'walkin',    name: 'THE WALK-IN',   aisle: 'frozen', max: 3, b: 0, v: 8, cap: 40,  d: v => 'things near you crawl ' + v + '% slower' },
+  { id: 'melon',     name: 'MELON',         aisle: 'frozen', max: 2, b: 2, sig: 'melon',  fixed: 4 },
+  /* ---- HARDWARE: whatever you are holding ---- */
+  { id: 'cycle',     name: 'CYCLE',         aisle: 'hardware', max: 5, b: 0, v: 6, cap: 45, d: v => '+' + v + '% fire rate' },
+  { id: 'split',     name: 'SPLIT',         aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 2, d: v => 'your shot forks ' + (v * 2 + 1) + ' ways' },
+  { id: 'caliber',   name: 'CALIBER',       aisle: 'hardware', max: 5, b: 0, v: 1.2, dec: 1, cap: 12, d: v => '+' + v + ' flat damage a shot' },
+  { id: 'hopper',    name: 'HOPPER',        aisle: 'hardware', max: 3, b: 0, v: 22, cap: 90, d: v => '+' + v + '% magazine' },
+  { id: 'quick',     name: 'QUICK HANDS',   aisle: 'hardware', max: 3, b: 0, v: 11, cap: 45, d: v => '-' + v + '% reload time' },
+  { id: 'ricochet',  name: 'RICOCHET',      aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 3, d: v => 'shots bounce ' + v + ' more times' },
+  { id: 'guidance',  name: 'GUIDANCE',      aisle: 'hardware', max: 2, b: 2, v: 1.1, dec: 1, cap: 3.5, d: v => 'shots steer, turn rate ' + v },
+  { id: 'munitions', name: 'MUNITIONS',     aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 2, d: v => '+' + v + ' frag every wave' },
+  /* ---- EXPIRED: the bad idea aisle ---- */
+  { id: 'clearance', name: 'CLEARANCE',     aisle: 'expired', max: 3, b: 1, v: 18, cap: 70, d: v => '+' + v + '% loot, and better cards' },
+  { id: 'pricehike', name: 'PRICE HIKE',    aisle: 'expired', max: 2, b: 1, v: 30, cap: 80, d: v => '+' + v + '% experience, -8% max health' },
+  { id: 'spoiled',   name: 'SPOILED',       aisle: 'expired', max: 3, b: 0, v: 6, cap: 30,  d: v => 'your hits burn for ' + v + '/s' },
+  { id: 'seconds',   name: 'SECOND HELPING',aisle: 'expired', max: 1, b: 2, v: 1, int: 1, cap: 1, d: v => 'survive ' + v + ' fatal hit a floor' },
+  { id: 'flashpoint',name: 'FLASHPOINT',    aisle: 'expired', max: 2, b: 2, v: 1, int: 1, cap: 2, d: v => 'a nova every ' + Math.max(8, 22 - v * 5) + ' kills' },
+  { id: 'coolade',   name: 'COOLADE',       aisle: 'expired', max: 2, b: 2, sig: 'coolade', fixed: 4 },
+  { id: 'glock',     name: 'GLOCK-18',      aisle: 'expired', max: 2, b: 2, sig: 'glock',   fixed: 4 }
 ];
-function wup(id) {
-  if (!S.wupg[id]) S.wupg[id] = { rate: 0, split: 0, pow: 0 };
-  return S.wupg[id];
+/* What a card needs before it will be dealt. Tier 1 opens on the wave-4 elite
+   and tier 2 — novas, second chances, the signature groceries — only on a real
+   floor boss. Gating tier 1 behind wave 10 as well meant a whole floor fought
+   on plain numbers, which is not difficulty, it is a flat line. */
+const BOSS_GATE = ['from the start', 'once you have killed an elite', 'once you have killed a floor boss'];
+function cardUnlocked(c) {
+  const b = c.b | 0;
+  return b === 0 || (b === 1 ? S.bossKills >= 1 : S.floorBosses >= 1);
 }
-/* The beam is bought, not built — nothing in the armory touches it. */
-function wupgradable(id) { return !WEP[id].beam; }
-/* Better guns cost more to improve, and each rank costs more than the last —
-   except SPLIT, which is one flat purchase at the same price on every weapon. */
-function wupCost(id, track, rank) {
-  if (track === 'split') return SPLIT_COST;
-  const tier = 1 + (WEP[id].price || 120) / 190;
-  return Math.round((20 + rank * 24) * tier);
+const CARD_BY_ID = {};
+for (const c of CARDS) CARD_BY_ID[c.id] = c;
+
+/* Read a card's accumulated number, and its rank. These two are all the rest
+   of the game needs to know about the deck. */
+function dk(id) { const d = S.deck[id]; return d ? d.amt : 0; }
+function dkr(id) { const d = S.deck[id]; return d ? d.rank : 0; }
+/* The capped read. A card that says "-62% damage taken" has to mean it, so the
+   cap lives on the card and both the maths and the printed number go through
+   here — there is no way for the face to promise something ST() won't pay. */
+function dkc(id) {
+  const c = CARD_BY_ID[id], v = dk(id);
+  return c && c.cap !== undefined ? Math.min(c.cap, v) : v;
+}
+
+/* What one pick at this grade is worth. Integer cards round up so a PRIME
+   SPLIT is genuinely worth two SELECT ones instead of 1.55 of one. */
+function cardVal(c, g) {
+  const raw = c.v * GRADE[g].mul;
+  return c.int ? Math.max(1, Math.round(raw)) : c.dec ? Math.round(raw * 10) / 10 : Math.round(raw);
+}
+function cardLine(c, v) {
+  if (c.sig) { const lv = clamp((S.items[c.sig] | 0), 0, 1); return ITEMS[c.sig].d[lv]; }
+  return c.d(c.cap !== undefined ? Math.min(c.cap, v) : v);
+}
+function cardName(c) {
+  if (c.sig) return ITEMS[c.sig].n[Math.min(S.items[c.sig] | 0, 1)];
+  return c.name;
+}
+
+/* Deal a hand. Signature cards are deliberately rare until THE FULL MENU is
+   signed off, and every card rolls its own grade. */
+function dealCards(n, luckBonus) {
+  const luck = S.luck + (luckBonus || 0);
+  const sigW = contractDone('menu') ? 0.9 : 0.4;
+  const pool = CARDS.filter(c => dkr(c.id) < c.max && cardUnlocked(c));
+  const out = [];
+  while (out.length < n && pool.length) {
+    let tw = 0;
+    for (const c of pool) tw += c.sig ? sigW : 1;
+    let r = Math.random() * tw, ci = pool.length - 1;
+    for (let i = 0; i < pool.length; i++) { r -= pool[i].sig ? sigW : 1; if (r <= 0) { ci = i; break; } }
+    const c = pool.splice(ci, 1)[0];
+    const g = c.fixed !== undefined ? c.fixed : rollGrade(luck);
+    out.push({ c, g, val: c.sig ? 0 : cardVal(c, g) });
+  }
+  return out;
 }
 
 const SCAR_COLS = ['#ffe9a8', '#7fd0ff', '#8fff9a', '#ff7fe0', '#ffb03a',
@@ -379,55 +588,181 @@ function roman(n) {
   while (v > 0) for (const [d, r] of M) if (v >= d) { s += r; v -= d; break; }
   return s;
 }
-const scarName = () => 'SCAR-L MK ' + roman(S.scarLv);
+const scarName = () => 'SIDEARM MK ' + roman(S.scarLv);
 
-/* ---------- XP & upgrades ---------- */
-const UPGRADES = [
-  { id: 'spd', name: 'ADRENALINE', col: '#7fe08a', d: '+6% move speed' },
-  { id: 'dmg', name: 'MALICE',     col: '#ff6a72', d: '+8% damage' },
-  { id: 'def', name: 'CALLUS',     col: '#7fd0ff', d: '-7% damage taken' }
+/* ============================================================
+   AUGMENTS — what TOMCE deals in.
+
+   Not cards. Every one is a trade with a real cost attached, tuned so the
+   upside beats the downside by a nose and no further. He turns up in a corner
+   of some floors, never the corner the sigil is in, and offers three.
+   ============================================================ */
+const AUGMENTS = [
+  { id: 'cataract',  name: 'CATARACT',    max: 2, up: r => '+' + (15 * r) + '% damage',           dn: r => 'you see ' + (11 * r) + '% less' },
+  { id: 'tinnitus',  name: 'TINNITUS',    max: 2, up: r => '+' + (16 * r) + '% fire rate',        dn: r => '-' + (9 * r) + '% move speed' },
+  { id: 'glass',     name: 'GLASS HANDS', max: 2, up: r => '+' + (24 * r) + '% damage',           dn: r => '-' + (15 * r) + '% max health' },
+  { id: 'ballast',   name: 'DEAD WEIGHT', max: 2, up: r => '+' + (22 * r) + '% max health',       dn: r => '-' + (8 * r) + '% move speed' },
+  { id: 'shortfuse', name: 'SHORT FUSE',  max: 2, up: r => '-' + (22 * r) + '% reload time',      dn: r => '-' + (16 * r) + '% magazine' },
+  { id: 'thinskin',  name: 'THIN SKIN',   max: 2, up: r => '+' + (30 * r) + '% damage',           dn: r => '+' + (22 * r) + '% damage taken' },
+  { id: 'grease',    name: 'GREASE',      max: 2, up: r => 'dash ' + (30 * r) + '% more often',   dn: r => '+' + (11 * r) + '% damage taken' },
+  { id: 'coldblood', name: 'COLD BLOOD',  max: 2, up: r => '+' + (9 * r) + '% critical chance',   dn: r => 'loot pulls from ' + (30 * r) + '% closer' },
+  { id: 'debt',      name: 'THE DEBT',    max: 2, up: r => '+' + (40 * r) + '% coins',            dn: r => '-' + (14 * r) + '% experience' },
+  { id: 'feeder',    name: 'FEEDER',      max: 2, up: r => '+' + (1.5 * r) + ' health a kill',    dn: r => '-' + (18 * r) + '% experience' },
+  { id: 'loudmouth', name: 'LOUDMOUTH',   max: 2, up: r => '+' + (45 * r) + '% experience',       dn: r => (18 * r) + '% more of them come' },
+  { id: 'sleepless', name: 'SLEEPLESS',   max: 2, up: r => '+' + (14 * r) + '% move speed',       dn: r => '-' + (10 * r) + '% sight' },
+  { id: 'hollow',    name: 'HOLLOW',      max: 1, up: r => 'one more card in every hand',         dn: r => '-10% max health' }
 ];
+const ag = id => S.augs[id] | 0;
+
+function dealAugments(n) {
+  const pool = AUGMENTS.filter(a => ag(a.id) < a.max);
+  const out = [];
+  while (out.length < n && pool.length) out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  return out;
+}
+function openAugments() {
+  if (S.mode !== 'play') return;
+  S.mode = 'augment';
+  S.augOffer = dealAugments(3);
+  if (A.duck) A.duck(0.5, 3);
+  A.secret();
+}
+function takeAugment(a) {
+  S.augs[a.id] = ag(a.id) + 1;
+  if (S.tomce) S.tomce.used = true;
+  S.mode = 'play'; S.augOffer = null;
+  S.p.hp = Math.min(ST().maxhp, S.p.hp);       // GLASS HANDS can cut the ceiling out from under you
+  A.god(); A.bigpickup();
+  S.flash = 0.6; S.flashCol = '#a8e8ff';
+  float(S.p.x, S.p.y - 26, a.name, '#a8e8ff', true);
+  msg('TOMCE', 'he writes something down and does not look up.', 3);
+}
+function refuseAugments() {
+  if (S.tomce) S.tomce.used = true;
+  S.mode = 'play'; S.augOffer = null;
+  msg('TOMCE', 'he nods. he was not going to insist.', 2.4);
+}
+
+/* ---------- XP & the level-up hand ---------- */
+/* Levels come roughly twice as fast as they used to: the deck is now the whole
+   progression, so waiting four waves for one card made a floor feel flat. */
 function gainXP(n) {
-  S.xp += n;
+  S.xp += Math.round(n * (1 + dkc('pricehike') / 100) * ST().xpMul);
   while (S.xp >= S.xpNext) {
     S.xp -= S.xpNext;
     S.level++;
     S.upgPts++;
-    S.xpNext = Math.round(S.xpNext * 1.32);
+    S.xpNext = Math.round(S.xpNext * 1.23);
     A.bigpickup();
     S.flash = Math.max(S.flash, 0.4); S.flashCol = '#9fe08a';
     ring(S.p.x, S.p.y, 46, '#9fe08a', 0.5, 2);
     float(S.p.x, S.p.y - 26, 'LEVEL ' + S.level, '#9fe08a', true);
   }
-  if (S.upgPts > 0 && S.mode === 'play') openLevelUp();
 }
-function openLevelUp() {
+/* How many cards you get to look at. The APEX contract widens the hand. */
+function handSize() { return (contractDone('apex') ? 4 : 3) + ag('hollow'); }
+function rerollCost() { return 20 + S.rerolls * 15; }
+function openLevelUp(luckBonus) {
+  if (S.mode === 'levelup') return;
   S.mode = 'levelup';
-  S.lvlChoices = UPGRADES.slice();
+  S.lvlLuck = luckBonus || 0;
+  S.hand = dealCards(handSize(), S.lvlLuck);
   if (A.duck) A.duck(0.5, 3);
 }
-function takeUpgrade(id) {
-  if (S.upgPts <= 0) return;
-  S.upg[id] = (S.upg[id] | 0) + 1;
+function rerollHand() {
+  const c = rerollCost();
+  if (S.coins < c) { A.denied(); return; }
+  S.coins -= c; S.rerolls++;
+  S.hand = dealCards(handSize(), S.lvlLuck + 0.35);
+  A.rack(); persist();
+}
+function takeCard(o) {
+  if (S.upgPts <= 0 || !o) return;
+  const c = o.c;
+  const d = S.deck[c.id] || (S.deck[c.id] = { rank: 0, amt: 0, g: 0 });
+  d.rank++;
+  d.amt = Math.round((d.amt + o.val) * 10) / 10;
+  d.g = Math.max(d.g | 0, o.g);
+  if (c.sig) grantItem(c.sig);            // the five groceries still run on the old plumbing
   S.upgPts--;
+  S.cardsTaken++;
+  if (o.g >= 2) bump('prime');
+  const sigs = CARDS.filter(x => x.sig && dkr(x.id) > 0).length;
+  if (sigs) bumpMax('sigs', sigs);
+  recalcLuck();
   A.buy();
-  S.flash = 0.5; S.flashCol = UPGRADES.find(u => u.id === id).col;
-  if (S.p) S.p.hp = Math.min(ST().maxhp, S.p.hp + 12);
-  if (S.upgPts <= 0) S.mode = 'play';
+  S.flash = 0.5; S.flashCol = GRADE[o.g].col;
+  if (S.p) S.p.hp = Math.min(ST().maxhp, S.p.hp + 8);
+  if (S.upgPts <= 0) { S.mode = 'play'; S.hand = null; }
+  else S.hand = dealCards(handSize(), S.lvlLuck);
+}
+
+/* ============================================================
+   CONTRACTS — the reason to come back.
+
+   Persistent, cross-run objectives. Each one unlocks something the game
+   actually does differently, so the meta isn't just a bigger number.
+   ============================================================ */
+const CONTRACTS = [
+  { id: 'seal',  name: 'BREAK THE SEAL',   goal: 8,     stat: 'bosses', d: 'put down 8 floor bosses',           u: 'THE ROTISSERIE joins the crate' },
+  { id: 'deep',  name: 'THE DESCENT',      goal: 8,     stat: 'deep',   d: 'reach floor 8',                     u: 'FREEZER BURN joins the crate' },
+  { id: 'reg',   name: 'REGULAR',          goal: 12,    stat: 'shops',  d: 'visit PACI 12 times',               u: 'PACI lays out a fourth pedestal' },
+  { id: 'grade', name: 'GRADED',           goal: 25,    stat: 'prime',  d: 'take 25 PRIME-or-better cards',     u: '+1 LUCK on every card you are dealt' },
+  { id: 'dozen', name: "BUTCHER'S DOZEN",  goal: 3000,  stat: 'kills',  d: '3000 kills, all runs counted',      u: 'start every run one level up' },
+  { id: 'hoard', name: 'HOARDER',          goal: 12000, stat: 'vault',  d: 'bank 12000 coins in the vault',     u: 'start every run holding 60 coins' },
+  { id: 'apex',  name: 'APEX PREDATOR',    goal: 1,     stat: 'apex',   d: 'kill an APEX',                      u: 'you are dealt four cards, not three' },
+  { id: 'menu',  name: 'THE FULL MENU',    goal: 5,     stat: 'sigs',   d: 'hold all five signature cards',     u: 'signature cards turn up far more often' }
+];
+/* Counters live in the save under c_*, except two that were already tracked. */
+function cStat(k) {
+  const s = loadSave();
+  if (k === 'deep') return s.deep || 1;
+  if (k === 'vault') return s.vault || 0;
+  return s['c_' + k] | 0;
+}
+function bump(k, n) {
+  const s = loadSave(), v = (s['c_' + k] | 0) + (n === undefined ? 1 : n);
+  const patch = {}; patch['c_' + k] = v;
+  writeSave(patch);
+  return v;
+}
+function bumpMax(k, v) {
+  const s = loadSave();
+  if (v > (s['c_' + k] | 0)) { const patch = {}; patch['c_' + k] = v; writeSave(patch); }
+}
+function contractDone(id) {
+  const c = CONTRACTS.find(x => x.id === id);
+  return c ? cStat(c.stat) >= c.goal : false;
+}
+/* Called after anything that could complete one, so the toast fires once. */
+function checkContracts() {
+  const s = loadSave();
+  const seen = s.cDone || [];
+  let changed = false;
+  for (const c of CONTRACTS) {
+    if (seen.indexOf(c.id) >= 0 || !contractDone(c.id)) continue;
+    seen.push(c.id); changed = true;
+    if (S.mode === 'play' || S.mode === 'levelup') {
+      msg('CONTRACT SIGNED', c.name + '  —  ' + c.u, 4.5);
+      A.secret(); S.flash = 0.6; S.flashCol = '#ffb03a';
+    }
+  }
+  if (changed) writeSave({ cDone: seen });
 }
 /* One knob for how hard the floor hits. Evolutions stack on top forever. */
 function diff() {
   const ev = S.evo | 0;
   return {
-    hp: (1 + S.room * 0.95) * (1 + ev * 0.38),
-    dmg: (1 + S.room * 0.62) * (1 + ev * 0.26) * 0.95,   // a flat 5% off the top
-    spd: (1 + S.room * 0.08) * (1 + ev * 0.05),
+    hp: (1 + S.room * 1.25) * (1 + ev * 0.38),
+    dmg: (1 + S.room * 0.72) * (1 + ev * 0.26),
+    spd: (1 + S.room * 0.11) * (1 + ev * 0.05),
     score: (1 + S.room * 0.7) * (1 + ev * 0.5)
   };
 }
 function curW() { return WEP[S.p.owned[S.p.wi]]; }
 function curMag() { return S.p.mags[S.p.owned[S.p.wi]]; }
-function magMax() { return S.god ? 999 : curW().mag; }
+function magCap(w) { return Math.round(w.mag * ST().magMul); }
+function magMax() { return S.god ? 999 : magCap(curW()); }
 
 /* ============================================================
    ROOM BUILD
@@ -544,6 +879,21 @@ function buildRoom(idx) {
     found: false, pulse: 0
   };
 
+  /* TOMCE stands in one of the other three corners, on some floors, and never
+     in the sigil's — the two of them are not to be found in the same place. */
+  S.tomce = null;
+  if (rng() < 0.6) {
+    const free = [0, 1, 2, 3].filter(k => k !== c);
+    for (let a = 0; a < free.length; a++) {
+      const tc = free.splice(Math.floor(rng() * free.length), 1)[0];
+      const tx = (tc === 1 || tc === 3) ? R.aw - 62 : 62;
+      const ty = (tc === 2 || tc === 3) ? R.ah - 70 : 70;
+      if (pointInWall(tx, ty) || pointInWall(tx, ty - 26) || pointInWall(tx, ty + 16)) continue;
+      S.tomce = { x: tx, y: ty, bob: 0, used: false, near: 0 };
+      break;
+    }
+  }
+
   bakeFloor(R, rng);
   S.cracks = [];
   S.shops = [];
@@ -558,11 +908,16 @@ function buildRoom(idx) {
    he happens to be holding. Buy, or don't, then walk back out the bottom
    and the wave picks up where it left off.
    ============================================================ */
+/* Two guns are behind contracts and simply are not in the crate until those
+   are signed. REGULAR buys a fourth pedestal. */
+function shopSlots() { return contractDone('reg') ? 4 : 3; }
 function shopStock() {
-  const pool = BUYABLE.filter(id => S.p.owned.indexOf(id) < 0);
+  const pool = BUYABLE.filter(id => S.p.owned.indexOf(id) < 0 &&
+                                    (!WEP[id].lock || contractDone(WEP[id].lock)));
   if (S.p.owned.indexOf('omega') < 0) pool.push('omega');
   const offer = [];
-  while (offer.length < 3 && pool.length) offer.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  const n = shopSlots();
+  while (offer.length < n && pool.length) offer.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
   offer.sort((a, b) => WORDER.indexOf(a) - WORDER.indexOf(b));
   return offer;
 }
@@ -576,7 +931,7 @@ function enterShop() {
     S.shopStash = {
       aw: S.aw, ah: S.ah, walls: S.walls, deco: S.deco, layout: S.layout,
       floorCan, floorCtx, decalCan, decalCtx,
-      door: S.door, secret: S.secret, corner: S.corner,
+      door: S.door, secret: S.secret, corner: S.corner, tomce: S.tomce,
       px: S.p.x, py: S.p.y
     };
     const R = SHOP_ROOM, T = 24;
@@ -588,7 +943,7 @@ function enterShop() {
       { x: 0, y: 0, w: T, h: R.ah }, { x: R.aw - T, y: 0, w: T, h: R.ah }
     ];
     S.deco = [];
-    S.secret = null; S.corner = null;
+    S.secret = null; S.corner = null; S.tomce = null;
     S.en.length = 0; S.bul.length = 0; S.eb.length = 0; S.cracks.length = 0;
     S.nades.length = 0; S.part.length = 0; S.gibs.length = 0; S.rings.length = 0;
     S.props.length = 0; S.peels.length = 0;
@@ -603,10 +958,12 @@ function enterShop() {
     S.door = { x: R.aw / 2 - 24, y: R.ah - T - 4, w: 48, h: T + 4, open: true, glow: 1, exit: true };
     bakeFloor(R, mulberry32(4242 + S.shopsSeen * 131));
     S.shopsSeen++;
+    bump('shops'); checkContracts();
 
-    S.paci = { x: R.aw / 2, y: 104, bob: 0, blink: rnd(2, 5), line: 0 };
+    S.paci = { x: R.aw / 2, y: 104, bob: 0, blink: rnd(2, 5), line: 0, anger: 0, angerT: 0 };
+    S.pendingKick = 0;
     S.shops = shopStock().map((id, i, arr) => ({
-      x: R.aw / 2 + (i - (arr.length - 1) / 2) * 96, y: 196, id,
+      x: R.aw / 2 + (i - (arr.length - 1) / 2) * (arr.length > 3 ? 84 : 96), y: 196, id,
       price: id === 'omega' ? 0 : WEP[id].price,
       cards: id === 'omega' ? OMEGA_CARDS : 0,
       bought: false, bob: rnd(0, TAU)
@@ -620,7 +977,7 @@ function enterShop() {
       d.vx = d.vy = 0;
       S.drops.push(d);
     });
-    for (const id of S.p.owned) S.p.mags[id] = WEP[id].mag;
+    for (const id of S.p.owned) S.p.mags[id] = magCap(WEP[id]);
     S.cam.cx = S.p.x; S.cam.cy = S.p.y;
 
     msg('PACI', S.shops.length ? 'HELLO TRAVELER, WELCOME TO MY SHOP'
@@ -630,6 +987,41 @@ function enterShop() {
     if (A.music) { A.music.setBoss(false); A.music.setIntensity(0.1); }
     persist();
   };
+}
+
+/* ---------- shooting the shopkeeper ----------
+   The first round is a warning. He does not take cover, he does not bleed and
+   he does not stop being twice your size; the room simply stops being a shop
+   and starts being a room with him in it. The second round ends the visit. */
+function angerPaci(bx, by) {
+  const q = S.paci;
+  if (!q || q.anger >= 2) return;
+  part(bx, by, '#e8c8ff', 10, 90, 0.4);
+
+  if (q.anger === 0) {
+    q.anger = 1; q.angerT = 0;
+    S.flash = 0.55; S.flashCol = '#c02028';
+    shake(20); punch(0.1); S.hitstop = Math.max(S.hitstop, 0.12);
+    ring(q.x, q.y, 150, '#ff2b2b', 0.7, 3);
+    A.roar(); A.setDread(1);
+    if (A.music) A.music.setBoss(true);
+    msg('PACI', 'DO NOT DO THAT AGAIN.', 3.6);
+    return;
+  }
+
+  /* Second one. He does not hit you — he just decides you are leaving, and
+     the room agrees with him. */
+  q.anger = 2; q.angerT = 0;
+  S.flash = 1; S.flashCol = '#ff2b2b';
+  shake(34); punch(0.16); S.hitstop = Math.max(S.hitstop, 0.2);
+  ring(q.x, q.y, 260, '#ff2b2b', 1.0, 4);
+  ring(q.x, q.y, 190, '#ffffff', 0.5, 2);
+  A.roar(); A.death();
+  msg('PACI', 'GET OUT.', 4.0);
+  // whatever is still on the pedestals stays on the pedestals
+  S.shops = [];
+  S.p.vx += (S.p.x - q.x) * 5.5; S.p.vy += 260;
+  S.pendingKick = 0.85;
 }
 
 function exitShop() {
@@ -644,7 +1036,7 @@ function exitShop() {
     S.aw = st.aw; S.ah = st.ah; S.walls = st.walls; S.deco = st.deco; S.layout = st.layout;
     floorCan = st.floorCan; floorCtx = st.floorCtx;
     decalCan = st.decalCan; decalCtx = st.decalCtx;
-    S.door = st.door; S.secret = st.secret; S.corner = st.corner;
+    S.door = st.door; S.secret = st.secret; S.corner = st.corner; S.tomce = st.tomce;
     S.p.x = st.px; S.p.y = st.py; S.p.vx = S.p.vy = 0;
     S.cam.cx = S.p.x; S.cam.cy = S.p.y;
     carried.forEach((d, i) => {
@@ -664,30 +1056,79 @@ function exitShop() {
   };
 }
 
+/* 4x4 Bayer. Ordered dithering is how the floor gets a value gradient out of
+   three flat tones: instead of a fourth colour, tiles fade into each other in
+   a fixed pattern, which at this pixel density reads as grime settling rather
+   than as a pattern. Same trick the sprites use to shade a curved surface. */
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const bay = (x, y) => BAYER[((y & 3) << 2) | (x & 3)] / 16;
+
 function bakeFloor(R, rng) {
-  floorCan = document.createElement('canvas');
-  floorCan.width = R.aw; floorCan.height = R.ah;
-  floorCtx = floorCan.getContext('2d');
-  const g = floorCtx;
-  g.fillStyle = R.floor[0]; g.fillRect(0, 0, R.aw, R.ah);
-  const TS = 16;
+  const sc = subCanvas(R.aw, R.ah);
+  floorCan = sc.can; floorCtx = sc.ctx;
+  const g = floorCtx, P = 1 / RS;          // one device pixel, in game units
+  const TS = 16, cols = Math.ceil(R.aw / TS), rows = Math.ceil(R.ah / TS);
+  /* Pick every tile's two tones and how worn it is up front, then resolve the
+     whole floor in one buffer pass. Doing the dither with fillRect would be a
+     million calls a room. */
+  const tone = new Int8Array(cols * rows), wear = new Float32Array(cols * rows);
+  for (let i = 0; i < cols * rows; i++) {
+    const v = rng();
+    tone[i] = v < 0.30 ? 1 : v < 0.44 ? 2 : 0;
+    wear[i] = 0.35 + rng() * 0.5;
+  }
+  const rgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const TONES = [rgb(R.floor[0]), rgb(R.floor[1]), rgb(R.floor[2])];
+  const ALT = [1, 2, 1];                    // which tone each one dithers toward
+
+  const dw = floorCan.width, dh = floorCan.height;
+  const img = g.createImageData(dw, dh), px = img.data;
+  const span = TS * RS;
+  for (let dy = 0; dy < dh; dy++) {
+    const ty = (dy / span) | 0, fy = (dy % span) / span - 0.5;
+    for (let dx = 0; dx < dw; dx++) {
+      const tx = (dx / span) | 0;
+      const ti = ty * cols + tx;
+      const t = tone[ti] || 0;
+      const u = Math.max(Math.abs((dx % span) / span - 0.5), Math.abs(fy)) * 2;
+      const c = (u * u * wear[ti] > bay(dx, dy)) ? TONES[ALT[t]] : TONES[t];
+      // fine grain, one device pixel — the surface never sits perfectly flat
+      const n = ((dx * 73856093) ^ (dy * 19349663)) & 255;
+      const k = n < 40 ? -14 : n > 232 ? 10 : 0;
+      const o = (dy * dw + dx) << 2;
+      px[o] = clamp(c[0] + k, 0, 255); px[o + 1] = clamp(c[1] + k, 0, 255);
+      px[o + 2] = clamp(c[2] + k, 0, 255); px[o + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+
   for (let y = 0; y < R.ah; y += TS) {
     for (let x = 0; x < R.aw; x += TS) {
-      const v = rng();
-      g.fillStyle = v < 0.30 ? R.floor[1] : v < 0.44 ? R.floor[2] : R.floor[0];
-      g.fillRect(x, y, TS, TS);
+      // grout: a dark channel with a lit lip on the side the room's lamp finds
       g.fillStyle = R.grout;
-      g.fillRect(x, y, TS, 1); g.fillRect(x, y, 1, TS);
-      const sp = 5 + Math.floor(rng() * 9);
-      for (let i = 0; i < sp; i++) {
-        g.fillStyle = rng() < 0.5 ? 'rgba(0,0,0,0.22)' : 'rgba(255,240,220,0.045)';
-        g.fillRect(x + Math.floor(rng() * TS), y + Math.floor(rng() * TS), 1, 1);
+      g.fillRect(x, y, TS, P * 2); g.fillRect(x, y, P * 2, TS);
+      g.fillStyle = 'rgba(255,244,224,0.05)';
+      g.fillRect(x, y + P * 2, TS, P); g.fillRect(x + P * 2, y, P, TS);
+      // old spill: a dark core with a dithered halo, not a flat rectangle
+      if (rng() < 0.07) {
+        const cx = x + rng() * TS, cy = y + rng() * TS, rr = 2 + rng() * 5;
+        for (let ty = -rr * RS; ty < rr * RS; ty++) {
+          for (let tx = -rr * RS; tx < rr * RS; tx++) {
+            const d = Math.hypot(tx, ty * 1.7) / (rr * RS);
+            if (d > 1) continue;
+            g.fillStyle = d < 0.55 ? 'rgba(48,8,12,0.42)' : 'rgba(60,12,16,0.30)';
+            if (d < 0.55 || 1 - d > bay(tx + 64, ty + 64) * 0.9) g.fillRect(cx + tx * P, cy + ty * P, P, P);
+          }
+        }
       }
-      if (rng() < 0.05) { g.fillStyle = 'rgba(60,10,14,0.30)'; const s = 3 + rng() * 8; g.fillRect(x + rng() * 8, y + rng() * 8, s, s * 0.6); }
-      if (rng() < 0.03) {
-        g.fillStyle = 'rgba(0,0,0,0.4)';
-        let cx = x + rng() * TS, cy = y + rng() * TS;
-        for (let i = 0; i < 10; i++) { g.fillRect(cx | 0, cy | 0, 1, 1); cx += rng() * 3 - 1.5; cy += rng() * 3 - 1.5; }
+      // a hairline crack, one device pixel wide
+      if (rng() < 0.05) {
+        let cx = x + rng() * TS, cy = y + rng() * TS, a = rng() * TAU;
+        for (let i = 0; i < 22; i++) {
+          g.fillStyle = i % 5 === 0 ? 'rgba(255,240,220,0.05)' : 'rgba(0,0,0,0.42)';
+          g.fillRect(Math.round(cx * RS) * P, Math.round(cy * RS) * P, P, P);
+          a += rng() - 0.5; cx += Math.cos(a) * 0.7; cy += Math.sin(a) * 0.7;
+        }
       }
     }
   }
@@ -697,9 +1138,8 @@ function bakeFloor(R, rng) {
     for (let i = 0; i < 14; i++) g.fillRect(ax, ay + i, 1, 1);
     for (let i = 0; i < 6; i++) { g.fillRect(ax - i, ay + i, 1, 1); g.fillRect(ax + i, ay + i, 1, 1); }
   }
-  decalCan = document.createElement('canvas');
-  decalCan.width = R.aw; decalCan.height = R.ah;
-  decalCtx = decalCan.getContext('2d');
+  const dc = subCanvas(R.aw, R.ah);
+  decalCan = dc.can; decalCtx = dc.ctx;
 }
 
 /* ============================================================
@@ -709,7 +1149,7 @@ function makePlayer() {
   return {
     x: S.aw / 2, y: S.ah / 2, vx: 0, vy: 0, r: 6, ang: 0,
     hp: 100, shield: 0, shieldT: 0,
-    owned: ['scar'], wi: 0, mags: { scar: 30 },
+    owned: ['pistol'], wi: 0, mags: { pistol: 14 },
     reT: 0, reMax: 0, reStage: 0, fireT: 0, recoil: 0,
     spin: 0, charge: 0, beamT: 0,
     nades: 3, nadeCd: 0,
@@ -721,14 +1161,15 @@ function makePlayer() {
 
 function spawnEnemy(type, x, y) {
   const d = ETYPE[type], D = diff();
-  const waveK = 1 + S.wave * 0.045;
+  const waveK = 1 + S.wave * 0.05;
   const hp = d.hp * D.hp * waveK;
   const e = {
     type, x, y, vx: 0, vy: 0, r: d.r, bank: d.bank, spr: d.bank.walk[0],
     // random phase so a spawned batch doesn't march in lockstep
     anim: rnd(0, 4), poseT: 0,
     hp, max: hp,
-    spd: d.spd * D.spd * rnd(0.9, 1.12),
+    spd: d.spd * D.spd * rnd(0.9, 1.12), base: d.spd * D.spd,
+    mark: 0, slowT: 0, slowAmt: 0,
     dmg: d.dmg * D.dmg * (1 + S.wave * 0.03),
     score: d.score, gib: d.gib, name: d.name,
     hit: 0, atkT: 0, fireT: rnd(1, 2), wob: rnd(0, TAU), stun: 0, burn: 0, burnT: 0,
@@ -739,15 +1180,19 @@ function spawnEnemy(type, x, y) {
   return e;
 }
 
-function spawnBoss(idx) {
+function spawnBoss(idx, apex) {
   const B = BOSSES[idx], D = diff();
-  const hp = B.hp * D.hp * 1.35;
+  const am = apex ? 2.6 : 1;
+  const hp = B.hp * D.hp * 1.35 * am;
   const b = {
-    type: 'boss', def: B, name: B.name, x: S.aw / 2, y: 90, vx: 0, vy: 0,
-    r: B.r, bank: B.bank, spr: B.bank.walk[0], tint: B.tint,
+    type: 'boss', def: B, name: apex ? 'APEX ' + B.name : B.name, x: S.aw / 2, y: 90, vx: 0, vy: 0,
+    r: B.r * (apex ? 1.45 : 1), bank: B.bank, spr: B.bank.walk[0],
+    tint: apex ? 'rgba(176,40,255,0.5)' : B.tint, scale: apex ? 1.5 : 1, apex: !!apex,
     anim: 0, poseT: 0,
-    hp, max: hp, spd: B.spd * (1 + S.room * 0.06) * (1 + (S.evo | 0) * 0.04),
-    dmg: 26 * D.dmg, score: 500,
+    hp, max: hp, spd: B.spd * (1 + S.room * 0.06) * (1 + (S.evo | 0) * 0.04) * (apex ? 1.22 : 1),
+    base: B.spd * (1 + S.room * 0.06) * (1 + (S.evo | 0) * 0.04) * (apex ? 1.22 : 1),
+    mark: 0, slowT: 0, slowAmt: 0,
+    dmg: 26 * D.dmg * (apex ? 1.45 : 1), score: apex ? 1400 : 500,
     gib: '#8a3540', hit: 0, phase: 'idle', pt: 1.2, wob: 0, bob: 0, sq: 0, orbit: rnd(0, TAU),
     stun: 0, burn: 0, burnT: 0, flip: false, boss: true, dead: false, chargeDir: 0, spawnT: 4,
     twitch: 0, twx: 0, twy: 0, trail: []
@@ -756,9 +1201,37 @@ function spawnBoss(idx) {
   A.roar();
   if (A.music) { A.music.setBoss(true); A.duck(0.7, 1.4); }
   S.jump = 0.42; S.jumpSpr = B;
-  shake(11); punch(0.05);
-  msg(B.name, B.cry, 3.2);
+  shake(apex ? 18 : 11); punch(apex ? 0.09 : 0.05);
+  if (apex) { S.flash = 0.8; S.flashCol = '#b028ff'; }
+  msg(b.name, apex ? 'IT CAME UP WRONG AND IT KEPT GROWING' : B.cry, 3.2);
   return b;
+}
+
+/* An elite: a regular horror that got too big for the aisle. Uses the ordinary
+   enemy AI, wears a boss health bar, and is worth a card. */
+function spawnMini(idx) {
+  const M = MINIS[idx % MINIS.length], D = diff();
+  const e = spawnEnemy(M.key, S.aw / 2, 92);
+  /* These were a slightly chunky crawler. They are a fight now: seven times
+     the meat, twice the bite, and they shell the room and call for help. */
+  const k = 5 + S.room * 1.6;
+  e.hp = e.max = ETYPE[M.key].hp * D.hp * k;
+  e.dmg *= 1.9;
+  e.base *= 1.25; e.spd = e.base;
+  e.score = 320;
+  e.elite = true; e.eliteT = 2.4; e.eliteCol = M.col;
+  e.mini = true; e.boss = true;              // boss:true only for the bar and the payout
+  e.def = { item: null };
+  e.name = M.name;
+  e.tint = M.tint; e.scale = 1.9; e.r = ETYPE[M.key].r * 1.8;
+  e.trail = [];
+  S.boss = e;
+  A.roar();
+  if (A.music) { A.music.setBoss(true); A.duck(0.6, 1.2); }
+  S.jump = 0.34; S.jumpSpr = { bank: ETYPE[M.key].bank, tint: M.tint };
+  shake(8); punch(0.04);
+  msg(M.name, 'AN ELITE. IT IS CARRYING A CARD.', 3.0);
+  return e;
 }
 
 /* ---------- juice ---------- */
@@ -780,13 +1253,45 @@ function gib(x, y, col, n) {
     S.gibs.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, col, life: rnd(0.6, 1.5), s: rndi(1, 3) });
   }
 }
+/* Decals are baked at render resolution now, so a splash can be a spatter of
+   fine droplets around a wet core instead of a handful of blocks. */
 function blood(x, y, r, col) {
   if (!decalCtx) return;
+  const P = 1 / RS;
   decalCtx.fillStyle = col || 'rgba(96,10,16,0.55)';
   for (let i = 0; i < 6; i++) {
-    const a = rnd(0, TAU), d = rnd(0, r);
-    const s = rnd(1, r * 0.5);
-    decalCtx.fillRect((x + Math.cos(a) * d) | 0, (y + Math.sin(a) * d) | 0, (s | 0) || 1, ((s * 0.7) | 0) || 1);
+    const a = rnd(0, TAU), d = rnd(0, r * 0.7);
+    const s = rnd(0.8, r * 0.45);
+    decalCtx.fillRect(Math.round((x + Math.cos(a) * d) * RS) * P, Math.round((y + Math.sin(a) * d) * RS) * P,
+      Math.max(P, (s * RS | 0) * P), Math.max(P, (s * 0.7 * RS | 0) * P));
+  }
+  decalCtx.fillStyle = col || 'rgba(96,10,16,0.32)';
+  for (let i = 0; i < r * 2; i++) {
+    const a = rnd(0, TAU), d = rnd(r * 0.5, r * 1.7);
+    decalCtx.fillRect(Math.round((x + Math.cos(a) * d) * RS) * P, Math.round((y + Math.sin(a) * d) * RS) * P, P, P);
+  }
+}
+
+/* SHREDDING.
+   What comes off Damjan when something reaches him. Cloth tears in flat dark
+   scraps that tumble and settle; meat comes off wet and leaves a mark. How
+   much of each depends on how far gone he already is — early on it is all
+   jacket, and by the end there is not much jacket left to lose. */
+function shred(x, y, dmg, stage) {
+  const cos = cosDef(equippedCos());
+  const cloth = cos.pal.j || '#31483a', clothD = cos.pal.J || '#1d2c24';
+  const n = clamp(Math.round(dmg * 0.35) + 2, 2, 9);
+  for (let i = 0; i < n; i++) {
+    const a = rnd(0, TAU), s = rnd(40, 170);
+    S.gibs.push({ x: x + rnd(-4, 4), y: y + rnd(-6, 4), vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+      col: Math.random() < 0.5 ? cloth : clothD, life: rnd(0.7, 1.6), s: rndi(1, 3), rag: true });
+  }
+  // and the parts of him that were under it
+  const meat = Math.round(stage * 1.6 + dmg * 0.2);
+  for (let i = 0; i < meat; i++) {
+    const a = rnd(0, TAU), s = rnd(50, 190);
+    S.gibs.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+      col: pick(['#8c141d', '#c9926a', '#6d2230', '#a03a3a']), life: rnd(0.5, 1.2), s: rndi(1, 2) });
   }
 }
 function ring(x, y, r, col, life, wid) { S.rings.push({ x, y, r0: 2, r1: r, col, life, max: life, wid: wid || 1 }); }
@@ -865,8 +1370,8 @@ function cycleWeapon(dir) {
 
 function startReload() {
   const p = S.p, w = curW();
-  if (p.reT > 0 || S.god || p.mags[w.id] >= w.mag) return;
-  p.reT = w.reload; p.reMax = w.reload; p.reStage = 0;
+  if (p.reT > 0 || S.god || p.mags[w.id] >= magCap(w)) return;
+  p.reT = w.reload * ST().reloadMul; p.reMax = p.reT; p.reStage = 0;
 }
 
 function fire() {
@@ -884,29 +1389,32 @@ function fire() {
 
 function emit(w) {
   const p = S.p, st = ST();
-  const u = wup(w.id);
   const spin = w.spin ? p.spin : 1;
-  const rateMul = 1 - u.rate * 0.10;
-  p.fireT = (w.spin ? lerp(0.16, w.rate, p.spin) : w.rate) * rateMul;
+  p.fireT = (w.spin ? lerp(0.16, w.rate, p.spin) : w.rate) * st.rateMul;
   if (!S.god) p.mags[w.id]--;
 
   const base = (w.spread + p.recoil * 0.05) * (S.god ? 0.4 : 1);
   const mx = p.x + Math.cos(p.ang) * 11, my = p.y + Math.sin(p.ang) * 11 - 1;
-  const isScar = w.id === 'scar';
-  const dmg = w.dmg * st.dmgMul * (isScar ? st.scarMul : 1) * (1 + u.pow * 0.15);
-  const col = S.god ? '#ff6cf5' : (isScar ? scarCol() : w.col);
+  const evo = !!w.evolve;
+  const dmg = (w.dmg + st.flatDmg) * st.dmgMul * (evo ? st.scarMul : 1);
+  const col = S.god ? '#ff6cf5' : (evo ? scarCol() : w.col);
+  /* THE ROTISSERIE ignores the crosshair entirely and walks its own angle
+     around you — that is the whole joke, and the whole reason to own it. */
+  const aim = w.radial ? (p.spitAng = (p.spitAng || 0) + w.radial) : p.ang;
   // SPLIT rank n fires a fan of 2n+1 directions
-  const dirs = u.split ? u.split * 2 + 1 : 1;
+  const dirs = st.split ? st.split * 2 + 1 : 1;
   const fan = 0.20;
   for (let d = 0; d < dirs; d++) {
     const off = dirs === 1 ? 0 : (d - (dirs - 1) / 2) * fan;
     for (let i = 0; i < w.pellets; i++) {
-      const a = p.ang + off + rnd(-base, base);
+      const a = aim + off + rnd(-base, base);
       S.bul.push({
         x: mx, y: my, vx: Math.cos(a) * w.spd, vy: Math.sin(a) * w.spd,
         dmg, pierce: (w.pierce || 0) + st.pierce, hitIds: [], life: 1.4,
-        col, size: (w.size || 1) + (isScar && S.scarLv > 3 ? 1 : 0),
-        knock: w.knock || 60, pin: w.pin || 0, burn: w.burn || 0, bounce: w.bounce || 0, god: S.god
+        col, size: (w.size || 1) + (evo && S.scarLv > 3 ? 1 : 0),
+        knock: w.knock || 60, pin: w.pin || 0, burn: (w.burn || 0) + st.burn,
+        bounce: (w.bounce || 0) + st.bounce, mark: w.mark || 0, chill: w.chill || 0,
+        home: st.home || 0, spd: w.spd, god: S.god
       });
     }
   }
@@ -914,12 +1422,12 @@ function emit(w) {
   p.kick = w.pellets > 3 ? 6 : w.charge ? 7 : 2.6;
   p.vx -= Math.cos(p.ang) * (w.knock ? w.knock * 0.28 : 12);
   p.vy -= Math.sin(p.ang) * (w.knock ? w.knock * 0.28 : 12);
-  spray(mx, my, p.ang, '#ffd07a', w.pellets > 3 ? 14 : 5, 140, 0.18, 0.4);
+  spray(mx, my, aim, '#ffd07a', w.pellets > 3 ? 14 : 5, 140, 0.18, 0.4);
   S.muzzle = { x: mx, y: my, t: 0.06, big: w.pellets > 3 || !!w.charge };
   shake(w.pellets > 3 ? 3.4 : w.charge ? 5.5 : S.god ? 1.4 : 1.0);
   if (w.charge) punch(0.05);
   if (S.god) A.godshoot();
-  else if (isScar) A.scarMk(S.scarLv);       // voice morphs toward a laser each mark
+  else if (evo) A.scarMk(S.scarLv);          // voice morphs toward a laser each mark
   else if (A[w.sfx]) A[w.sfx](spin);
   else A.shoot();
   if (!w.beam) A.shell();
@@ -937,11 +1445,10 @@ function updateBeam(dt) {
   if (!S.god) p.mags.omega -= dt * 42;
   if (p.mags.omega < 0) p.mags.omega = 0;
 
-  const u = wup(w.id);
   const ox = p.x + Math.cos(p.ang) * 11, oy = p.y + Math.sin(p.ang) * 11 - 1;
   let ex = ox, ey = oy;
   const hits = [];
-  const girth = w.girth * (1 + u.split * 0.55);   // SPLIT widens the beam instead of forking it
+  const girth = w.girth * (1 + st.split * 0.45);   // SPLIT widens the beam instead of forking it
   for (let i = 1; i < 220; i++) {
     const nx = ox + Math.cos(p.ang) * i * 4, ny = oy + Math.sin(p.ang) * i * 4;
     if (pointInWall(nx, ny)) break;
@@ -949,7 +1456,7 @@ function updateBeam(dt) {
     for (const e of S.en) if (!e.dead && hits.indexOf(e) < 0 && Math.hypot(e.x - nx, e.y - ny) < e.r + girth) hits.push(e);
   }
   S.beamHit = { x: ox, y: oy, ex, ey, girth };
-  for (const e of hits) damageEnemy(e, w.dmg * st.dmgMul * (1 + u.pow * 0.15) * (1 + u.rate * 0.10) * dt, true, p.ang);
+  for (const e of hits) damageEnemy(e, (w.dmg + st.flatDmg * 8) * st.dmgMul / st.rateMul * dt, true, p.ang);
   if (Math.random() < dt * 70) spray(ex, ey, p.ang + Math.PI, '#e0a8ff', 4, 150, 0.35, 1.4);
   if (Math.random() < dt * 26) A.beam();
   shake(1.2);
@@ -1015,15 +1522,28 @@ function explode(x, y, r, dmg, col) {
 /* ============================================================
    DAMAGE
    ============================================================ */
-function damageEnemy(e, dmg, fromBullet, ang) {
-  if (e.dead) return;
+const MARK_MUL = 1.6;      // what THE PRICE GUN's tag is worth to everything else
+function damageEnemy(e, dmg, fromBullet, ang, noRoll) {
+  if (e.dead) return 0;
+  const st = ST();
+  let crit = false;
+  if (!noRoll) {
+    if (e.mark > 0) dmg *= MARK_MUL;
+    if (st.crit > 0 && Math.random() < st.crit) { dmg *= st.critMul; crit = true; }
+  }
   e.hp -= dmg;
-  e.hit = 0.09;
+  e.hit = crit ? 0.16 : 0.09;
   e.sq = Math.min(1, e.sq + dmg * 0.012);
-  blood(e.x, e.y + 4, 5, 'rgba(90,10,16,0.4)');
+  blood(e.x, e.y + 4, crit ? 9 : 5, 'rgba(90,10,16,0.4)');
+  if (crit) {
+    part(e.x, e.y, '#fff0c0', 10, 190, 0.35, 2);
+    ring(e.x, e.y, 16, '#ffd070', 0.18, 1);
+    A.hit();
+  }
   if (ang !== undefined) spray(e.x, e.y, ang, e.gib, 5, 120, 0.35, 0.7);
   else part(e.x, e.y, e.gib, 3, 70, 0.3);
   if (e.hp <= 0) killEnemy(e, ang);
+  return crit ? dmg : 0;
 }
 
 function killEnemy(e, ang) {
@@ -1044,48 +1564,104 @@ function killEnemy(e, ang) {
     punch(0.03);
   }
 
+  /* ---- what the deck does when something dies ---- */
+  const st = ST();
+  /* OVERKILL and FLASHPOINT are both triggered BY a kill and both CAUSE kills.
+     Fired inline they recurse — one death used to clear a room of 140 and put
+     600 bullets on screen in a single frame. They go on a queue that drains a
+     few at a time, once a frame, so a chain is a chain and not a stack. */
+  if (st.overkill > 0) S.fx.push({ k: 'boom', x: e.x, y: e.y, r: 42, d: st.overkill * st.dmgMul });
+  if (st.graze > 0 && S.p.hp > 0) S.p.hp = Math.min(st.maxhp, S.p.hp + st.graze);
+  if (st.novaEvery > 0) {
+    S.killsSinceNova++;
+    if (S.killsSinceNova >= st.novaEvery) { S.killsSinceNova = 0; S.fx.push({ k: 'nova', x: S.p.x, y: S.p.y }); }
+  }
+
   // ---- loot ----
-  const bossKill = !!e.boss;
-  if (bossKill) {
+  if (e.boss) {
     S.boss = null;
     if (A.music) { A.music.setBoss(false); A.duck(0.8, 2.2); }
     S.slow = 0.9; punch(0.09);
     S.flash = 0.7; S.flashCol = '#ff2b2b';
-    /* Groceries stop at level two. Bosses repeat forever, so once a shelf is
-       full the same boss pays out in metal instead of a third banana. */
-    const key = e.def.item;
-    const capped = (S.items[key] | 0) >= 2;
-    if (!capped) dropPickup(e.x, e.y, 'item', key);
-    const coins = capped ? 12 : 5;                      // 5 coins a boss, 12 once it has nothing left to give
+
+    /* Elites and floor bosses both pay in a card you get to choose. That is
+       the whole reason to fight one now — the groceries live in the deck. */
+    const elite = !!e.mini;
+    const coins = elite ? 10 : e.apex ? 38 : 18;
     for (let i = 0; i < coins; i++) {
       const a = rnd(0, TAU);
       S.drops.push({ x: e.x, y: e.y, kind: 'coin', t: 0, life: 40, bob: rnd(0, TAU), vx: Math.cos(a) * 70, vy: Math.sin(a) * 70 });
     }
-    if (Math.random() < (capped ? 0.45 : 0.05)) dropPickup(e.x + 8, e.y, 'card');
+    if (Math.random() < (elite ? 0.20 : e.apex ? 1 : 0.55)) dropPickup(e.x + 8, e.y, 'card');
     dropPickup(e.x - 10, e.y, 'nade');
+    if (!elite) dropPickup(e.x + 18, e.y, 'shield');
 
-    /* Every third boss, the next door leads sideways instead of onward. */
+    /* A guaranteed hand, dealt at better odds the bigger the thing was. */
+    S.upgPts++;
+    S.pendingLuck = elite ? 0.5 : e.apex ? 2.4 : 1.2;
+    S.lvlDelay = 1.1;
+
     S.bossKills++;
     if (S.bossKills % SHOP_EVERY === 0) S.shopDue = true;
-    msg(e.name + ' IS MEAT', capped ? 'it had nothing left you did not have.' : 'it dropped something edible.', 3);
+    /* Only a FLOOR boss opens the top of the deck — elites do not count. */
+    if (!elite) {
+      S.floorBosses++;
+      if (e.apex) S.apexKills++;
+      bump('bosses'); if (e.apex) bump('apex');
+      float(e.x, e.y - 44, 'THE DECK OPENS', '#ffb03a', true);
+    }
+    checkContracts();
+    msg(e.name + ' IS MEAT', elite ? 'an elite. the deck opens.'
+        : e.apex ? 'the apex is down. take something obscene.' : 'the floor is yours. pick a card.', 3);
     if (S.shopDue) float(e.x, e.y - 30, 'A DOOR OPENS SIDEWAYS', '#c05cff', true);
     A.roar();
   } else {
-    const r = Math.random();
+    /* Med kits used to be a 6% drop on top of two guaranteed ones every wave,
+       which meant health was never actually a resource. */
+    const r = Math.random() / st.lootMul;
     if (r < 0.008) dropPickup(e.x, e.y, 'card');        // cards: genuinely rare
     else if (r < 0.021) dropPickup(e.x, e.y, 'nova');   // the rarer of the two new ones
-    else if (r < 0.061) dropPickup(e.x, e.y, 'shield');
-    else if (r < 0.221) dropPickup(e.x, e.y, 'coin');   // coins: reasonably common
-    else if (r < 0.281) dropPickup(e.x, e.y, 'ammo');
-    else if (r < 0.341) dropPickup(e.x, e.y, 'med');
-    else if (r < 0.381) dropPickup(e.x, e.y, 'nade');
+    else if (r < 0.056) dropPickup(e.x, e.y, 'shield');
+    else if (r < 0.216) dropPickup(e.x, e.y, 'coin');   // coins: reasonably common
+    else if (r < 0.276) dropPickup(e.x, e.y, 'ammo');
+    else if (r < 0.308) dropPickup(e.x, e.y, 'med');    // 3.2%, down from 6%
+    else if (r < 0.338) dropPickup(e.x, e.y, 'nade');
   }
+  if (S.kills % 25 === 0) { bump('kills', 25); checkContracts(); }
+}
+
+/* Shared by the NOVA pickup and the FLASHPOINT card. */
+function fireNova(x, y) {
+  const st = ST(), N = 26;
+  for (let k = 0; k < N; k++) {
+    const a = k / N * TAU + Math.random() * 0.1;
+    S.bul.push({
+      x, y, vx: Math.cos(a) * 340, vy: Math.sin(a) * 340,
+      dmg: 90 * st.dmgMul, pierce: 2 + st.pierce, hitIds: [], life: 2.6,
+      col: '#ffb03a', size: 3, knock: 180, pin: 0, burn: 12 + st.burn, bounce: st.bounce,
+      mark: 0, chill: 0, god: S.god, home: 5.5, spd: 340
+    });
+  }
+  float(x, y - 18, 'NOVA', '#ffb03a', true);
+  ring(x, y, 64, '#ffb03a', 0.4, 2);
+  part(x, y, '#fff0a8', 40, 200, 0.7, 2);
+  shake(9); punch(0.05); S.flash = Math.max(S.flash, 0.45); S.flashCol = '#ffcf8a';
+  A.boom();
 }
 
 function hurtPlayer(dmg, sx, sy) {
   const p = S.p;
   if (S.god || p.iframe > 0 || p.tempShield > 0 || S.mode !== 'play') return;
-  dmg *= ST().resist;
+  const stp = ST();
+  /* AEGIS PLATING: sometimes the hit just doesn't land. */
+  if (stp.dodge > 0 && Math.random() < stp.dodge) {
+    p.iframe = 0.3;
+    float(p.x, p.y - 14, 'PLATED', '#7fd0ff');
+    part(p.x, p.y, '#c6e8ff', 10, 90, 0.35);
+    A.hit();
+    return;
+  }
+  dmg *= stp.resist;
   if (p.shield > 0) {
     p.shield--; p.shieldT = ST().shieldCd; p.iframe = 0.45;
     part(p.x, p.y, '#63b04a', 16, 130, 0.5);
@@ -1094,6 +1670,7 @@ function hurtPlayer(dmg, sx, sy) {
     A.hit(); shake(4);
     return;
   }
+  const wasStage = hurtStage();
   p.hp -= dmg; p.iframe = 0.62; p.hurtFlash = 0.35;
   S.redness = Math.min(1, S.redness + 0.5);
   S.combo = 1; S.streak = 0;
@@ -1101,7 +1678,29 @@ function hurtPlayer(dmg, sx, sy) {
   A.hurt();
   part(p.x, p.y, '#b01822', 14, 120, 0.45);
   blood(p.x, p.y + 5, 7);
+  shred(p.x, p.y - 2, dmg, wasStage);
+  /* crossing into a worse state is its own moment — that is the hit where a
+     piece of him actually leaves, so it gets the weight of one */
+  if (hurtStage() > wasStage) {
+    shred(p.x, p.y - 4, dmg * 2.2, hurtStage());
+    blood(p.x, p.y + 6, 12);
+    shake(12); punch(0.05); S.hitstop = Math.max(S.hitstop, 0.09);
+    A.crack();
+  }
   if (sx !== undefined) { p.vx += (p.x - sx) * 1.8; p.vy += (p.y - sy) * 1.8; }
+  /* SECOND HELPING: one refusal per floor, per rank. */
+  if (p.hp <= 0 && S.savesLeft > 0) {
+    S.savesLeft--;
+    p.hp = Math.round(stp.maxhp * 0.30);
+    p.iframe = 2.0;
+    S.slow = 0.7; S.flash = 1.0; S.flashCol = '#c05cff';
+    shake(16); punch(0.09);
+    ring(p.x, p.y, 90, '#c05cff', 0.7, 3);
+    float(p.x, p.y - 26, 'SECOND HELPING', '#c05cff', true);
+    msg('NOT YET', S.savesLeft ? S.savesLeft + ' more refusals this floor.' : 'that was the last one.', 2.6);
+    A.god(); A.bigpickup();
+    return;
+  }
   if (p.hp <= 0) {
     p.hp = 0; S.mode = 'dead'; S.deadT = 0;
     A.death(); A.setDread(1);
@@ -1146,7 +1745,7 @@ function giveWeapon(id) {
   if (p.owned.indexOf(id) >= 0) return;
   p.owned.push(id);
   p.owned.sort((a, b) => WORDER.indexOf(a) - WORDER.indexOf(b));
-  p.mags[id] = WEP[id].mag;
+  p.mags[id] = magCap(WEP[id]);
   p.wi = p.owned.indexOf(id);
   p.reT = 0; p.spin = 0; p.charge = 0;
   S.banner = { wep: id, t: 4.2 };
@@ -1163,10 +1762,15 @@ function startWave(n) {
   S.waveState = 'fight';
   S.queue = [];
   S.spawnT = 0.5;
-  if (BOSS_WAVES[n] !== undefined) {
-    spawnBoss(BOSS_WAVES[n]);
+  if (n === BOSS_WAVE) {
+    const apex = isApexFloor(S.room);
+    spawnBoss(bossIndexFor(S.room), apex);
     for (let i = 0; i < Math.round(4 + n * 0.9 + S.room * 3.5); i++) S.queue.push(pick(['crawler', 'crawler', 'shrieker']));
-    msg('WAVE ' + n, 'BOSS', 2.4);
+    msg('WAVE ' + n, apex ? 'APEX' : 'FLOOR BOSS', 2.4);
+  } else if (MINI_WAVES.indexOf(n) >= 0) {
+    spawnMini(S.room * MINI_WAVES.length + MINI_WAVES.indexOf(n));
+    for (let i = 0; i < Math.round(6 + n * 1.4 + S.room * 3); i++) S.queue.push(pick(['crawler', 'crawler', 'shrieker', 'stalker']));
+    msg('WAVE ' + n, 'ELITE', 2.4);
   } else {
     // Head count, not a spend budget — a budget buys fewer/tougher enemies as it
     // grows, which is backwards. This grows quadratically across a floor and is
@@ -1174,8 +1778,9 @@ function startWave(n) {
     // Every gun you own is another mouth the floor sends to meet it.
     const armed = 1 + Math.max(0, S.p.owned.length - 1) * 0.10;
     const levelled = 1 + Math.max(0, S.level - 1) * 0.06;   // the stronger you get, the more come
-    const count = Math.round((7 + n * 2.8 + n * n * 0.26) * (1 + S.room * 0.55)
-                             * (1 + (S.evo | 0) * 0.12) * armed * levelled);
+    // gentler inside a floor, much steeper between them
+    const count = Math.round((7 + n * 2.6 + n * n * 0.26) * (1 + S.room * 0.72)
+                             * (1 + (S.evo | 0) * 0.12) * armed * levelled * ST().swarm);
     // Weights shift toward the nastier things as the wave and floor climb.
     const pool = [['crawler', 10]];
     if (n >= 2 || S.room > 0) pool.push(['shrieker', 3 + n * 0.4 + S.room]);
@@ -1199,7 +1804,7 @@ function updateWaves(dt) {
   if (S.waveState === 'fight') {
     S.spawnT -= dt;
     // How many can be breathing at once, how fast they arrive, how many per crack
-    const cap = Math.min(78, Math.round(19 + S.wave * 1.4 + S.room * 7.5 + (S.evo | 0) * 2 +
+    const cap = Math.min(95, Math.round(18 + S.wave * 1.3 + S.room * 9.5 + (S.evo | 0) * 2 +
                                         Math.max(0, S.p.owned.length - 1) * 1.5 +
                                         Math.max(0, S.level - 1) * 0.8));
     /* Cracks take 0.75s to hatch but batches fire every 0.15s, so counting only
@@ -1219,9 +1824,9 @@ function updateWaves(dt) {
       S.waveState = 'clear'; S.waveT = 3.0;
       S.vacuum = 2.6;                 // sweep the floor clean
       A.pickup();
-      const heal = S.wave === 10 ? 60 : 10;
+      const heal = S.wave === BOSS_WAVE ? 30 : 12;
       S.p.hp = Math.min(ST().maxhp, S.p.hp + heal);
-      S.p.nades = Math.min(6, S.p.nades + 1);
+      S.p.nades = Math.min(9, S.p.nades + 1 + dkc('munitions'));
       S.score += 100 * S.wave * (S.room + 1);
       persist();
       if (S.wave >= 10) {
@@ -1231,7 +1836,9 @@ function updateWaves(dt) {
       } else {
         msg('WAVE ' + S.wave + ' CLEARED', '+' + (100 * S.wave * (S.room + 1)) + ' // +' + heal + ' hp // +1 frag', 2.2);
       }
-      for (let i = 0; i < 2; i++) { const p = freeSpot(40); dropPickup(p.x, p.y, Math.random() < 0.5 ? 'ammo' : 'med'); }
+      /* One parting gift, and it is usually ammo. Two guaranteed drops with a
+         coin-flip on health meant a med kit every other wave for free. */
+      { const q = freeSpot(40); dropPickup(q.x, q.y, Math.random() < 0.78 ? 'ammo' : 'med'); }
     }
   } else if (S.waveState === 'clear') {
     S.waveT -= dt;
@@ -1276,6 +1883,22 @@ function update(rdt) {
   S.jump = Math.max(0, S.jump - rdt);
   if (S.comboT > 0) { S.comboT -= rdt; if (S.comboT <= 0) { S.combo = 1; S.streak = 0; } }
 
+  /* An angry PACI does not attack. He stands there and the building reacts:
+     the floor will not stop moving and the light goes the colour of the
+     inside of him. It gets worse the longer you stand in it. */
+  if (S.paci && S.paci.anger > 0) {
+    S.paci.angerT += rdt;
+    const a = S.paci.anger;
+    shake(a > 1 ? 26 : 7 + Math.min(6, S.paci.angerT * 1.4) + Math.sin(S.t * 31) * 3);
+    S.redness = Math.min(1, S.redness + rdt * (a > 1 ? 4.2 : 1.9));
+    if (Math.random() < rdt * (a > 1 ? 50 : 16))
+      part(rnd(0, S.aw), rnd(0, S.ah), '#8c141d', 1, 30, 0.7);
+    if (a > 1 && S.pendingKick > 0) {
+      S.pendingKick -= rdt;
+      if (S.pendingKick <= 0) { S.pendingKick = 0; exitShop(); }
+    }
+  }
+
   if (S.fadeDir) {
     S.fade += S.fadeDir * rdt * 1.6;
     if (S.fade >= 1 && S.fadeDir > 0) { S.fade = 1; S.fadeDir = -1; if (S.pending) { S.pending(); S.pending = null; } }
@@ -1286,6 +1909,19 @@ function update(rdt) {
   if (S.mode !== 'play') { updateCam(rdt); return; }
 
   const p = S.p, st = ST(), w = curW();
+
+  /* The hand is dealt from here rather than from gainXP, so a boss can add its
+     guaranteed pick and its luck bonus before the cards are turned over. */
+  if (S.upgPts > 0) {
+    S.lvlDelay -= rdt;
+    if (S.lvlDelay <= 0 && !S.fadeDir) { openLevelUp(S.pendingLuck); S.pendingLuck = 0; }
+  }
+
+  /* REGROWTH ticks once a second so the number on the card is the number you get. */
+  if (st.regen > 0 && p.hp > 0) {
+    S.regenT += rdt;
+    if (S.regenT >= 1) { S.regenT -= 1; p.hp = Math.min(st.maxhp, p.hp + st.regen); }
+  }
 
   S.whisperT -= rdt;
   if (S.whisperT <= 0) { S.whisperT = rnd(7, 18); A.whisper(); }
@@ -1420,7 +2056,7 @@ function update(rdt) {
       p.reStage = 3; A.rack();
       part(p.x + Math.cos(p.ang) * 12, p.y + Math.sin(p.ang) * 12, '#ffe9a8', 5, 60, 0.2);
     }
-    if (p.reT <= 0) { p.mags[w.id] = w.mag; p.reT = 0; }
+    if (p.reT <= 0) { p.mags[w.id] = magCap(w); p.reT = 0; }
   }
 
   /* ---- firing ---- */
@@ -1510,6 +2146,13 @@ function update(rdt) {
         spray(b.x, b.y, Math.atan2(-b.vy, -b.vx), '#d8c8b0', 6, 110, 0.28, 0.7);
         S.bul.splice(i, 1); removed = true; break;
       }
+      /* PACI is not an enemy and has no health bar. He is a very large man
+         standing in his own shop, and rounds do land on him. */
+      if (S.paci && S.paci.anger < 2 &&
+          Math.abs(b.x - S.paci.x) < 34 && b.y > S.paci.y - 46 && b.y < S.paci.y + 48) {
+        angerPaci(b.x, b.y);
+        S.bul.splice(i, 1); removed = true; break;
+      }
       for (const e of S.en) {
         if (e.dead || b.hitIds.indexOf(e) >= 0) continue;
         if (Math.hypot(e.x - b.x, e.y - b.y) < e.r + 3.5 + b.size) {
@@ -1517,6 +2160,14 @@ function update(rdt) {
           if (b.knock) { e.vx += Math.cos(a) * b.knock; e.vy += Math.sin(a) * b.knock; }
           if (b.pin) e.stun = Math.max(e.stun, b.pin);
           if (b.burn) { e.burn = Math.max(e.burn, b.burn); e.burnT = Math.max(e.burnT, 2.6); }
+          if (b.mark && e.mark <= 0) { e.mark = b.mark; float(e.x, e.y - 12, 'ON SALE', '#ff4ab0'); }
+          if (b.chill) { e.slowT = Math.max(e.slowT, b.chill); e.slowAmt = Math.max(e.slowAmt, 0.55); }
+          if (st.slowHit > 0) { e.slowT = Math.max(e.slowT, 1.5); e.slowAmt = Math.max(e.slowAmt, st.slowHit); }
+          if (st.freeze > 0 && !e.boss && Math.random() < st.freeze) {
+            e.stun = Math.max(e.stun, 1.3);
+            float(e.x, e.y - 10, 'FROZEN', '#bfefff');
+            part(e.x, e.y, '#dff4ff', 12, 90, 0.5);
+          }
           damageEnemy(e, b.dmg, true, a);
           float(b.x, b.y - 6, Math.round(b.dmg), b.god ? '#ff5cf0' : b.dmg > 60 ? '#ff8a3a' : '#ffe8b0', b.dmg > 60);
           b.hitIds.push(e);
@@ -1582,6 +2233,13 @@ function update(rdt) {
       if (Math.random() < 0.4) part(e.x, e.y - 2, pick(['#ff8a2b', '#ffd05a', '#ff3b1e']), 1, 30, 0.4);
       if (e.hp <= 0) { killEnemy(e); continue; }
     }
+    /* COLD SNAP, FREEZER BURN and THE WALK-IN all turn the same dial, and a
+       PRICE GUN tag times out on its own. */
+    e.mark = Math.max(0, e.mark - dt);
+    e.slowT = Math.max(0, e.slowT - dt);
+    let sl = e.slowT > 0 ? e.slowAmt : 0;
+    if (st.aura > 0 && Math.hypot(e.x - p.x, e.y - p.y) < 66) sl = Math.max(sl, st.aura);
+    e.spd = e.base * (1 - Math.min(0.85, sl));
     if (e.stun > 0) {
       e.stun -= dt;
       e.x += e.vx * dt; e.y += e.vy * dt;
@@ -1589,7 +2247,8 @@ function update(rdt) {
       collideWalls(e);
       continue;
     }
-    if (e.boss) updateBoss(e, dt); else updateEnemy(e, dt);
+    // elites wear the boss bar but keep their own species' AI
+    if (e.boss && !e.mini) updateBoss(e, dt); else updateEnemy(e, dt);
 
     if (Math.hypot(e.x - p.x, e.y - p.y) < e.r + p.r + 1) {
       e.atkT -= dt;
@@ -1636,12 +2295,17 @@ function update(rdt) {
       d.vx = d.vy = 0;
       if (Math.random() < dt * 12) part(d.x, d.y, '#ffe9a8', 1, 20, 0.3);
     }
-    else if (dd < 40 && !perm) { d.x += (p.x - d.x) * dt * 6; d.y += (p.y - d.y) * dt * 6; }
+    else if (dd < 40 * ST().magnet && !perm) { d.x += (p.x - d.x) * dt * 6; d.y += (p.y - d.y) * dt * 6; }
     if (dd < 12) {
-      if (d.kind === 'ammo') { p.mags[curW().id] = curW().mag; p.reT = 0; float(p.x, p.y - 16, 'AMMO', '#f2d14a'); A.pickup(); }
-      else if (d.kind === 'med') { p.hp = Math.min(ST().maxhp, p.hp + 32); float(p.x, p.y - 16, '+32 HP', '#ff6b6b'); A.pickup(); }
-      else if (d.kind === 'nade') { p.nades = Math.min(6, p.nades + 1); float(p.x, p.y - 16, '+1 FRAG', '#7aa35e'); A.pickup(); }
-      else if (d.kind === 'coin') { S.coins++; S.vault++; float(p.x, p.y - 16, '+1', '#f5c518'); A.coin(); }
+      if (d.kind === 'ammo') { p.mags[curW().id] = magCap(curW()); p.reT = 0; float(p.x, p.y - 16, 'AMMO', '#f2d14a'); A.pickup(); }
+      else if (d.kind === 'med') { p.hp = Math.min(ST().maxhp, p.hp + 26); float(p.x, p.y - 16, '+26 HP', '#ff6b6b'); A.pickup(); }
+      else if (d.kind === 'nade') { p.nades = Math.min(9, p.nades + 1); float(p.x, p.y - 16, '+1 FRAG', '#7aa35e'); A.pickup(); }
+      else if (d.kind === 'coin') {
+        S.coinFrac += ST().coinMul;
+        let got = 0;
+        while (S.coinFrac >= 1) { S.coinFrac -= 1; S.coins++; S.vault++; got++; }
+        float(p.x, p.y - 16, '+' + got, '#f5c518'); A.coin();
+      }
       else if (d.kind === 'shield') {
         p.tempShield = Math.max(p.tempShield, 3.0);
         float(p.x, p.y - 18, 'AEGIS', '#7fd0ff', true);
@@ -1649,23 +2313,7 @@ function update(rdt) {
         part(p.x, p.y, '#c6e8ff', 22, 130, 0.6);
         A.bigpickup();
       }
-      else if (d.kind === 'nova') {
-        const st2 = ST(), N = 26;
-        for (let k = 0; k < N; k++) {
-          const a = k / N * TAU + Math.random() * 0.1;
-          S.bul.push({
-            x: p.x, y: p.y, vx: Math.cos(a) * 340, vy: Math.sin(a) * 340,
-            dmg: 90 * st2.dmgMul, pierce: 2 + st2.pierce, hitIds: [], life: 2.6,
-            col: '#ffb03a', size: 3, knock: 180, pin: 0, burn: 12, bounce: 0, god: S.god,
-            home: 5.5, spd: 340         // they go looking
-          });
-        }
-        float(p.x, p.y - 18, 'NOVA', '#ffb03a', true);
-        ring(p.x, p.y, 64, '#ffb03a', 0.4, 2);
-        part(p.x, p.y, '#fff0a8', 40, 200, 0.7, 2);
-        shake(9); punch(0.05); S.flash = 0.45; S.flashCol = '#ffcf8a';
-        A.boom();
-      }
+      else if (d.kind === 'nova') fireNova(p.x, p.y);
       else if (d.kind === 'card') {
         S.cards++;
         float(p.x, p.y - 18, 'CARD ' + S.cards + '/' + OMEGA_CARDS, '#c0202a', true);
@@ -1679,6 +2327,18 @@ function update(rdt) {
 
   /* ---- weapon pedestals ---- */
   S.prompt = null;
+
+  if (S.tomce) {
+    const q = S.tomce;
+    q.bob += dt;
+    const d = Math.hypot(q.x - p.x, q.y - p.y);
+    q.near = clamp(1 - d / 110, 0, 1);
+    if (!q.used && d < 34) {
+      S.prompt = { x: q.x, y: q.y - 30, tomce: 1 };
+      if (keys.KeyE) { keys.KeyE = false; openAugments(); }
+    }
+  }
+
   for (const sh of S.shops) {
     if (sh.bought) continue;
     sh.bob += dt * 2;
@@ -1724,6 +2384,16 @@ function update(rdt) {
     else if (inX && p.y < S.door.y + S.door.h + 12) nextRoom();
   }
 
+  /* drain the on-kill queue — at most three a frame, whatever queued them */
+  if (S.fx.length) {
+    const batch = S.fx.splice(0, 3);
+    for (const f of batch) {
+      if (f.k === 'nova') fireNova(f.x, f.y);
+      else explode(f.x, f.y, f.r, f.d, '#ff6a72');
+    }
+    if (S.fx.length > 12) S.fx.length = 12;    // a runaway chain still has to end
+  }
+
   updateWaves(dt);
   updateParticles(dt);
   updateCam(rdt);
@@ -1734,6 +2404,28 @@ function updateEnemy(e, dt) {
   const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1;
   e.wob += dt * 3;
   let tx = dx / d, ty = dy / d;
+
+  /* Elites keep their species' movement but add a shell burst and a summon, so
+     you cannot simply back away from one the way you can from a bloater. */
+  if (e.elite) {
+    e.eliteT -= dt;
+    if (e.eliteT <= 0) {
+      e.eliteT = rnd(2.2, 3.2);
+      e.poseT = 0.4;
+      const n = 8 + Math.floor(S.room * 1.5);
+      for (let i = 0; i < n; i++) {
+        const a = i / n * TAU + rnd(0, 0.26);
+        S.eb.push({ x: e.x, y: e.y, vx: Math.cos(a) * 145, vy: Math.sin(a) * 145,
+                    r: 4, bob: rnd(0, TAU), dmg: e.dmg * 0.45, life: 2.6, col: e.eliteCol });
+      }
+      const adds = 1 + Math.floor(S.room * 0.7);
+      for (let i = 0; i < adds; i++) {
+        const q = freeSpot(90);
+        S.cracks.push({ x: q.x, y: q.y, t: 0.75, type: pick(['crawler', 'stalker', 'shrieker']) });
+      }
+      A.screech(); shake(4);
+    }
+  }
 
   if (e.type === 'shrieker') {
     if (d < 96) { tx *= -1; ty *= -1; }
@@ -1747,7 +2439,7 @@ function updateEnemy(e, dt) {
       A.screech();
       const a = Math.atan2(dy, dx);
       for (let k = -1; k <= 1; k++)
-        S.eb.push({ x: e.x, y: e.y, vx: Math.cos(a + k * 0.16) * 130, vy: Math.sin(a + k * 0.16) * 130, r: 3, dmg: e.dmg * 0.7, life: 2.2, col: '#9ad14a' });
+        S.eb.push({ x: e.x, y: e.y, vx: Math.cos(a + k * 0.16) * 130, vy: Math.sin(a + k * 0.16) * 130, r: 4, bob: rnd(0, TAU), dmg: e.dmg * 0.7, life: 2.2, col: '#9ad14a' });
     }
   } else if (e.type === 'stalker') {
     e.blinkT -= dt;
@@ -1820,12 +2512,12 @@ function updateBoss(b, dt) {
       b.vy = Math.sin(b.chargeDir) * b.spd * 5.2;
       blood(b.x, b.y + 8, 8, 'rgba(80,8,14,0.28)');
       if (pat === 'burst' && Math.random() < dt * 14)
-        S.eb.push({ x: b.x, y: b.y + 6, vx: rnd(-20, 20), vy: rnd(-20, 20), r: 3, dmg: b.dmg * 0.35, life: 1.6, col: '#ff8a2b' });
+        S.eb.push({ x: b.x, y: b.y + 6, vx: rnd(-20, 20), vy: rnd(-20, 20), r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.35, life: 1.6, col: '#ff8a2b' });
       if (b.pt <= 0) {
         b.phase = 'idle'; b.pt = rnd(1.4, 2.4);
         shake(8); punch(0.03);
         if (pat === 'burst') {
-          for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; S.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 115, vy: Math.sin(a) * 115, r: 3, dmg: b.dmg * 0.5, life: 2.2, col: '#ff8a2b' }); }
+          for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; S.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 115, vy: Math.sin(a) * 115, r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.5, life: 2.2, col: '#ff8a2b' }); }
           ring(b.x, b.y, 70, '#ff8a2b', 0.4, 2);
           A.roar();
         }
@@ -1838,7 +2530,7 @@ function updateBoss(b, dt) {
       b.pt = rnd(2.6, 3.6);
       b.poseT = 0.5;
       const off = Math.random() * TAU, n = 12 + S.room * 4;
-      for (let i = 0; i < n; i++) { const a = off + i / n * TAU; S.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 100, vy: Math.sin(a) * 100, r: 3, dmg: b.dmg * 0.5, life: 3, col: '#8fdd4a' }); }
+      for (let i = 0; i < n; i++) { const a = off + i / n * TAU; S.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 100, vy: Math.sin(a) * 100, r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.5, life: 3, col: '#8fdd4a' }); }
       ring(b.x, b.y, 60, '#8fdd4a', 0.35, 2);
       A.screech(true); shake(5);
     }
@@ -1856,7 +2548,7 @@ function updateBoss(b, dt) {
       part(b.x, b.y, '#e8f0ff', 28, 140, 0.55);
       A.screech();
       const aa = Math.atan2(p.y - b.y, p.x - b.x);
-      for (let k = 0; k < 5; k++) S.eb.push({ x: b.x, y: b.y, vx: Math.cos(aa + rnd(-0.25, 0.25)) * 150, vy: Math.sin(aa + rnd(-0.25, 0.25)) * 150, r: 3, dmg: b.dmg * 0.4, life: 2, col: '#f2ede2' });
+      for (let k = 0; k < 5; k++) S.eb.push({ x: b.x, y: b.y, vx: Math.cos(aa + rnd(-0.25, 0.25)) * 150, vy: Math.sin(aa + rnd(-0.25, 0.25)) * 150, r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.4, life: 2, col: '#f2ede2' });
     }
   } else if (pat === 'circle') {
     // THE COURIER never stops moving. It orbits, then commits.
@@ -1881,7 +2573,7 @@ function updateBoss(b, dt) {
       if (b.pt <= 0) {
         b.phase = 'idle'; b.pt = rnd(1.6, 2.6);
         ring(b.x, b.y, 54, '#5ac8ff', 0.35, 2); shake(6);
-        for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; S.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 125, vy: Math.sin(a) * 125, r: 3, dmg: b.dmg * 0.45, life: 2.2, col: '#5ac8ff' }); }
+        for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; S.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 125, vy: Math.sin(a) * 125, r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.45, life: 2.2, col: '#5ac8ff' }); }
       }
     }
   }
@@ -1901,9 +2593,12 @@ function updateParticles(dt) {
   for (let i = S.gibs.length - 1; i >= 0; i--) {
     const q = S.gibs[i];
     q.x += q.vx * dt; q.y += q.vy * dt;
-    q.vx *= 0.90; q.vy *= 0.90;
+    // cloth catches the air and flutters down; meat just goes where it was thrown
+    if (q.rag) { q.vx *= 0.82; q.vy = q.vy * 0.82 + 26 * dt; q.spin = (q.spin || 0) + dt * 9; }
+    else { q.vx *= 0.90; q.vy *= 0.90; }
     q.life -= dt;
-    if (q.life <= 0) { blood(q.x, q.y, 3, 'rgba(80,8,14,0.35)'); S.gibs.splice(i, 1); }
+    // a scrap of jacket does not leave a bloodstain where it lands
+    if (q.life <= 0) { if (!q.rag) blood(q.x, q.y, 3, 'rgba(80,8,14,0.35)'); S.gibs.splice(i, 1); }
   }
   for (let i = S.props.length - 1; i >= 0; i--) {
     const q = S.props[i];
@@ -1994,12 +2689,22 @@ function triggerGoromania() {
 /* ============================================================
    FLOW
    ============================================================ */
+/* LUCK tilts every hand up the grade ladder. Recomputed whenever the deck
+   changes, because CLEARANCE feeds it. */
+function recalcLuck() {
+  S.luck = dkc('clearance') / 100 + (contractDone('grade') ? 1 : 0);
+}
+
 function startRun() {
   freshState();
   S.mode = 'play';
   buildRoom(0);
   S.p = makePlayer();
   S.cam.cx = S.p.x; S.cam.cy = S.p.y;
+  recalcLuck();
+  /* Signed contracts pay out here, at the top of the run. */
+  if (contractDone('dozen')) { S.level = 2; S.upgPts = 1; S.lvlDelay = 2.6; }
+  if (contractDone('hoard')) { S.coins += 60; persist(); }
   A.init();
   A.setDread(0.2);
   if (A.music) { A.music.setFloor(0); A.music.setBoss(false); A.music.setIntensity(0.15); A.music.start(); }
@@ -2021,10 +2726,11 @@ function nextRoom() {
     S.nades.length = 0; S.props.length = 0; S.rings.length = 0;
     S.boss = null; S.wave = 0; S.waveState = 'idle';
     S.p.x = S.aw / 2; S.p.y = S.ah - 60; S.p.vx = S.p.vy = 0;
-    S.p.hp = Math.min(ST().maxhp, S.p.hp + 45);
-    S.p.nades = Math.min(6, S.p.nades + 2);
+    S.p.hp = Math.min(ST().maxhp, S.p.hp + 30);
+    S.p.nades = Math.min(9, S.p.nades + 2);
     S.p.reT = 0;
-    for (const id of S.p.owned) S.p.mags[id] = WEP[id].mag;
+    S.savesLeft = dkc('seconds');               // one refusal a floor, per rank
+    for (const id of S.p.owned) S.p.mags[id] = magCap(WEP[id]);
     S.score += 2500 * nr;
     S.cam.cx = S.p.x; S.cam.cy = S.p.y;
     // A new floor reforges the base rifle.
@@ -2053,8 +2759,8 @@ function drawWorld() {
   ctx.scale(c.z, c.z);
   ctx.translate(-c.cx, -c.cy);
 
-  ctx.drawImage(floorCan, 0, 0);
-  ctx.drawImage(decalCan, 0, 0);
+  blit(ctx, floorCan, 0, 0);
+  blit(ctx, decalCan, 0, 0);
 
   for (const d of S.deco) {
     if (d.x < vl || d.x > vr || d.y < vt || d.y > vb) continue;
@@ -2075,6 +2781,7 @@ function drawWorld() {
   }
 
   drawPaci();
+  drawTomce();
   drawShops();
 
   for (const d of S.drops) {
@@ -2106,7 +2813,15 @@ function drawWorld() {
     ctx.beginPath(); ctx.ellipse(c2.x, c2.y, 9 * k, 5 * k, 0, 0, TAU); ctx.fill();
   }
 
-  for (const q of S.gibs) { ctx.globalAlpha = clamp(q.life, 0, 1); ctx.fillStyle = q.col; ctx.fillRect(q.x | 0, q.y | 0, q.s, q.s); }
+  for (const q of S.gibs) {
+    ctx.globalAlpha = clamp(q.life, 0, 1);
+    ctx.fillStyle = q.col;
+    if (q.rag) {   // a scrap of cloth is a flat sliver, and it turns as it falls
+      ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.spin || 0);
+      ctx.fillRect(-q.s, -0.5, q.s * 2, 1);
+      ctx.restore();
+    } else ctx.fillRect(q.x | 0, q.y | 0, q.s, q.s);
+  }
   ctx.globalAlpha = 1;
 
   // dropped mags etc.
@@ -2164,9 +2879,31 @@ function drawWorld() {
   }
   ctx.lineCap = 'butt';
   ctx.restore();
+  /* Enemy fire used to be a 3px square that vanished against a lit floor.
+     It now carries a bloom, a black rim so it survives any background, a
+     saturated ring and a pulsing white core — four layers, all readable. */
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.lineCap = 'round';
   for (const b of S.eb) {
-    ctx.fillStyle = b.col; ctx.fillRect((b.x - b.r / 2) | 0, (b.y - b.r / 2) | 0, b.r, b.r);
-    ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.fillRect(b.x | 0, b.y | 0, 1, 1);
+    const tx = b.x - b.vx * 0.05, ty = b.y - b.vy * 0.05;
+    ctx.globalAlpha = 0.20;
+    ctx.strokeStyle = b.col; ctx.lineWidth = b.r * 2.4;
+    ctx.beginPath(); ctx.moveTo(b.x, b.y); ctx.lineTo(tx, ty); ctx.stroke();
+    ctx.globalAlpha = 0.30 + Math.sin(S.t * 15 + b.bob) * 0.11;
+    ctx.fillStyle = b.col;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 2.7, 0, TAU); ctx.fill();
+  }
+  ctx.lineCap = 'butt';
+  ctx.restore();
+  for (const b of S.eb) {
+    const pu = 1 + Math.sin(S.t * 15 + b.bob) * 0.13;
+    ctx.fillStyle = 'rgba(4,0,2,0.62)';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * pu + 1.7, 0, TAU); ctx.fill();
+    ctx.fillStyle = b.col;
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * pu + 0.6, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#fff4e2';
+    ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 0.5, 0, TAU); ctx.fill();
   }
 
   for (const q of S.part) { ctx.globalAlpha = clamp(q.life / q.max, 0, 1); ctx.fillStyle = q.col; ctx.fillRect(q.x | 0, q.y | 0, q.s, q.s); }
@@ -2192,30 +2929,38 @@ function drawWorld() {
 function drawPaci() {
   const q = S.paci;
   if (!q) return;
-  const breath = Math.sin(S.t * 1.4);
-  const spr = breath > 0 ? SPR.paci2 : SPR.paci;
-  const y = q.y + breath * 1.6;
+  const mad = q.anger | 0;
+  // when he is angry his breathing goes shallow and fast, and he shakes with it
+  const breath = Math.sin(S.t * (mad ? 5.5 + mad * 3 : 1.4));
+  const bank = mad > 1 ? [SPR.paciDone, SPR.paciDone2] : mad ? [SPR.paciMad, SPR.paciMad2]
+                                                            : [SPR.paci, SPR.paci2];
+  const spr = breath > 0 ? bank[1] : bank[0];
+  const jx = mad ? rnd(-mad, mad) : 0, jy = mad ? rnd(-mad, mad) : 0;
+  const y = q.y + breath * (mad ? 0.9 : 1.6) + jy;
 
   ctx.fillStyle = 'rgba(0,0,0,0.42)';
   ctx.beginPath(); ctx.ellipse(q.x, q.y + 50, 46, 12, 0, 0, TAU); ctx.fill();
-  ctx.globalAlpha = 0.10 + Math.sin(S.t * 2) * 0.035;
-  ctx.fillStyle = '#c05cff';
-  ctx.beginPath(); ctx.arc(q.x, q.y, 82, 0, TAU); ctx.fill();
+  ctx.globalAlpha = mad ? 0.22 + Math.sin(S.t * 11) * 0.10 : 0.10 + Math.sin(S.t * 2) * 0.035;
+  ctx.fillStyle = mad ? '#ff2b2b' : '#c05cff';
+  ctx.beginPath(); ctx.arc(q.x, q.y, mad ? 104 + mad * 22 : 82, 0, TAU); ctx.fill();
   ctx.globalAlpha = 1;
 
-  drawSpr(ctx, spr, q.x, y, 3.6);
+  drawSpr(ctx, spr, q.x + jx, y, 3.6);
 
-  const line = S.shops.length ? 'HELLO TRAVELER, WELCOME TO MY SHOP'
+  const line = mad > 1 ? 'YOU ARE LEAVING NOW'
+             : mad ? 'PUT IT DOWN. I WILL NOT ASK TWICE.'
+             : S.shops.length ? 'HELLO TRAVELER, WELCOME TO MY SHOP'
                               : 'NOTHING LEFT. COME BACK WHEN I RESTOCK.';
+  const col = mad ? ['#ff9a9a', '#ffd0d0'] : ['#c8a8e0', '#e8c8ff'];
   ctx.font = '8px ' + GAME_FONT; ctx.textAlign = 'center';
   const tw = ctx.measureText(line).width;
-  ctx.fillStyle = 'rgba(10,4,16,0.82)';
+  ctx.fillStyle = mad ? 'rgba(24,2,4,0.88)' : 'rgba(10,4,16,0.82)';
   ctx.fillRect(q.x - tw / 2 - 6, q.y - 74, tw + 12, 22);
-  ctx.fillStyle = 'rgba(176,92,255,0.55)';
+  ctx.fillStyle = mad ? 'rgba(255,43,43,0.75)' : 'rgba(176,92,255,0.55)';
   ctx.fillRect(q.x - tw / 2 - 6, q.y - 74, tw + 12, 1);
   ctx.fillRect(q.x - tw / 2 - 6, q.y - 53, tw + 12, 1);
-  ctx.fillStyle = '#e8c8ff'; ctx.fillText('PACI', q.x, q.y - 65);
-  ctx.fillStyle = '#c8a8e0'; ctx.fillText(line, q.x, q.y - 57);
+  ctx.fillStyle = col[1]; ctx.fillText('PACI', q.x, q.y - 65);
+  ctx.fillStyle = col[0]; ctx.fillText(line, q.x, q.y - 57);
   ctx.textAlign = 'left';
 }
 
@@ -2225,11 +2970,30 @@ function drawShops() {
     drawSpr(ctx, SPR.pedestal, sh.x, sh.y + 2, 1);
     if (sh.bought) continue;
     const by = Math.sin(sh.bob) * 2.2;
-    ctx.globalAlpha = 0.20 + Math.sin(S.t * 4 + sh.bob) * 0.08;
+    const gr = GRADE[w.gr];
+    /* How hard it shines is how good it is — you can read the grade of a gun
+       from the doorway before you can read the price. */
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.18 + gr.glow / 28 * 0.34 + Math.sin(S.t * 4 + sh.bob) * 0.07;
+    ctx.fillStyle = gr.col;
+    ctx.beginPath(); ctx.arc(sh.x, sh.y - 14 + by, 15 + gr.glow * 0.7, 0, TAU); ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha = 0.22 + Math.sin(S.t * 4 + sh.bob) * 0.08;
     ctx.fillStyle = w.col;
-    ctx.beginPath(); ctx.arc(sh.x, sh.y - 14 + by, 16, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(sh.x, sh.y - 14 + by, 15, 0, TAU); ctx.fill();
     ctx.globalAlpha = 1;
+    if (w.gr >= 2) {
+      // a slow ring of sparks, one per grade above PRIME
+      for (let k = 0; k < w.gr - 1; k++) {
+        const a = S.t * (0.8 + k * 0.4) + k * 2.1;
+        ctx.fillStyle = gr.col;
+        ctx.fillRect((sh.x + Math.cos(a) * 20) | 0, (sh.y - 14 + by + Math.sin(a) * 9) | 0, 1, 1);
+      }
+    }
     drawSpr(ctx, w.spr, sh.x, sh.y - 14 + by, 1.15, false, 1);
+    ctx.font = '6px ' + GAME_FONT; ctx.textAlign = 'center';
+    ctx.fillStyle = '#000'; ctx.fillText(gr.n, sh.x + 1, sh.y + 8);
+    ctx.fillStyle = gr.col; ctx.fillText(gr.n, sh.x, sh.y + 7);
     ctx.font = '7px ' + GAME_FONT; ctx.textAlign = 'center';
     const cost = sh.cards ? sh.cards + ' CARDS' : sh.price + '';
     const ok = sh.cards ? S.cards >= sh.cards : S.coins >= sh.price;
@@ -2325,14 +3089,27 @@ function drawSecret() {
   }
 }
 
-/* ---------- Damjan ---------- */
-function bodySprite() {
-  const c = cosDef(equippedCos());
-  return c.id === 'crimson' ? SPR.body : variant(SPR.body, c.id, c.pal);
+/* ---------- Damjan ----------
+   How chewed up he is, from 0 (untouched) to 3 (barely). It reads off health
+   rather than off the number of hits, so a big one takes a visible piece out
+   of him and a graze does not. */
+function hurtStage() {
+  const p = S.p;
+  if (!p) return 0;
+  const f = p.hp / Math.max(1, ST().maxhp);
+  return f > 0.72 ? 0 : f > 0.46 ? 1 : f > 0.22 ? 2 : 3;
 }
-function legSprite(i) {
+function bodySprite(stage) {
   const c = cosDef(equippedCos());
-  const base = SPR.legs[i];
+  const st = stage === undefined ? hurtStage() : stage;
+  const base = st === 0 ? SPR.body : SPR.bodyHurt[st - 1];
+  return c.id === 'crimson' ? base : variant(base, c.id, c.pal);
+}
+function legSprite(i, stage) {
+  const c = cosDef(equippedCos());
+  const st = stage === undefined ? hurtStage() : stage;
+  // trousers survive the first hit; a jacket shoulder does not
+  const base = st < 2 ? SPR.legs[i] : SPR.legsHurt[st - 2][i];
   return (c.pal.n || c.pal.t) ? variant(base, c.id, c.pal) : base;
 }
 
@@ -2497,11 +3274,49 @@ function drawPlayer(p) {
     const q = S.prompt;
     ctx.font = '7px ' + GAME_FONT; ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillRect(q.x - 44, q.y - 42, 88, 17);
-    ctx.fillStyle = q.w.col; ctx.fillText(q.w.name, q.x, q.y - 34);
-    ctx.fillStyle = q.ok ? '#9fe08a' : '#ff5a62';
-    ctx.fillText((q.ok ? '[E] BUY  ' : 'NEED ') + q.cost, q.x, q.y - 27);
+    if (q.tomce) {
+      ctx.fillStyle = '#a8e8ff'; ctx.fillText('TOMCE', q.x, q.y - 34);
+      ctx.fillStyle = '#9fe08a'; ctx.fillText('[E] SPEAK', q.x, q.y - 27);
+    } else {
+      ctx.fillStyle = q.w.col; ctx.fillText(q.w.name, q.x, q.y - 34);
+      ctx.fillStyle = q.ok ? '#9fe08a' : '#ff5a62';
+      ctx.fillText((q.ok ? '[E] BUY  ' : 'NEED ') + q.cost, q.x, q.y - 27);
+    }
     ctx.textAlign = 'left';
   }
+}
+
+/* TOMCE. Two frames, a very slow sway, and a cold light he does not cast so
+   much as fail to block. He is barely there until you are nearly on him. */
+function drawTomce() {
+  const q = S.tomce;
+  if (!q) return;
+  const sway = Math.sin(q.bob * 0.7);
+  const spr = sway > 0 ? SPR.tomce2 : SPR.tomce;
+  const vis = 0.16 + q.near * 0.84;
+
+  ctx.fillStyle = 'rgba(0,0,0,' + (0.35 * vis) + ')';
+  ctx.beginPath(); ctx.ellipse(q.x, q.y + 30, 14, 5, 0, 0, TAU); ctx.fill();
+
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  ctx.globalAlpha = (0.05 + q.near * 0.10) + Math.sin(S.t * 1.6) * 0.02;
+  ctx.fillStyle = '#a8e8ff';
+  ctx.beginPath(); ctx.arc(q.x, q.y, 46, 0, TAU); ctx.fill();
+  ctx.restore();
+
+  drawSpr(ctx, spr, q.x, q.y + sway * 0.7, 2, false, vis);
+
+  // the lenses catch what little light there is
+  if (q.near > 0.05) {
+    ctx.globalAlpha = clamp(q.near * 1.4, 0, 1) * (0.5 + Math.sin(S.t * 7) * 0.18);
+    ctx.fillStyle = '#dff4ff';
+    ctx.fillRect((q.x - 7) | 0, (q.y - 22) | 0, 3, 2);
+    ctx.fillRect((q.x + 4) | 0, (q.y - 22) | 0, 3, 2);
+    ctx.globalAlpha = 1;
+  }
+  if (q.used) return;
+  if (q.near > 0.3 && Math.random() < 0.16)
+    part(q.x + rnd(-8, 8), q.y + rnd(-24, 24), '#a8e8ff', 1, 12, 0.6);
 }
 
 /* Which frame of the bank is showing: the wind-up pose if the AI has flagged
@@ -2514,9 +3329,17 @@ function enemySpr(e) {
 
 function drawEnemy(e) {
   const bob = Math.sin(e.bob) * (e.boss ? 1.6 : 1);
-  const sc = e.boss ? 1.7 : 1;
+  const sc = (e.boss ? 1.7 : 1) * (e.scale || 1);
   const spr = enemySpr(e);
   const lift = e.boss ? 8 : 0;
+
+  /* Marked, chilled and frozen all need to read at a glance in a crowd. */
+  if (e.mark > 0) {
+    ctx.globalAlpha = 0.30 + Math.sin(S.t * 9) * 0.12;
+    ctx.strokeStyle = '#ff4ab0'; ctx.lineWidth = 1;
+    ctx.strokeRect((e.x - e.r - 3) | 0, (e.y - e.r - 5) | 0, (e.r * 2 + 6) | 0, (e.r * 2 + 8) | 0);
+    ctx.globalAlpha = 1;
+  }
 
   // afterimages — you see where it was before you see where it is
   if (e.trail && e.trail.length) {
@@ -2607,13 +3430,15 @@ function drawLight() {
   const z = S.cam.z;
   const ps = worldToScreen(S.p.x, S.p.y);
 
-  let g = lctx.createRadialGradient(ps.x, ps.y, 4, ps.x, ps.y, 104 * z);
+  const sight = ST().sight;                 // CATARACT and SLEEPLESS close this in
+  const lamp = 104 * sight;
+  let g = lctx.createRadialGradient(ps.x, ps.y, 4, ps.x, ps.y, lamp * z);
   g.addColorStop(0, 'rgba(0,0,0,1)');
   g.addColorStop(0.5, 'rgba(0,0,0,0.72)');
   g.addColorStop(1, 'rgba(0,0,0,0)');
-  lctx.fillStyle = g; lctx.beginPath(); lctx.arc(ps.x, ps.y, 104 * z, 0, TAU); lctx.fill();
+  lctx.fillStyle = g; lctx.beginPath(); lctx.arc(ps.x, ps.y, lamp * z, 0, TAU); lctx.fill();
 
-  const spread = 0.52, len = 210 * z;
+  const spread = 0.52, len = 210 * sight * z;
   lctx.save();
   lctx.translate(ps.x, ps.y); lctx.rotate(S.p.ang);
   const cg = lctx.createLinearGradient(0, 0, len, 0);
@@ -2642,34 +3467,42 @@ function drawLight() {
   for (const d of S.drops) if (d.kind === 'item' || d.kind === 'god' || d.kind === 'card') blob(d.x, d.y, 46, 0.9);
   for (const sh of S.shops) if (!sh.bought) blob(sh.x, sh.y - 12, 52, 0.85);
   if (S.paci) blob(S.paci.x, S.paci.y, 120, 0.95);
+  if (S.tomce) blob(S.tomce.x, S.tomce.y, 34 + S.tomce.near * 40, 0.35 + S.tomce.near * 0.5);
   if (S.corner && (S.corner.found || S.corner.pulse > 0.15)) blob(S.corner.x, S.corner.y, 40, S.corner.found ? 0.8 : S.corner.pulse * 0.7);
   if (S.door.open) blob(S.door.x + S.door.w / 2, S.door.y + S.door.h, 70, 0.9);
   for (const e of S.en) blob(e.x, e.y, e.boss ? 40 : 15, 0.42);
+  // incoming fire lights its own way in, so a dark room can't hide it
+  for (const b of S.eb) blob(b.x, b.y, 26, 0.75);
   for (const r of S.rings) blob(r.x, r.y, r.r1 * 0.8, clamp(r.life / r.max, 0, 1) * 0.8);
 
   lctx.globalCompositeOperation = 'source-over';
-  ctx.drawImage(lcan, 0, 0);
+  blit(ctx, lcan, 0, 0);
   ctx.fillStyle = R.fog; ctx.fillRect(0, 0, W, H);
 }
 
 /* ---------- post ---------- */
 let grainCans = [];
 (() => {
+  // Grain and scanlines live at render scale now, so they sit ON the image
+  // instead of being blown up into visible blocks with it.
   for (let k = 0; k < 4; k++) {
-    const c = document.createElement('canvas'); c.width = W; c.height = H;
-    const g = c.getContext('2d');
-    const img = g.createImageData(W, H);
+    const s = subCanvas(W, H), g = s.ctx;
+    const img = g.createImageData(s.can.width, s.can.height);
     for (let i = 0; i < img.data.length; i += 4) {
       const v = Math.random() < 0.5 ? 0 : 255;
       img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-      img.data[i + 3] = Math.random() < 0.054 ? 13 : 0;   // +20% over the last pass
+      img.data[i + 3] = Math.random() < 0.054 ? 15 : 0;
     }
     g.putImageData(img, 0, 0);
-    grainCans.push(c);
+    grainCans.push(s.can);
   }
 })();
-const scan = document.createElement('canvas'); scan.width = W; scan.height = H;
-(() => { const g = scan.getContext('2d'); g.fillStyle = 'rgba(0,0,0,0.07)'; for (let y = 0; y < H; y += 2) g.fillRect(0, y, W, 1); })();
+const scan = subCanvas(W, H).can;
+(() => {
+  const g = scan.getContext('2d'), P = 1 / RS;
+  g.fillStyle = 'rgba(0,0,0,0.09)';
+  for (let y = 0; y < H; y += P * 2) g.fillRect(0, y, W, P);
+})();
 
 function post() {
   const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.40, W / 2, H / 2, H * 0.98);
@@ -2677,6 +3510,21 @@ function post() {
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
   if (S.redness > 0.01) { ctx.fillStyle = 'rgba(150,0,10,' + (S.redness * 0.34) + ')'; ctx.fillRect(0, 0, W, H); }
+  /* the back room, once he has stopped being a shopkeeper */
+  if (S.paci && S.paci.anger > 0) {
+    const a = S.paci.anger;
+    ctx.fillStyle = 'rgba(158,0,8,' + (a > 1 ? 0.46 : 0.24 + Math.sin(S.t * 9) * 0.07) + ')';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'rgba(120,0,0,' + (0.10 + Math.sin(S.t * 17) * 0.05) * a + ')';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'source-over';
+    // the picture starts tearing at the second one
+    if (a > 1) {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      for (let i = 0; i < 9; i++) ctx.fillRect(0, (Math.random() * H) | 0, W, 1 + Math.random() * 4);
+    }
+  }
   if (S.modT > 0) {
     ctx.fillStyle = 'rgba(120,20,200,' + (S.modT / 2.6 * 0.22) + ')'; ctx.fillRect(0, 0, W, H);
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
@@ -2685,8 +3533,8 @@ function post() {
   if (S.god) { ctx.fillStyle = 'hsla(' + ((S.t * 90) % 360) + ',80%,50%,0.055)'; ctx.fillRect(0, 0, W, H); }
   if (S.flash > 0) { ctx.globalAlpha = clamp(S.flash, 0, 1) * 0.7; ctx.fillStyle = S.flashCol; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
 
-  ctx.drawImage(grainCans[Math.abs(S.t * 24 | 0) % grainCans.length], 0, 0);
-  ctx.drawImage(scan, 0, 0);
+  blit(ctx, grainCans[Math.abs(S.t * 24 | 0) % grainCans.length], 0, 0);
+  blit(ctx, scan, 0, 0);
 
   if (S.jump > 0 && S.jumpSpr) {
     ctx.globalAlpha = clamp(S.jump * 2.2, 0, 1);
@@ -2807,14 +3655,15 @@ function drawHUD() {
     /* Pips, not a string of '|' and '.'. That bar only ever held a steady
        width because Courier was monospaced; in a proportional face it would
        breathe in and out as rounds swapped between the two glyphs. */
-    const bars = Math.min(30, w.mag);
-    const filled = Math.ceil(mag / w.mag * bars);
-    const low = mag / w.mag <= 0.2;
+    const cap = magCap(w);
+    const bars = Math.min(30, cap);
+    const filled = Math.ceil(mag / cap * bars);
+    const low = mag / cap <= 0.2;
     for (let i = 0; i < bars; i++) {
       ctx.fillStyle = i < filled ? (low ? '#ff3b3b' : w.col) : 'rgba(255,255,255,0.15)';
       ctx.fillRect(8 + i * 3, H - 29, 2, 5);
     }
-    txt(mag + '/' + w.mag, 8, H - 16, '#7b6a58');
+    txt(mag + '/' + cap, 8, H - 16, '#7b6a58');
   }
   if (w.spin && p.spin > 0) {
     ctx.fillStyle = 'rgba(255,210,138,0.8)'; ctx.fillRect(8, H - 12, 40 * p.spin, 2);
@@ -2833,10 +3682,10 @@ function drawHUD() {
     ctx.fillRect(x - 9, y - 7, 18, 14);
     if (i === p.wi) { ctx.fillStyle = ww.col; ctx.fillRect(x - 9, y + 6, 18, 1); }
     drawSpr(ctx, ww.spr, x, y, 0.85, false, i === p.wi ? 1 : 0.45,
-            ww.id === 'scar' && S.scarLv > 1 ? scarCol() : null);
+            WEP[ww.id].evolve && S.scarLv > 1 ? scarCol() : null);
   }
-  const isScar = w.id === 'scar';
-  txt(isScar ? scarName() : w.name, W / 2, H - 20, isScar ? scarCol() : w.col, 'center', 7);
+  const isEvo = !!w.evolve;
+  txt(isEvo ? scarName() : w.name, W / 2, H - 20, isEvo ? scarCol() : w.col, 'center', 7);
 
   /* wave / room */
   txt(R.name, W / 2, 12, '#8e7a68', 'center');
@@ -2845,7 +3694,7 @@ function drawHUD() {
     txt('leave through the door at the bottom', W / 2, 32, 'rgba(160,130,190,0.75)', 'center', 7);
   } else {
     txt(S.waveState === 'idle' ? 'PREPARING' : 'WAVE ' + S.wave + '/10', W / 2, 22,
-        BOSS_WAVES[S.wave] !== undefined ? '#ff3b46' : '#c0ac96', 'center');
+        S.wave === BOSS_WAVE ? '#ff3b46' : MINI_WAVES.indexOf(S.wave) >= 0 ? '#ff8a3a' : '#c0ac96', 'center');
     for (let i = 1; i <= 10; i++) {
       ctx.fillStyle = i < S.wave ? '#8a2a2e' : i === S.wave ? '#ff3b46' : 'rgba(255,255,255,0.12)';
       ctx.fillRect(W / 2 - 30 + (i - 1) * 6, 26, 4, 2);
@@ -2891,10 +3740,10 @@ function drawHUD() {
     ctx.fillStyle = 'rgba(8,4,8,0.86)'; ctx.fillRect(0, H / 2 + 18, W, 44);
     const col = b.scar ? scarCol() : b.wep ? WEP[b.wep].col : b.key === 'god' ? '#ff2b2b' : ITEMS[b.key].col;
     ctx.fillStyle = col; ctx.fillRect(0, H / 2 + 18, W, 1); ctx.fillRect(0, H / 2 + 61, W, 1);
-    const spr = b.scar ? SPR.scar : b.wep ? WEP[b.wep].spr : b.key === 'god' ? SPR.eye : ITEMS[b.key].spr;
+    const spr = b.scar ? SPR.pistol : b.wep ? WEP[b.wep].spr : b.key === 'god' ? SPR.eye : ITEMS[b.key].spr;
     drawSpr(ctx, spr, W / 2 - 84, H / 2 + 40, b.wep || b.scar ? 2 : 1.8, false, 1, b.scar ? col : null);
     const nm = b.scar ? scarName() : b.wep ? WEP[b.wep].name : b.key === 'god' ? 'THE THIRD EYE OF DAMJAN' : ITEMS[b.key].n[Math.min(b.lv - 1, 1)];
-    const de = b.scar ? ('the rifle reforged — +' + Math.round((ST().scarMul - 1) * 100) + '% damage')
+    const de = b.scar ? ('the sidearm reforged — +' + Math.round((ST().scarMul - 1) * 100) + '% damage')
              : b.wep ? WEP[b.wep].tag : b.key === 'god' ? 'you are no longer bound by meat.' : ITEMS[b.key].d[Math.min(b.lv - 1, 1)];
     ctx.globalAlpha = 1;
     htxt(nm, W / 2 - 58, H / 2 + 36, col, 'left', 12, { weight: '700', alpha: a, glow: col, glowSize: 12, track: 0.10 });
@@ -2977,6 +3826,11 @@ function drawMinimap() {
     ctx.restore();
     ctx.fillStyle = '#ff40be';
     ctx.beginPath(); ctx.arc(gx(S.boss.x), gy(S.boss.y), r, 0, TAU); ctx.fill();
+  }
+
+  if (S.tomce && !S.tomce.used) {
+    ctx.fillStyle = Math.sin(S.t * 3) > 0 ? '#a8e8ff' : 'rgba(168,232,255,0.45)';
+    ctx.fillRect(gx(S.tomce.x) - 1, gy(S.tomce.y) - 2, 2, 4);
   }
 
   // you
@@ -3097,13 +3951,38 @@ function drawTitle() {
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, 120);
 
   const flick = Math.sin(S.t * 30) > 0.93 ? 0.4 : 1;
-  htxt('MEAT PROTOCOL', W / 2, 52, '#e02630', 'center', 30,
-       { weight: '700', glow: '#8c0a14', glowSize: 26, alpha: flick, track: 0.14 });
+  /* The wordmark is the one string in the game set in the display face. A
+     melted face needs less tracking than the body face does — it is already
+     doing the work that letter-spacing was doing for Pixelify Sans.
+
+     Its size is fitted rather than fixed. 30px is right for the faces this
+     was drawn against, but a display face can be half again as wide at the
+     same nominal size, and a wordmark that runs off both edges of the screen
+     is a worse first impression than one that is a few pixels short. */
+  const disp = fontMissing().indexOf('Melted Monster') < 0;
+  const trk = disp ? 0.04 : 0.14;
+  let tsz = 30;
+  while (tsz > 14 && htxtWidth('MEAT PROTOCOL', tsz, trk, TITLE_FONT) > W - 40) tsz -= 1;
+  /* anchored on the middle of the cap box, not the baseline: two display
+     faces with different cap heights then sit at the same optical height
+     instead of one of them riding 6px low. 42 is where the old fixed-size
+     baseline-at-52 wordmark had its cap centre. */
+  htxt('MEAT PROTOCOL', W / 2, 42, '#e02630', 'center', tsz,
+       { weight: '700', glow: '#8c0a14', glowSize: 26, alpha: flick,
+         track: trk, font: TITLE_FONT, mid: true });
   htxt('a Damjan situation', W / 2, 66, '#7d6a5c', 'center', 8, { track: 0.30 });
 
-  drawSpr(ctx, bodySprite(), W / 2, 104, 2.2);
-  drawSpr(ctx, legSprite(0), W / 2, 127.1, 2.2);   // 2.2 * (16/2 + 5/2) below the body centre
-  drawSprRot(ctx, SPR.scar, W / 2 + 4, 112, 0.15, 2, 2, 3, false);
+  /* If a requested typeface is not in fonts/, say so here rather than quietly
+     rendering the fallback and letting it pass for the real thing. */
+  const missing = fontMissing();
+  if (missing.length)
+    htxt('typeface not found in fonts/ — ' + missing.join(', '), W / 2, H - 6,
+         '#6a4a4a', 'center', 6, { track: 0.12 });
+
+  // the title screen shows him before any of it happened
+  drawSpr(ctx, bodySprite(0), W / 2, 104, 2.2);
+  drawSpr(ctx, legSprite(0, 0), W / 2, 127.1, 2.2);   // 2.2 * (16/2 + 5/2) below the body centre
+  drawSprRot(ctx, SPR.pistol, W / 2 + 4, 112, 0.15, 2, 2, 3, false);
   if (cosDef(equippedCos()).fx === 'fire' && Math.random() < 0.8)
     part(W / 2 + rnd(-10, 10), 88, pick(['#ff8a20', '#ffd05a']), 1, 30, 0.5);
   for (const q of S.part) { ctx.globalAlpha = clamp(q.life / q.max, 0, 1); ctx.fillStyle = q.col; ctx.fillRect(q.x | 0, q.y | 0, q.s, q.s); }
@@ -3111,27 +3990,32 @@ function drawTitle() {
   updateParticles(1 / 60);
 
   const evoCost = EVO_COST(S.evo | 0);
+  const signed = CONTRACTS.filter(c => contractDone(c.id)).length;
   uiBtn(W / 2 - 150, 150, 96, 22, 'PLAY', '#e8b25a', () => startRun());
   uiBtn(W / 2 - 48, 150, 96, 22, 'COSMETICS', '#b558ff', () => { S.cosReturn = 'title'; S.mode = 'cos'; });
   uiBtn(W / 2 + 54, 150, 96, 22, 'EVOLVE ' + (S.evo | 0), '#ff4a54', () => evolve(), !canEvolve());
-  if (S.evo | 0)
-    uiBtn(W / 2 - 48, 176, 96, 16, 'RESET EVO', '#7fe08a', () => resetEvolution());
+  if (S.evo | 0) {
+    uiBtn(W / 2 - 100, 176, 96, 16, 'CONTRACTS', '#f0c65a', () => { S.cosReturn = 'title'; S.mode = 'contracts'; });
+    uiBtn(W / 2 + 4, 176, 96, 16, 'RESET EVO', '#7fe08a', () => resetEvolution());
+  } else {
+    uiBtn(W / 2 - 48, 176, 96, 16, 'CONTRACTS', '#f0c65a', () => { S.cosReturn = 'title'; S.mode = 'contracts'; });
+  }
 
   statRow([
     { spr: SPR.coin, v: String(S.coins), col: '#f5c518' },
     { spr: SPR.card, v: S.cards + '/' + OMEGA_CARDS, sc: 0.6, col: '#d8b8b8' },
-    { v: 'VAULT ' + S.vault, col: '#9d8a7a' },
+    { v: 'CONTRACTS ' + signed + '/' + CONTRACTS.length, col: signed ? '#ffb03a' : '#6b5a4e' },
     { v: 'EVO ' + (S.evo | 0) + ' / NEXT ' + evoCost, col: canEvolve() ? '#ff6a72' : '#6b5a4e' }
-  ], (S.evo | 0) ? 204 : 190);
+  ], 204);
 
   const sv = loadSave();
-  const y0 = (S.evo | 0) ? 218 : 206;
+  const y0 = 218;
   htxt('BEST ' + (sv.best || 0) + '   ·   DEEPEST FLOOR ' + (sv.deep || 1) +
        (sv.godFound ? '   ·   EYE' : '') + (sv.modagaz ? '   ·   MODAGAZ x' + sv.modagaz : '') +
        (sv.goro ? '   ·   GOROMANIA' : ''), W / 2, y0, '#6d5c4e', 'center', 7.5, { track: 0.12 });
   htxt('WASD move · MOUSE aim · LMB fire · RMB frag · WHEEL swap · R reload · E buy',
        W / 2, y0 + 13, '#7e6d5f', 'center', 7.5, { track: 0.06 });
-  htxt('ENTER play · C cosmetics · B armory · ESC pause · M mute',
+  htxt('ENTER play · C cosmetics · B the menu · ESC pause · M mute',
        W / 2, y0 + 23, '#6b5c50', 'center', 7.5, { track: 0.06 });
   htxt('one thing is hidden on floor 1.  one in every corner.  one behind a door that is shut.',
        W / 2, H - 8, 'rgba(126,86,86,0.55)', 'center', 7, { track: 0.10, noShadow: true });
@@ -3217,10 +4101,22 @@ function drawDead() {
     ], 128);
     const sv = loadSave();
     const evoCost = EVO_COST(S.evo | 0);
-    htxt('guns ' + S.p.owned.length + '/7  ·  items ' + Object.keys(S.items).length + '/5' +
-         (S.god ? '  ·  THE EYE' : '') + '  ·  best ' + (sv.best || 0) +
+    htxt('guns ' + S.p.owned.length + '/' + WORDER.length + '  ·  cards ' + S.cardsTaken +
+         '  ·  level ' + S.level + (S.god ? '  ·  THE EYE' : '') + '  ·  best ' + (sv.best || 0) +
          '  ·  EVO ' + (S.evo | 0) + ' / NEXT ' + evoCost,
          W / 2, 142, '#5f5044', 'center', 7, { track: 0.10 });
+
+    /* The nearest unsigned contract, so there is always one visible reason to
+       press RETRY rather than close the tab. */
+    const open = CONTRACTS.filter(c => !contractDone(c.id))
+                          .sort((a, b) => cStat(b.stat) / b.goal - cStat(a.stat) / a.goal)[0];
+    if (open) {
+      const have = Math.min(cStat(open.stat), open.goal);
+      htxt('NEXT CONTRACT  ·  ' + open.name + '  ' + have + '/' + open.goal + '  →  ' + open.u,
+           W / 2, 152, '#a8905c', 'center', 7, { track: 0.06 });
+    } else {
+      htxt('every contract signed. there is still no bottom.', W / 2, 152, '#a8905c', 'center', 7, { track: 0.06 });
+    }
 
     if (S.deadT > 1.0) {
       uiBtn(W / 2 - 150, 156, 96, 22, 'RETRY', '#e8b25a', () => startRun());
@@ -3234,162 +4130,243 @@ function drawDead() {
   crosshair();
 }
 
-function drawArmory() {
-  S.ui = []; uiWipe();
-  ctx.fillStyle = 'rgba(5,4,7,0.90)'; ctx.fillRect(0, 0, W, H);
-  const bg = ctx.createRadialGradient(W / 2, 18, 6, W / 2, 18, 200);
-  bg.addColorStop(0, 'rgba(200,150,30,0.13)'); bg.addColorStop(1, 'rgba(200,150,30,0)');
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+/* A card face, drawn the same way on the level-up hand and in THE MENU. */
+function cardFace(o, x, y, cw, ch, t, held) {
+  const c = o.c, g = GRADE[o.g], ai = AISLES[c.aisle];
+  const off = t * 3;
+  const yy = y - off;
 
-  // Title and wallet share the top line, which buys the rows 12px of height.
-  htxt('ARMORY', 30, 25, '#f0c65a', 'left', 18, { weight: '700', glow: '#6a4a10', glowSize: 16, track: 0.24 });
-  const cs = String(S.coins);
-  htxt(cs, W - 30, 25, '#f5c518', 'right', 11, { track: 0.08 });
-  drawSpr(ctx, SPR.coin, W - 34 - htxtWidth(cs, 11, 0.08) - 5, 21, 1);
+  ctx.fillStyle = 'rgba(' + Math.round(9 + t * 22) + ',' + Math.round(8 + t * 20) + ',' + Math.round(11 + t * 24) + ',0.95)';
+  ctx.fillRect(x, yy, cw, ch);
+  // the grade's own light, pooled at the top of the card
+  if (g.glow > 0) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const lg = ctx.createLinearGradient(x, yy, x, yy + ch);
+    lg.addColorStop(0, g.col); lg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = (0.05 + g.glow / 28 * 0.13) * (0.55 + t * 0.75);
+    ctx.fillStyle = lg; ctx.fillRect(x, yy, cw, ch);
+    ctx.restore();
+  }
+  // aisle colour down the left edge, grade colour across the top
+  ctx.fillStyle = ai.col; ctx.globalAlpha = 0.55 + t * 0.45;
+  ctx.fillRect(x, yy, 2, ch);
+  ctx.fillStyle = g.col; ctx.globalAlpha = 0.7 + t * 0.3;
+  ctx.fillRect(x, yy, cw, 2);
+  ctx.globalAlpha = 0.20 + t * 0.5;
+  ctx.fillRect(x, yy + ch - 1, cw, 1); ctx.fillRect(x + cw - 1, yy, 1, ch);
+  ctx.globalAlpha = 1;
 
-  /* What a track actually does used to be crushed into 6px type inside the
-     box, underneath the rank pips. It lives in the footer now, where there is
-     room to show the rank you are buying and what it gets you. */
-  let footer = null;
+  htxt(g.n, x + cw / 2, yy + 12, g.col, 'center', 6.5,
+       { track: 0.30, glow: o.g >= 2 ? g.col : null, glowSize: g.glow * 0.5 });
 
-  const owned = S.p.owned;
-  owned.forEach((id, i) => {
-    const w = WEP[id], u = wup(id);
-    const y = 40 + i * 28, rh = 22;
-    ctx.fillStyle = 'rgba(13,10,14,0.78)'; ctx.fillRect(16, y, W - 32, rh);
-    ctx.fillStyle = w.col; ctx.globalAlpha = 0.75; ctx.fillRect(16, y, 2, rh); ctx.globalAlpha = 1;
-    drawSpr(ctx, w.spr, 34, y + 11, 0.95, false, 1, id === 'scar' && S.scarLv > 1 ? scarCol() : null);
-    htxt(id === 'scar' ? scarName() : w.name, 52, y + 10,
-         id === 'scar' ? scarCol() : w.col, 'left', 8.5, { track: 0.06 });
-    htxt(w.beam ? 'beam' : Math.round(1 / (w.rate * (1 - u.rate * 0.10))) + '/s  ·  ' +
-         (u.split ? (u.split * 2 + 1) + '-way' : '1-way'), 52, y + 19, 'rgba(140,122,108,0.9)', 'left', 6.5,
-         { track: 0.03, noShadow: true });
+  if (c.sig) drawSpr(ctx, ITEMS[c.sig].spr, x + cw / 2, yy + 28, 1.5);
+  const nm = cardName(c);
+  const nsz = nm.length > 14 ? 9 : nm.length > 10 ? 10.5 : 12;
+  htxt(nm, x + cw / 2, yy + (c.sig ? 48 : 38), t > 0.4 ? '#ffffff' : ai.col, 'center', nsz,
+       { weight: '700', glow: t > 0.15 ? ai.col : null, glowSize: 15 * t, track: 0.06 });
 
-    /* The OMEGA BEAM sits in the list so you can see it, but it takes no
-       upgrades — it is already the ceiling. */
-    if (!wupgradable(id)) {
-      const bx = 154, bw = 100 * 3 + 8;
-      ctx.fillStyle = 'rgba(18,12,22,0.9)'; ctx.fillRect(bx, y, bw, rh);
-      ctx.fillStyle = w.col; ctx.globalAlpha = 0.30;
-      ctx.fillRect(bx, y, bw, 1); ctx.fillRect(bx, y + rh - 1, bw, 1);
-      ctx.globalAlpha = 1;
-      htxt('CANNOT BE IMPROVED', bx + bw / 2, y + 14, 'rgba(150,110,190,0.9)', 'center', 9, { track: 0.24 });
-      return;
-    }
+  const ey = yy + (c.sig ? 60 : 52);
+  const lines = wrapped(cardLine(c, o.val), x + cw / 2, ey, cw - 14, '#a89a8c', 7.5);
 
-    WTRACKS.forEach((tr, j) => {
-      const bx = 154 + j * 104, bw = 100, bh = rh, by = y;
-      const rank = u[tr.id] | 0;
-      const maxed = rank >= tr.max;
-      const cost = wupCost(id, tr.id, rank);
-      const afford = S.coins >= cost;
-      const over = mouse.x > bx && mouse.x < bx + bw && mouse.y > by && mouse.y < by + bh;
-      const canBuy = !maxed && afford;
-      const key = 'arm' + id + tr.id;
-      hoverT[key] = clamp((hoverT[key] || 0) + (over && canBuy ? 0.22 : -0.18), 0, 1);
-      const t = hoverT[key];
+  const rank = dkr(c.id);
+  /* What you already hold, printed under what this pick adds. It wraps too — a
+     fully stacked RAW NERVE is a long sentence. */
+  if (held && rank && !c.sig)
+    wrapped('held: ' + cardLine(c, dk(c.id)), x + cw / 2, ey + lines * 9 + 4, cw - 12,
+            'rgba(176,158,138,0.8)', 6.5);
 
-      if (over) {
-        footer = maxed
-          ? tr.name + '  ·  rank ' + rank + '/' + tr.max + '  ·  ' + tr.d(rank) + '  ·  fully upgraded'
-          : tr.name + '  ·  rank ' + rank + '/' + tr.max + '  ·  ' + tr.d(rank) + '   →   ' +
-            tr.d(rank + 1) + '  ·  ' + cost + (afford ? ' coins' : ' coins (short ' + (cost - S.coins) + ')');
-      }
+  htxt(ai.n, x + cw / 2, yy + ch - 16, 'rgba(150,136,124,0.7)', 'center', 6, { track: 0.24, noShadow: true });
+  for (let j = 0; j < c.max; j++) {
+    ctx.fillStyle = j < rank ? ai.col : 'rgba(255,255,255,0.16)';
+    ctx.fillRect(x + cw / 2 - c.max * 3 + j * 6, yy + ch - 10, 4, 3);
+  }
+}
 
-      ctx.fillStyle = maxed ? 'rgba(26,24,19,0.92)' : 'rgba(' + Math.round(11 + t * 42) + ',10,13,0.92)';
-      ctx.fillRect(bx, by, bw, bh);
-      ctx.fillStyle = maxed ? 'rgba(150,138,100,0.55)' : tr.col;
-      ctx.globalAlpha = maxed ? 0.55 : (afford ? 0.45 + t * 0.55 : 0.22);
-      ctx.fillRect(bx, by, bw, 1); ctx.fillRect(bx, by + bh - 1, bw, 1);
-      ctx.globalAlpha = 1;
-
-      htxt(tr.name, bx + 6, by + 9, maxed ? '#a89a72' : afford ? (t > 0.4 ? '#fff' : tr.col) : '#8a6a64',
-           'left', 8, { track: 0.10, glow: t > 0.2 ? tr.col : null, glowSize: 10 * t });
-      if (maxed) htxt('MAX', bx + bw - 6, by + 9, '#a89a72', 'right', 7.5, { track: 0.10 });
-      else {
-        htxt(String(cost), bx + bw - 6, by + 9, afford ? '#f5c518' : '#96605e', 'right', 8, { track: 0.06 });
-        drawSpr(ctx, SPR.coin, bx + bw - 10 - htxtWidth(String(cost), 8, 0.06) - 3, by + 6, 0.62);
-      }
-
-      /* Pips get their own line and enough contrast to read: filled ones carry
-         the track colour with a lit top edge, empty ones are outlined sockets
-         rather than a smudge that disappears into the panel. */
-      const PW = 8, PH = 5, PITCH = 11;
-      for (let k = 0; k < tr.max; k++) {
-        const px = bx + 6 + k * PITCH, py = by + 13;
-        if (k < rank) {
-          ctx.fillStyle = tr.col; ctx.fillRect(px, py, PW, PH);
-          ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.fillRect(px, py, PW, 1);
-        } else {
-          ctx.fillStyle = 'rgba(0,0,0,0.55)'; ctx.fillRect(px, py, PW, PH);
-          ctx.fillStyle = 'rgba(255,255,255,0.22)';
-          ctx.fillRect(px, py, PW, 1); ctx.fillRect(px, py + PH - 1, PW, 1);
-          ctx.fillRect(px, py, 1, PH); ctx.fillRect(px + PW - 1, py, 1, PH);
-        }
-      }
-      htxt(rank + '/' + tr.max, bx + bw - 6, by + 18, maxed ? '#a89a72' : 'rgba(160,146,132,0.9)',
-           'right', 7, { track: 0.06, noShadow: true });
-
-      if (!maxed) S.ui.push({ x: bx, y: by, w: bw, h: bh, fn: () => {
-        if (S.coins < cost) { A.denied(); return; }
-        S.coins -= cost; u[tr.id] = rank + 1;
-        persist(); A.buy();
-        S.flash = 0.3; S.flashCol = tr.col;
-      } });
-    });
-  });
-
-  htxt(footer || 'CYCLE fire rate  ·  SPLIT one flat ' + SPLIT_COST + '-coin fan  ·  POWER damage  —  bought with run coins, kept for the run',
-       W / 2, H - 30, footer ? '#e2cba2' : 'rgba(126,112,100,0.8)', 'center', 7.5, { track: 0.08 });
-  uiBtn(W / 2 - 48, H - 22, 96, 17, 'BACK', '#e8b25a', () => { S.mode = 'pause'; });
-  crosshair();
+/* Two lines, centred, broken on a space. Card copy is short but not that short. */
+function wrapped(str, cx, y, maxw, col, size) {
+  const words = String(str).split(' ');
+  let line = '', out = [];
+  for (const wd of words) {
+    const t = line ? line + ' ' + wd : wd;
+    if (htxtWidth(t, size, 0.03) > maxw && line) { out.push(line); line = wd; } else line = t;
+  }
+  if (line) out.push(line);
+  out = out.slice(0, 3);
+  out.forEach((l, i) => htxt(l, cx, y + i * 9, col, 'center', size, { track: 0.03, noShadow: true }));
+  return out.length;
 }
 
 function drawLevelUp() {
   S.ui = []; uiWipe();
-  ctx.fillStyle = 'rgba(4,6,4,0.86)'; ctx.fillRect(0, 0, W, H);
-  const bg = ctx.createRadialGradient(W / 2, H / 2, 6, W / 2, H / 2, 190);
-  bg.addColorStop(0, 'rgba(30,140,60,0.18)'); bg.addColorStop(1, 'rgba(30,140,60,0)');
+  ctx.fillStyle = 'rgba(4,3,6,0.90)'; ctx.fillRect(0, 0, W, H);
+  const bg = ctx.createRadialGradient(W / 2, H / 2, 6, W / 2, H / 2, 200);
+  bg.addColorStop(0, 'rgba(120,40,150,0.15)'); bg.addColorStop(1, 'rgba(120,40,150,0)');
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
-  htxt('LEVEL ' + S.level, W / 2, 48, '#9fe08a', 'center', 26,
-       { weight: '700', glow: '#2e7a38', glowSize: 22, track: 0.18 });
-  htxt(S.upgPts > 1 ? S.upgPts + ' POINTS TO SPEND' : 'CHOOSE ONE', W / 2, 64, '#7d8f78', 'center', 8.5, { track: 0.26 });
+  htxt('THE MENU', W / 2, 34, '#e8d2a4', 'center', 24,
+       { weight: '700', glow: '#5a2a6a', glowSize: 20, track: 0.20 });
+  htxt('LEVEL ' + S.level + (S.upgPts > 1 ? '  ·  ' + S.upgPts + ' PICKS LEFT' : '  ·  TAKE ONE'),
+       W / 2, 48, '#8d7f92', 'center', 8, { track: 0.24 });
 
-  const CW = 116, CH = 92, gap = 12;
-  const x0 = W / 2 - (CW * 3 + gap * 2) / 2;
-  (S.lvlChoices || UPGRADES).forEach((u, i) => {
-    const x = x0 + i * (CW + gap), y = 86;
-    const hot = mouse.x > x && mouse.x < x + CW && mouse.y > y && mouse.y < y + CH;
-    const k = 'lvl' + u.id;
+  const hand = S.hand || [];
+  const CW = hand.length > 3 ? 104 : 116, gap = 10, CH = 118;
+  const x0 = W / 2 - (CW * hand.length + gap * (hand.length - 1)) / 2;
+  hand.forEach((o, i) => {
+    const x = x0 + i * (CW + gap), y = 62;
+    const hot = mouse.x > x && mouse.x < x + CW && mouse.y > y - 4 && mouse.y < y + CH;
+    const k = 'card' + i + o.c.id;
     hoverT[k] = clamp((hoverT[k] || 0) + (hot ? 0.22 : -0.18), 0, 1);
-    const t = hoverT[k], off = t * 3;
-
-    ctx.fillStyle = 'rgba(' + Math.round(10 + t * 26) + ',' + Math.round(12 + t * 30) + ',' + Math.round(11 + t * 22) + ',0.94)';
-    ctx.fillRect(x, y - off, CW, CH);
-    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = t * 0.14;
-    ctx.fillStyle = u.col; ctx.fillRect(x, y - off, CW, CH); ctx.restore();
-    ctx.fillStyle = u.col;
-    ctx.globalAlpha = 0.5 + t * 0.5;
-    ctx.fillRect(x, y - off, CW, 2);
-    ctx.globalAlpha = 0.22 + t * 0.7;
-    ctx.fillRect(x, y + CH - 1 - off, CW, 1);
-    ctx.fillRect(x, y - off, 1, CH); ctx.fillRect(x + CW - 1, y - off, 1, CH);
-    ctx.globalAlpha = 1;
-
-    const lvl = S.upg[u.id] | 0;
-    htxt(u.name, x + CW / 2, y + 26 - off, t > 0.4 ? '#ffffff' : u.col, 'center', 13,
-         { weight: '700', glow: t > 0.15 ? u.col : null, glowSize: 16 * t, track: 0.10 });
-    htxt(u.d, x + CW / 2, y + 44 - off, '#9a8f84', 'center', 8, { track: 0.04 });
-    htxt('RANK ' + lvl, x + CW / 2, y + 66 - off, lvl ? u.col : '#4f4a44', 'center', 9, { track: 0.16 });
-    for (let j = 0; j < Math.min(lvl, 10); j++) {
-      ctx.fillStyle = u.col;
-      ctx.fillRect(x + CW / 2 - Math.min(lvl, 10) * 3 + j * 6, y + 74 - off, 4, 3);
-    }
-    S.ui.push({ x, y, w: CW, h: CH, fn: () => takeUpgrade(u.id) });
+    cardFace(o, x, y, CW, CH, hoverT[k], true);
+    S.ui.push({ x, y: y - 4, w: CW, h: CH, fn: () => takeCard(o) });
   });
 
-  htxt('kills feed the meter. it does not stop climbing.', W / 2, H - 16, 'rgba(120,132,116,0.6)', 'center', 7.5, { track: 0.14 });
+  /* Rerolling is the only thing coins do during a fight, which keeps them
+     worth picking up between shops. */
+  const rc = rerollCost(), can = S.coins >= rc;
+  uiBtn(W / 2 - 66, H - 32, 132, 18, 'REROLL  ' + rc, can ? '#f5c518' : '#6b5a4e', () => rerollHand(), !can);
+  htxt('LUCK ' + (Math.round((S.luck + S.lvlLuck) * 10) / 10) + '   ·   ' + S.coins + ' coins   ·   ' +
+       'SELECT → CHOICE → PRIME → BLACK LABEL',
+       W / 2, H - 8, 'rgba(126,114,124,0.7)', 'center', 7, { track: 0.10, noShadow: true });
+  crosshair();
+}
+
+/* THE MENU, read-only: everything the run has picked up so far. */
+function drawDeck() {
+  S.ui = []; uiWipe();
+  ctx.fillStyle = 'rgba(5,4,7,0.92)'; ctx.fillRect(0, 0, W, H);
+  const bg = ctx.createRadialGradient(W / 2, 16, 6, W / 2, 16, 200);
+  bg.addColorStop(0, 'rgba(120,40,150,0.13)'); bg.addColorStop(1, 'rgba(120,40,150,0)');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  htxt('THE MENU', 22, 22, '#e8d2a4', 'left', 17, { weight: '700', glow: '#5a2a6a', glowSize: 14, track: 0.22 });
+  htxt('LEVEL ' + S.level + '  ·  ' + S.cardsTaken + ' cards  ·  LUCK ' + (Math.round(S.luck * 10) / 10),
+       W - 22, 22, '#9d8a7a', 'right', 8, { track: 0.10 });
+
+  /* Two columns of aisles, each aisle a heading and its cards under it. */
+  let col = 0, y = 38;
+  const colX = [22, 250], colW = 208;
+  for (const key of AISLE_ORDER) {
+    const held = CARDS.filter(c => c.aisle === key && dkr(c.id) > 0);
+    if (!held.length) continue;
+    const need = 11 + held.length * 11;
+    if (y + need > H - 24 && col === 0) { col = 1; y = 38; }
+    const ai = AISLES[key], x = colX[col];
+    htxt(ai.n, x, y, ai.col, 'left', 8, { track: 0.26 });
+    const lw = htxtWidth(ai.n, 8, 0.26);
+    ctx.fillStyle = ai.col; ctx.globalAlpha = 0.22;
+    ctx.fillRect(x + lw + 6, y - 3, colW - lw - 6, 1);
+    ctx.globalAlpha = 1;
+    y += 11;
+    for (const c of held) {
+      const d = S.deck[c.id];
+      if (c.sig) drawSpr(ctx, ITEMS[c.sig].spr, x + 6, y - 2, 0.8);
+      htxt(cardName(c), x + (c.sig ? 15 : 4), y + 1, GRADE[d.g | 0].col, 'left', 7.5, { track: 0.04 });
+      htxt(cardLine(c, d.amt), x + colW - 2, y + 1, 'rgba(150,134,120,0.9)', 'right', 6.5,
+           { track: 0.02, noShadow: true });
+      y += 11;
+    }
+    y += 5;
+  }
+  if (!S.cardsTaken) htxt('nothing yet. go and level up.', 22, 52, '#5f5044', 'left', 8);
+
+  uiBtn(W / 2 - 48, H - 20, 96, 16, 'BACK', '#e8b25a', () => { S.mode = 'pause'; });
+  crosshair();
+}
+
+/* TOMCE's offer. Not a card screen — every row is a trade, and the cost is
+   printed as loudly as the benefit. */
+function drawAugments() {
+  S.ui = []; uiWipe();
+  ctx.fillStyle = 'rgba(3,6,8,0.92)'; ctx.fillRect(0, 0, W, H);
+  const bg = ctx.createRadialGradient(W / 2, H / 2, 6, W / 2, H / 2, 210);
+  bg.addColorStop(0, 'rgba(30,110,150,0.16)'); bg.addColorStop(1, 'rgba(30,110,150,0)');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  drawSpr(ctx, Math.sin(S.t * 0.7) > 0 ? SPR.tomce2 : SPR.tomce, 40, H / 2 - 4, 2.3, false, 0.85);
+  htxt('TOMCE', W / 2 + 18, 30, '#a8e8ff', 'center', 20,
+       { weight: '700', glow: '#14506a', glowSize: 18, track: 0.26 });
+  htxt('"i can do something about that. it will cost you something else."',
+       W / 2 + 18, 44, '#6f8894', 'center', 7.5, { track: 0.08 });
+
+  const offer = S.augOffer || [];
+  const CW = 118, gap = 9, CH = 104, y = 58;
+  const x0 = W / 2 + 18 - (CW * offer.length + gap * (offer.length - 1)) / 2;
+  offer.forEach((a, i) => {
+    const x = x0 + i * (CW + gap);
+    const hot = mouse.x > x && mouse.x < x + CW && mouse.y > y && mouse.y < y + CH;
+    const k = 'aug' + a.id;
+    hoverT[k] = clamp((hoverT[k] || 0) + (hot ? 0.22 : -0.18), 0, 1);
+    const t = hoverT[k], off = t * 3, yy = y - off;
+    const rank = ag(a.id) + 1;
+
+    ctx.fillStyle = 'rgba(' + Math.round(8 + t * 16) + ',' + Math.round(11 + t * 24) + ',' + Math.round(14 + t * 30) + ',0.95)';
+    ctx.fillRect(x, yy, CW, CH);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = t * 0.13;
+    ctx.fillStyle = '#a8e8ff'; ctx.fillRect(x, yy, CW, CH); ctx.restore();
+    ctx.fillStyle = '#a8e8ff'; ctx.globalAlpha = 0.6 + t * 0.4;
+    ctx.fillRect(x, yy, CW, 2);
+    ctx.globalAlpha = 0.18 + t * 0.5;
+    ctx.fillRect(x, yy + CH - 1, CW, 1); ctx.fillRect(x, yy, 1, CH); ctx.fillRect(x + CW - 1, yy, 1, CH);
+    ctx.globalAlpha = 1;
+
+    htxt(a.name, x + CW / 2, yy + 16, t > 0.4 ? '#ffffff' : '#a8e8ff', 'center',
+         a.name.length > 11 ? 10 : 12, { weight: '700', glow: t > 0.15 ? '#a8e8ff' : null, glowSize: 14 * t, track: 0.06 });
+    if (a.max > 1) htxt('STAGE ' + rank + '/' + a.max, x + CW / 2, yy + 25, 'rgba(130,150,160,0.8)', 'center', 6, { track: 0.20, noShadow: true });
+
+    // the good half, then a rule, then the bill
+    const uy = yy + 38;
+    htxt('GAIN', x + 8, uy, '#7fe08a', 'left', 6.5, { track: 0.22, noShadow: true });
+    const un = wrapped(a.up(rank), x + CW / 2, uy + 11, CW - 14, '#9fe08a', 8);
+    const ry = uy + 11 + un * 9 + 3;
+    ctx.fillStyle = 'rgba(168,232,255,0.20)'; ctx.fillRect(x + 10, ry, CW - 20, 1);
+    htxt('COST', x + 8, ry + 12, '#ff6a72', 'left', 6.5, { track: 0.22, noShadow: true });
+    wrapped(a.dn(rank), x + CW / 2, ry + 23, CW - 14, '#ff8a90', 8);
+
+    S.ui.push({ x, y, w: CW, h: CH, fn: () => takeAugment(a) });
+  });
+
+  uiBtn(W / 2 + 18 - 54, H - 26, 108, 17, 'WALK AWAY', '#8b7a68', () => refuseAugments());
+  htxt('he only offers once a floor.', W / 2 + 18, H - 6, 'rgba(110,132,142,0.65)', 'center', 7,
+       { track: 0.10, noShadow: true });
+  crosshair();
+}
+
+/* The contracts board. Persistent, cross-run, and the only thing in the game
+   that hands out permanent rules rather than permanent numbers. */
+function drawContracts() {
+  S.ui = [];
+  ctx.fillStyle = '#0a0610'; ctx.fillRect(0, 0, W, H);
+  const bg = ctx.createRadialGradient(W / 2, 18, 4, W / 2, 18, 190);
+  bg.addColorStop(0, 'rgba(200,140,20,0.15)'); bg.addColorStop(1, 'rgba(200,140,20,0)');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  const done = CONTRACTS.filter(c => contractDone(c.id)).length;
+  htxt('CONTRACTS', W / 2, 22, '#f0c65a', 'center', 18, { weight: '700', glow: '#6a4a10', glowSize: 16, track: 0.22 });
+  htxt(done + ' / ' + CONTRACTS.length + ' SIGNED', W / 2, 34, '#8b7a68', 'center', 7.5, { track: 0.26 });
+
+  CONTRACTS.forEach((c, i) => {
+    const x = 20, y = 42 + i * 21, w = W - 40, h = 19;
+    const have = cStat(c.stat), ok = have >= c.goal;
+    const f = clamp(have / c.goal, 0, 1);
+    ctx.fillStyle = ok ? 'rgba(28,22,10,0.9)' : 'rgba(12,10,14,0.85)';
+    ctx.fillRect(x, y, w, h);
+    // progress reads as a fill behind the text, not a separate bar
+    ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = ok ? 0.10 : 0.07;
+    ctx.fillStyle = ok ? '#ffb03a' : '#7fd0ff'; ctx.fillRect(x, y, w * f, h); ctx.restore();
+    ctx.fillStyle = ok ? '#ffb03a' : 'rgba(120,100,90,0.7)';
+    ctx.fillRect(x, y, 2, h);
+    ctx.globalAlpha = 0.25; ctx.fillRect(x, y + h - 1, w, 1); ctx.globalAlpha = 1;
+
+    htxt(c.name, x + 8, y + 9, ok ? '#ffd070' : '#c0ac96', 'left', 8.5, { track: 0.10 });
+    htxt(c.d, x + 8, y + 17, 'rgba(140,124,112,0.85)', 'left', 6.5, { track: 0.02, noShadow: true });
+    htxt(ok ? 'SIGNED' : Math.min(have, c.goal) + ' / ' + c.goal, x + w - 8, y + 9,
+         ok ? '#ffb03a' : '#8b7a68', 'right', 8, { track: 0.08 });
+    htxt(c.u, x + w - 8, y + 17, ok ? 'rgba(180,200,150,0.9)' : 'rgba(110,96,86,0.8)', 'right', 6.5,
+         { track: 0.02, noShadow: true });
+  });
+
+  uiBtn(W / 2 - 48, H - 20, 96, 16, 'BACK', '#e8b25a', () => { S.mode = S.cosReturn || 'title'; });
+  post();
   crosshair();
 }
 
@@ -3413,14 +4390,14 @@ function drawPause() {
   /* Buttons live in a centred row under the title. Cornering them put the wide
      ones straight through PAUSED, and the keyboard hints they used to sit
      beside are on the title screen where you actually read them. */
-  const btns = [['ARMORY', '#f0c65a', () => { S.mode = 'armory'; }],
+  const btns = [['THE MENU', '#f0c65a', () => { S.mode = 'deck'; }],
                 ['COSMETICS', '#b558ff', () => { S.cosReturn = 'pause'; S.mode = 'cos'; }]];
   if (S.evo | 0) btns.push(['RESET EVO', '#7fe08a', () => resetEvolution()]);
   const bw = 96, gap = 8, rowW = btns.length * bw + (btns.length - 1) * gap;
   btns.forEach((b, i) => uiBtn(W / 2 - rowW / 2 + i * (bw + gap), 40, bw, 18, b[0], b[1], b[2]));
 
   let y = 76;
-  sectionRule('GROCERIES', y);
+  sectionRule('SIGNATURE CARDS', y);
   y += 13;
   let any = false;
   for (const k of ['banana', 'melon', 'coolade', 'glock', 'bike']) {
@@ -3433,7 +4410,7 @@ function drawPause() {
     y += 12;
   }
   if (S.god) { drawSpr(ctx, SPR.eye, 38, y - 2, 0.8); htxt('THE THIRD EYE — you cannot die', 50, y + 1, '#ff5b5b', 'left', 8); y += 12; any = true; }
-  if (!any) { htxt('empty. go kill something with a name.', 38, y + 1, '#5f5044', 'left', 7.5); y += 12; }
+  if (!any) { htxt('none yet. they are the rarest cards in the deck.', 38, y + 1, '#5f5044', 'left', 7.5); y += 12; }
 
   /* Arsenal in two columns: seven guns stacked in one column ran into the
      footer once you owned them all. */
@@ -3445,8 +4422,8 @@ function drawPause() {
     const w = WEP[id], has = S.p.owned.indexOf(id) >= 0;
     const cx = colX[Math.floor(i / half)], ry = y + (i % half) * 12;
     drawSpr(ctx, w.spr, cx + 12, ry - 1, 0.9, false, has ? 1 : 0.22);
-    htxt(id === 'scar' ? scarName() : w.name, cx + 28, ry + 2,
-         has ? (id === 'scar' ? scarCol() : w.col) : '#4a3f36', 'left', 8, { track: 0.06 });
+    htxt(w.evolve ? scarName() : w.name, cx + 28, ry + 2,
+         has ? (w.evolve ? scarCol() : GRADE[w.gr].col) : '#4a3f36', 'left', 8, { track: 0.06 });
     htxt(has ? 'OWNED' : (w.cards ? w.cards + ' cards' : w.price + ' coins'),
          cx + colW - 4, ry + 2, has ? 'rgba(126,150,112,0.85)' : '#6b5a4e', 'right', 7,
          { track: 0.04, noShadow: true });
@@ -3484,21 +4461,23 @@ function frame(now) {
 
   update(dt);
 
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.setTransform(RS, 0, 0, RS, 0, 0);
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
   octx.clearRect(0, 0, ov.width, ov.height);
 
   if (S.mode === 'title') drawTitle();
   else if (S.mode === 'cos') drawCosmetics();
+  else if (S.mode === 'contracts') drawContracts();
   else {
     drawWorld();
     drawLight();
     post();
     drawHUD();
     if (S.mode === 'pause') drawPause();
-    if (S.mode === 'armory') drawArmory();
+    if (S.mode === 'deck') drawDeck();
     if (S.mode === 'levelup') drawLevelUp();
+    if (S.mode === 'augment') drawAugments();
     if (S.mode === 'dead') drawDead();
   }
 
@@ -3509,7 +4488,10 @@ function frame(now) {
 /* ---------- presentation: never render below 200% ---------- */
 function fitCanvas() {
   const sx = window.innerWidth / W, sy = window.innerHeight / H;
-  const scale = Math.max(2, Math.floor(Math.min(sx, sy)));   // 200% floor, integer steps
+  /* Steps of RS, not of 1: the backing store is already RS times the logical
+     grid, so only multiples of RS land one render pixel on a whole number of
+     screen pixels. Anything else reintroduces the shimmer this was fixing. */
+  const scale = Math.max(RS, Math.floor(Math.min(sx, sy) / RS) * RS);
   const cssW = W * scale, cssH = H * scale;
   cv.style.width = cssW + 'px';
   cv.style.height = cssH + 'px';
@@ -3545,9 +4527,14 @@ requestAnimationFrame(frame);
 window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantItem, grantGod, breakSecret,
                 giveWeapon, explode, triggerModagaz, triggerGoromania,
                 evolve, resetEvolution, canEvolve, EVO_COST, OMEGA_CARDS,
-                gainXP, openLevelUp, takeUpgrade, UPGRADES, scarName, scarCol, ST,
+                gainXP, openLevelUp, takeCard, dealCards, rerollHand, scarName, scarCol, ST,
                 ITEMS, BOSSES, WEP, WORDER, COSMETICS, frame, nextRoom,
-                enterShop, exitShop, shopStock, roomDef, curRoom, buildRoom,
-                wup, wupCost, wupgradable, WTRACKS, SPLIT_COST, SHOP_EVERY, diff, killEnemy };
+                enterShop, exitShop, shopStock, shopSlots, roomDef, curRoom, buildRoom,
+                CARDS, CARD_BY_ID, AISLES, GRADE, rollGrade, cardVal, dk, dkr, recalcLuck,
+                CONTRACTS, cStat, bump, bumpMax, contractDone, checkContracts,
+                AUGMENTS, ag, dealAugments, openAugments, takeAugment, refuseAugments,
+                spawnMini, MINIS, BOSS_WAVE, MINI_WAVES, isApexFloor, bossIndexFor,
+                magCap, fireNova, SHOP_EVERY, diff, killEnemy, damageEnemy,
+                angerPaci, hurtStage, bodySprite, legSprite, shred, hurtPlayer, RS };
 
 })();
