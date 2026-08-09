@@ -45,15 +45,24 @@ const _l = subCanvas(W, H), lcan = _l.can, lctx = _l.ctx;
    letterforms, the legibility comes from rasterising them at device
    resolution instead of at 480x270 and upscaling. */
 const UI_FONT = GAME_FONT;
+/* OPTICAL SIZE NORMALISATION.
+   A size passed to htxt means "capitals this many game units tall", not "this
+   em size" — em sizes lie. The layout was tuned against a face whose caps
+   were 0.63 of the em; a face with smaller caps (VT323 sits at ~0.56) would
+   render every label visibly smaller at the same px, so the px is scaled by
+   the measured ratio instead. Swap the font file and every string in the
+   game keeps its optical size without a single call site changing. */
+const OPT_CAP = 0.63;
+function fontNorm(fnt) { return clamp(OPT_CAP / capRatio(fnt), 0.8, 1.45); }
 function htxt(s, x, y, col, align, size, opts) {
   const o = opts || {}, k = uiScale, sz = size || 9;
   const fnt = o.font || UI_FONT;
+  const norm = fontNorm(fnt);
   // o.mid: treat y as the vertical centre of the cap box rather than the
   // baseline. Canvas' own 'middle' baseline sits low because it splits the em
   // box including descenders; centring on caps is what reads as centred.
-  // The ratio is measured off whichever face this string is set in, so the
-  // display face and the body face both land where they are asked to.
-  const by = o.mid ? y + sz * capRatio(fnt) / 2 : y;
+  // With the size normalised, the rendered cap height IS sz * OPT_CAP.
+  const by = o.mid ? y + sz * OPT_CAP / 2 : y;
   // Canvas puts letter-spacing after the final glyph as well, so the measured
   // run is one gap wider than the ink and centred text lands half a gap left.
   // Give it back, or every centred label sits fractionally off.
@@ -61,7 +70,11 @@ function htxt(s, x, y, col, align, size, opts) {
   const al = align || 'left';
   if (al === 'center') x += trk / 2; else if (al === 'right') x += trk;
   octx.save();
-  octx.font = (o.weight || '600') + ' ' + (sz * k) + 'px ' + fnt;
+  /* Default weight 400: the embedded face has one weight, and asking canvas
+     for 600 makes it synthesize a bold that smears a monoline pixel font.
+     Titles that explicitly pass 700 still get the synthetic bold — at title
+     sizes it reads as "thicker", which is what a title wants. */
+  octx.font = (o.weight || '400') + ' ' + (sz * norm * k) + 'px ' + fnt;
   octx.textAlign = al;
   octx.textBaseline = 'alphabetic';
   if (octx.letterSpacing !== undefined) octx.letterSpacing = (trk * k) + 'px';
@@ -76,9 +89,9 @@ function htxt(s, x, y, col, align, size, opts) {
   octx.restore();
 }
 function htxtWidth(s, size, track, font) {
-  const k = uiScale;
+  const k = uiScale, fnt = font || UI_FONT;
   octx.save();
-  octx.font = '600 ' + ((size || 9) * k) + 'px ' + (font || UI_FONT);
+  octx.font = '400 ' + ((size || 9) * fontNorm(fnt) * k) + 'px ' + fnt;
   if (octx.letterSpacing !== undefined) octx.letterSpacing = ((track === undefined ? 0.04 : track) * (size || 9) * k) + 'px';
   const w = octx.measureText(s).width / k;
   octx.restore();
@@ -215,7 +228,17 @@ const ETYPE = {
   crawler:  { bank: SPR.anim.crawler,  hp: 26,  spd: 54, dmg: 16, r: 6, score: 10, gib: '#8b6161', name: 'CRAWLER' },
   shrieker: { bank: SPR.anim.shrieker, hp: 38,  spd: 33, dmg: 20, r: 6, score: 20, gib: '#6b8a52', name: 'SHRIEKER' },
   stalker:  { bank: SPR.anim.stalker,  hp: 32,  spd: 84, dmg: 23, r: 6, score: 26, gib: '#9a927e', name: 'STALKER' },
-  bloater:  { bank: SPR.anim.bloater,  hp: 105, spd: 25, dmg: 32, r: 9, score: 40, gib: '#9c4049', name: 'BLOATER' }
+  bloater:  { bank: SPR.anim.bloater,  hp: 105, spd: 25, dmg: 32, r: 9, score: 40, gib: '#9c4049', name: 'BLOATER' },
+  /* The two late arrivals answer the two degenerate strategies. Every launch
+     enemy either chases or shoots, so spray-and-pray AoE and circle-kiting
+     both won for free. The HUSK is a dried-out bloater that is FULL OF THEM —
+     kill it carelessly and you have two more problems. The CYST does not come
+     to you at all: it sits where it landed and hatches, and either you cross
+     the room to burst it or the wave never thins. */
+  husk:     { bank: SPR.anim.bloater,  hp: 62,  spd: 36, dmg: 22, r: 8, score: 30, gib: '#b8b0a0', name: 'HUSK',
+              tint: 'rgba(216,210,196,0.45)', scale: 0.85, split: 2 },
+  cyst:     { bank: SPR.anim.bloater,  hp: 170, spd: 0,  dmg: 18, r: 10, score: 55, gib: '#8fae4a', name: 'CYST',
+              tint: 'rgba(150,210,70,0.42)', scale: 1.12, nest: 1 }
 };
 const CONTACT_CD = 0.74;   // still a shorter fuse than the 0.78 it used to be
 const OMEGA_CARDS = 50;    // the beam is the long game now
@@ -245,7 +268,9 @@ const MINIS = [
   { key: 'crawler',  name: 'THE FIRSTBORN',   col: '#ff8a6a', tint: 'rgba(255,110,70,0.42)' },
   { key: 'shrieker', name: 'THE CHOIRMASTER', col: '#a8ff6a', tint: 'rgba(150,255,90,0.42)' },
   { key: 'stalker',  name: 'THE LONG WALK',   col: '#e8e0c0', tint: 'rgba(240,230,200,0.38)' },
-  { key: 'bloater',  name: 'THE SPOILAGE',    col: '#ff6a8a', tint: 'rgba(255,90,120,0.42)' }
+  { key: 'bloater',  name: 'THE SPOILAGE',    col: '#ff6a8a', tint: 'rgba(255,90,120,0.42)' },
+  { key: 'husk',     name: 'THE HOLLOW MAN',  col: '#d8d0c0', tint: 'rgba(235,228,212,0.45)' },
+  { key: 'cyst',     name: 'THE BROODMOTHER', col: '#a8e04a', tint: 'rgba(160,225,70,0.5)' }
 ];
 
 const ITEMS = {
@@ -504,9 +529,11 @@ function ST() {
     pool: dkc('render'),
     frostEvery: dkr('frost') ? Math.max(5, 11 - dkc('frost') * 3) : 0,
     marrow: dkc('marrow') / 100,
-    /* The bleed is BLOOD DEBT's price and is charged at every grade. PAID
-       FORWARD is the rider on top of it, and it is the refund. */
-    bleed: dkr('debtcard') ? 1 : 0,
+    /* The bleed is BLOOD DEBT's price and it scales with the rank, because a
+       flat 1/s was cancelled outright by a single REGROWTH pick — at which
+       point the card was +20% damage for nothing and the whole aisle's
+       "worth it" premise fell over. PAID FORWARD is the refund, not a waiver. */
+    bleed: dkr('debtcard'),
     payback: rd('debtcard') ? 3 : 0,
     /* ---- TOMCE's side of the ledger ---- */
     xpMul: Math.max(0.3, (1 + dkc('ripe') / 100)
@@ -637,7 +664,7 @@ const CARDS = [
   /* ---- HARDWARE: whatever you are holding ---- */
   { id: 'cycle',     name: 'CYCLE',         aisle: 'hardware', max: 5, b: 0, v: 6, cap: 45, d: v => '+' + v + '% fire rate',
     r: { n: 'WOUND UP', d: 'holding the trigger winds to another +25%' } },
-  { id: 'split',     name: 'SPLIT',         aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 2, d: v => 'your shot forks ' + (v * 2 + 1) + ' ways',
+  { id: 'split',     name: 'SPLIT',         aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 2, d: v => 'shot forks ' + (v * 2 + 1) + ' ways at half power',
     r: { n: 'CROSSFIRE', d: 'the outer forks steer themselves in' } },
   { id: 'caliber',   name: 'CALIBER',       aisle: 'hardware', max: 5, b: 0, v: 1.2, dec: 1, cap: 12, d: v => '+' + v + ' flat damage a shot',
     r: { n: 'OVERBORE', d: 'and the rounds come out visibly bigger' } },
@@ -662,7 +689,7 @@ const CARDS = [
     r: { n: 'FULL PLATE', d: 'and you come back at full health' } },
   { id: 'flashpoint',name: 'FLASHPOINT',    aisle: 'expired', max: 2, b: 2, v: 1, int: 1, cap: 2, d: v => 'a nova every ' + Math.max(8, 22 - v * 5) + ' kills',
     r: { n: 'FALLOUT', d: 'the nova leaves the floor burning' } },
-  { id: 'debtcard',  name: 'BLOOD DEBT',    aisle: 'expired', max: 2, b: 1, v: 20, cap: 44, d: v => '+' + v + '% damage. you bleed 1 a second',
+  { id: 'debtcard',  name: 'BLOOD DEBT',    aisle: 'expired', max: 2, b: 1, v: 14, cap: 30, d: v => '+' + v + '% damage. the debt bleeds you',
     r: { n: 'PAID FORWARD', d: 'every kill gives 3 health back' } },
   { id: 'longpig',   name: 'THE LONG PIG',  aisle: 'expired', max: 2, b: 2, v: 7, cap: 16, d: v => '+' + v + '% damage per 10 kills this wave',
     r: { n: 'NO LEFTOVERS', d: 'it never resets' } },
@@ -1446,6 +1473,8 @@ function spawnEnemy(type, x, y) {
     // random phase so a spawned batch doesn't march in lockstep
     anim: rnd(0, 4), poseT: 0,
     hp, max: hp,
+    tint: d.tint || null, scale: d.scale || 1,
+    split: d.split | 0, nest: d.nest | 0, hatchT: rnd(1.5, 2.5),
     spd: d.spd * D.spd * rnd(0.9, 1.12), base: d.spd * D.spd,
     mark: 0, slowT: 0, slowAmt: 0,
     dmg: d.dmg * D.dmg * (1 + S.wave * 0.03),
@@ -1704,11 +1733,15 @@ function emit(w) {
     // CROSSFIRE: the middle shot goes where you pointed, the forks come back in
     const outer = dirs > 1 && d !== (dirs - 1) / 2;
     const homing = (st.home || 0) + (rd('split') && outer ? 3.2 : 0);
+    /* Forks are half-power rounds. At full power one SPLIT pick tripled crowd
+       output, which flattened every other card in the game — the centre shot
+       keeps the number on the gun, the forks are a bonus, not a multiplier. */
+    const fdmg = outer ? dmg * 0.5 : dmg;
     for (let i = 0; i < w.pellets; i++) {
       const a = aim + off + rnd(-base, base);
       S.bul.push({
         x: mx, y: my, vx: Math.cos(a) * w.spd, vy: Math.sin(a) * w.spd,
-        dmg, pierce: (w.pierce || 0) + st.pierce, hitIds: [], life: 1.4,
+        dmg: fdmg, pierce: (w.pierce || 0) + st.pierce, hitIds: [], life: 1.4,
         col, size: (w.size || 1) + (evo && S.scarLv > 3 ? 1 : 0) + (rd('caliber') ? 1 : 0),
         knock: w.knock || 60, pin: w.pin || 0, burn: (w.burn || 0) + st.burn,
         bounce: (w.bounce || 0) + st.bounce, mark: w.mark || 0, chill: w.chill || 0,
@@ -1928,6 +1961,31 @@ function killEnemy(e, ang) {
         }
     }
   }
+  /* The HUSK was full of them. Direct spawn, not the fx queue — spawning is
+     not damage, so it cannot recurse (crawlers do not split). The children
+     get a shove outward so they read as bursting out rather than appearing. */
+  if (e.split > 0) {
+    for (let i = 0; i < e.split; i++) {
+      const a = rnd(0, TAU);
+      const c2 = spawnEnemy('crawler', e.x + Math.cos(a) * 8, e.y + Math.sin(a) * 8);
+      c2.vx = Math.cos(a) * 160; c2.vy = Math.sin(a) * 160;
+      c2.stun = 0.25;
+    }
+    float(e.x, e.y - 16, 'IT WAS FULL', '#d8d0c0');
+    gib(e.x, e.y, e.gib, 8);
+    A.crack();
+  }
+  /* Bursting a CYST point-blank is answered: a slow ring of acid, easily
+     walked out of at range, not at arm's length. */
+  if (e.nest) {
+    for (let i = 0; i < 6; i++) {
+      const a = i / 6 * TAU + rnd(0, 0.4);
+      S.eb.push({ x: e.x, y: e.y, vx: Math.cos(a) * 85, vy: Math.sin(a) * 85,
+                  r: 4, bob: rnd(0, TAU), dmg: e.dmg * 0.55, life: 1.8, col: '#a8d14a' });
+    }
+    blood(e.x, e.y, 14, 'rgba(90,120,20,0.35)');
+  }
+
   // RENDERING: the dead leave something behind that the living have to walk through
   if (st.pool > 0 && !e.boss) S.pools.push({ x: e.x, y: e.y, r: 20, life: 6, max: 6, d: st.pool });
   if (st.novaEvery > 0) {
@@ -2242,11 +2300,13 @@ function startWave(n) {
   if (n === BOSS_WAVE) {
     const apex = isApexFloor(S.room);
     spawnBoss(bossIndexFor(S.room), apex);
-    for (let i = 0; i < Math.round(4 + n * 0.9 + S.room * 3.5); i++) S.queue.push(pick(['crawler', 'crawler', 'shrieker']));
+    const filler = S.room >= 1 ? ['crawler', 'crawler', 'shrieker', 'husk'] : ['crawler', 'crawler', 'shrieker'];
+    for (let i = 0; i < Math.round(4 + n * 0.9 + S.room * 3.5); i++) S.queue.push(pick(filler));
     msg('WAVE ' + n, apex ? 'APEX' : 'FLOOR BOSS', 2.4);
   } else if (MINI_WAVES.indexOf(n) >= 0) {
     spawnMini(S.room * MINI_WAVES.length + MINI_WAVES.indexOf(n));
-    for (let i = 0; i < Math.round(6 + n * 1.4 + S.room * 3); i++) S.queue.push(pick(['crawler', 'crawler', 'shrieker', 'stalker']));
+    const filler = S.room >= 1 ? ['crawler', 'crawler', 'shrieker', 'stalker', 'husk'] : ['crawler', 'crawler', 'shrieker', 'stalker'];
+    for (let i = 0; i < Math.round(6 + n * 1.4 + S.room * 3); i++) S.queue.push(pick(filler));
     msg('WAVE ' + n, 'ELITE', 2.4);
   } else {
     // Head count, not a spend budget — a budget buys fewer/tougher enemies as it
@@ -2263,6 +2323,9 @@ function startWave(n) {
     if (n >= 2 || S.room > 0) pool.push(['shrieker', 3 + n * 0.4 + S.room]);
     if (n >= 4 || S.room > 0) pool.push(['stalker', 2 + n * 0.45 + S.room]);
     if (n >= 6 || S.room > 0) pool.push(['bloater', 1 + n * 0.35 + S.room * 1.5]);
+    // the two teachers arrive once the basics are learned
+    if (n >= 5 || S.room >= 1) pool.push(['husk', 1 + n * 0.3 + S.room]);
+    if (n >= 7 || S.room >= 2) pool.push(['cyst', 0.5 + n * 0.15 + S.room * 0.5]);
     let total = 0;
     for (const c of pool) total += c[1];
     for (let i = 0; i < count; i++) {
@@ -3029,6 +3092,26 @@ function updateEnemy(e, dt) {
     if (Math.random() < dt * 0.5 && d < 120) { e.vx += tx * 90; e.vy += ty * 90; e.poseT = 0.22; }
   } else if (e.type === 'bloater') {
     if (d < e.r + 18) e.poseT = Math.max(e.poseT, 0.1);               // swells before it lands on you
+  } else if (e.nest) {
+    /* The CYST does not chase. It sits where the wave put it, swells, and
+       hatches — the pressure it applies is the growing crowd, and the counter
+       is crossing the room to burst it. It refuses knockback for the same
+       reason a door refuses knockback: its job is to be a place. */
+    e.vx *= 0.7; e.vy *= 0.7;
+    e.x += e.vx * dt; e.y += e.vy * dt;
+    collideWalls(e);
+    e.hatchT -= dt;
+    if (e.hatchT < 0.6) e.poseT = Math.max(e.poseT, 0.1);             // the swell is the warning
+    if (e.hatchT <= 0 && S.en.length < 70) {
+      e.hatchT = Math.max(1.6, 3.4 - S.room * 0.15);
+      e.poseT = 0.5;
+      const kind = S.room >= 3 && Math.random() < 0.3 ? 'husk' : 'crawler';
+      S.cracks.push({ x: e.x + rnd(-16, 16), y: e.y + rnd(10, 22), t: 0.75, type: kind });
+      part(e.x, e.y, '#8fae4a', 10, 60, 0.5);
+      A.screech();
+    }
+    if (Math.random() < dt * 2) part(e.x, e.y - 2, '#a8c85a', 1, 20, 0.6);
+    return;                                                            // no walk cycle, no wander
   }
 
   const wob = Math.sin(e.wob) * 0.28;
@@ -4576,7 +4659,7 @@ function drawTitle() {
   const flick = Math.sin(S.t * 30) > 0.93 ? 0.4 : 1;
   /* The wordmark is the one string in the game set in the display face. A
      melted face needs less tracking than the body face does — it is already
-     doing the work that letter-spacing was doing for Pixelify Sans.
+     doing the work that letter-spacing does for the body face.
 
      Its size is fitted rather than fixed. 30px is right for the faces this
      was drawn against, but a display face can be half again as wide at the
@@ -4758,8 +4841,30 @@ function drawDead() {
    Shared by cards and off-cuts so a hand is one shape repeated, not two
    competing designs sitting next to each other. */
 function frameBox(x, y, w, h, col, t, glow) {
-  ctx.fillStyle = 'rgba(' + Math.round(9 + t * 20) + ',' + Math.round(8 + t * 18) + ',' + Math.round(11 + t * 22) + ',0.96)';
+  // the card sits ON the screen, not IN it: a hard shadow low-right, and for
+  // anything rare enough to glow, a soft halo pooling behind the whole tag
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(x + 3, y + 4, w, h);
+  if (glow >= 16) {
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const hg = ctx.createRadialGradient(x + w / 2, y + h / 2, 4, x + w / 2, y + h / 2, w * 0.9);
+    hg.addColorStop(0, hexA(col, (0.04 + glow / 34 * 0.05) * (1 + t)));
+    hg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = hg;
+    ctx.fillRect(x - 24, y - 20, w + 48, h + 40);
+    ctx.restore();
+  }
+  // paper: a slight top-lit vertical gradient instead of one flat fill
+  const pg = ctx.createLinearGradient(x, y, x, y + h);
+  const lift = t * 18;
+  pg.addColorStop(0, 'rgba(' + Math.round(14 + lift) + ',' + Math.round(12 + lift) + ',' + Math.round(16 + lift) + ',0.97)');
+  pg.addColorStop(1, 'rgba(' + Math.round(7 + lift) + ',' + Math.round(6 + lift) + ',' + Math.round(9 + lift) + ',0.97)');
+  ctx.fillStyle = pg;
   ctx.fillRect(x, y, w, h);
+  // paper grain: faint ruled hairlines, like a receipt that has been handled
+  ctx.fillStyle = '#ffffff';
+  ctx.globalAlpha = 0.022;
+  for (let ly = y + 26; ly < y + h - 14; ly += 5) ctx.fillRect(x + 5, ly, w - 10, 1);
   if (glow > 0) {
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
     const lg = ctx.createLinearGradient(x, y, x, y + h);
@@ -4779,6 +4884,17 @@ function frameBox(x, y, w, h, col, t, glow) {
   ctx.fillRect(x + w - tk, y, tk, 2); ctx.fillRect(x + w - 2, y, 2, tk);
   ctx.fillRect(x, y + h - 2, tk, 2); ctx.fillRect(x, y + h - tk, 2, tk);
   ctx.fillRect(x + w - tk, y + h - 2, tk, 2); ctx.fillRect(x + w - 2, y + h - tk, 2, tk);
+  ctx.globalAlpha = 1;
+}
+
+/* The punched hole that makes the frame read as a price tag hanging on a
+   hook rather than a dialog box. Dark hole, a ring of the card's colour. */
+function tagHole(cx, y, col) {
+  ctx.fillStyle = '#030204';
+  ctx.beginPath(); ctx.arc(cx, y, 2.6, 0, TAU); ctx.fill();
+  ctx.strokeStyle = col; ctx.globalAlpha = 0.65;
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(cx, y, 2.6, 0, TAU); ctx.stroke();
   ctx.globalAlpha = 1;
 }
 
@@ -4813,17 +4929,19 @@ function cardFace(o, x, y, cw, ch, t, held) {
     ctx.restore();
   }
 
-  // rarity, and a hairline under it — the only rule on the card
-  htxt(fusion ? 'LEGENDARY  ·  OFF-CUT' : g.n, cx, yy + 12, g.col, 'center', 6.5,
+  // the tag hole, then the rarity, then the rule — top of the tag
+  tagHole(cx, yy + 9, g.col);
+  htxt(fusion ? 'LEGENDARY  ·  OFF-CUT' : g.n, cx, yy + 21, g.col, 'center', 6.5,
        { track: 0.26, mid: 1, glow: o.g >= 2 ? g.col : null, glowSize: g.glow * 0.5 });
   ctx.fillStyle = g.col;
   ctx.globalAlpha = 0.30 + t * 0.35;
-  ctx.fillRect(x + 16, yy + 19, cw - 32, 1);
+  ctx.fillRect(x + 16, yy + 28, cw - 32, 1);
   ctx.globalAlpha = 1;
 
   /* With no rider the name and effect sit in the middle of the card rather
-     than leaving a hole at the bottom where the band used to be. */
-  const ny = lit ? yy + 38 : yy + 54;
+     than leaving a hole at the bottom where the band used to be. Measured off
+     the card height so a taller card recentres rather than drifting up. */
+  const ny = lit ? yy + 46 : yy + Math.round(ch * 0.44);
   const nm = fusion ? o.fusion.name : cardName(c);
   const nsz = nm.length > 15 ? 8.5 : nm.length > 11 ? 10 : 11.5;
   htxt(nm, cx, ny, t > 0.4 ? '#ffffff' : '#efe4d2', 'center', nsz,
@@ -4845,22 +4963,27 @@ function cardFace(o, x, y, cw, ch, t, held) {
     wrapped(txt2, cx, by + 11, cw - 16, '#ded2c0', 6.5);
   }
 
-  // foot: which aisle it came from, and how many you hold. Aisle in grey —
-  // its colour belongs to THE ORDER strip, not in here.
+  /* Foot: which aisle it came from, and how many of this card you already
+     hold. The aisle is the one thing on the card a player scans for when they
+     are building toward THE ORDER, so it gets a glow — but in the rarity's
+     colour, not the aisle's. Aisle colours live on the strip and nowhere near
+     a card, or the hand becomes two colour systems again. */
   const foot = yy + ch - 9;
   if (fusion) {
-    htxt('OFF-CUT', cx, foot, 'rgba(150,136,124,0.7)', 'center', 5.5, { track: 0.26, mid: 1, noShadow: true });
+    htxt('OFF-CUT', cx, foot, '#d8ccb8', 'center', 6, { track: 0.26, mid: 1, glow: g.col, glowSize: 9 });
     return 1;
   }
   const ai = AISLES[c.aisle], rank = dkr(c.id);
-  const lbl = ai.n, lw = htxtWidth(lbl, 5.5, 0.26);
+  const lbl = ai.n, lw = htxtWidth(lbl, 6, 0.26);
   const pw = 4, pg = 2, pipsW = c.max * pw + (c.max - 1) * pg;
   const tot = lw + 9 + pipsW, sx = cx - tot / 2;
-  htxt(lbl, sx, foot, 'rgba(150,136,124,0.7)', 'left', 5.5, { track: 0.26, mid: 1, noShadow: true });
+  htxt(lbl, sx, foot, '#d8ccb8', 'left', 6, { track: 0.26, mid: 1, glow: g.col, glowSize: 9 });
+  /* Filled means held. Nothing else. The pip at `rank` used to pulse as a
+     preview of what this pick would add, which in a still frame is simply a
+     filled pip — so a card you owned none of read as one you owned one of. */
   for (let j = 0; j < c.max; j++) {
     const px = sx + lw + 9 + j * (pw + pg);
     if (j < rank) { ctx.fillStyle = g.col; ctx.globalAlpha = 0.9; ctx.fillRect(px, foot - 1.5, pw, 3); }
-    else if (j === rank) { ctx.fillStyle = g.col; ctx.globalAlpha = 0.4 + Math.sin(S.t * 6) * 0.2; ctx.fillRect(px, foot - 1.5, pw, 3); }
     else { ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.13; ctx.fillRect(px, foot - 0.5, pw, 1); }
     ctx.globalAlpha = 1;
   }
@@ -4952,7 +5075,7 @@ function drawLevelUp() {
      edges of a 480px screen. Fit the row to the space instead of guessing. */
   const gap = 9, ROOM = W - 24;
   const CW = Math.min(118, Math.floor((ROOM - gap * (hand.length - 1)) / Math.max(1, hand.length)));
-  const CH = 126, cy = 39;
+  const CH = 140, cy = 42;
   const x0 = W / 2 - (CW * hand.length + gap * (hand.length - 1)) / 2;
   hand.forEach((o, i) => {
     // each card deals in a beat after the one before it
@@ -4969,63 +5092,18 @@ function drawLevelUp() {
     if (a >= 1) S.ui.push({ x, y: y - 6, w: CW, h: CH + 6, fn: () => takeCard(o) });
   });
 
-  drawOrderStrip(172);
+  /* Three things and no more: the cards, what the aisles pay, and the reroll.
+     This screen also carried a rarity legend, a line explaining riders, the
+     nearest off-cut with its progress, and a luck/coins readout — all true,
+     all things you read once, and together they turned a choice between three
+     cards into a wall of text you had to look past to make it. The rarity
+     names explain themselves, a rider announces itself with a banner the
+     first time it fires, and an off-cut is loud enough when it turns up. */
+  drawOrderStrip(196);
 
-  /* Rerolling is the only thing coins do during a fight, which keeps them
-     worth picking up between shops. */
   const rc = rerollCost(), can = S.coins >= rc;
-  uiBtn(W / 2 - 66, 206, 132, 17, 'REROLL  ' + rc, can ? '#f5c518' : '#6b5a4e', () => rerollHand(), !can);
-
-  drawGradeLegend(233, top);
-
-  /* The nearest unbuilt off-cut, printed as a goal. This is the single line
-     that turns a pile of cards into something a player aims at. */
-  let near = null, nd = 1e9;
-  for (const f of FUSIONS) {
-    if (fz(f.id) || fusionReady(f)) continue;
-    let have = 0, want = 0;
-    if (f.id === 'primecut') { have = Math.min(primeCount(), 3); want = 3; }
-    else for (const [id, r] of f.need) { have += Math.min(dkr(id), r); want += r; }
-    const miss = want - have;
-    if (have > 0 && miss < nd) { nd = miss; near = f; }
-  }
-  if (near) {
-    const lbl = 'NEXT OFF-CUT  ' + near.name + '  —  ' + fusionHint(near);
-    htxt(lbl, W / 2, 255, 'rgba(180,150,200,0.85)', 'center', 6.5, { track: 0.04, mid: 1, noShadow: true });
-  } else {
-    htxt('LUCK ' + (Math.round((S.luck + S.lvlLuck) * 10) / 10) + '   ·   ' + S.coins + ' coins',
-         W / 2, 255, 'rgba(126,114,124,0.7)', 'center', 6.5, { track: 0.10, mid: 1, noShadow: true });
-  }
+  uiBtn(W / 2 - 66, 236, 132, 18, 'REROLL  ' + rc, can ? '#f5c518' : '#6b5a4e', () => rerollHand(), !can);
   crosshair();
-}
-
-/* The rarity ladder, spelled out in its own colours with the current rung
-   marked. It went missing when the footer was rewritten, which left PRIME as
-   a word on a card with nothing anywhere to say it was a rung on a scale —
-   and that is exactly how it read. */
-function drawGradeLegend(y, top) {
-  const names = GRADE.slice(0, 4);
-  const sep = '  ·  ', sepW = htxtWidth(sep, 6.5, 0.04);
-  let total = 0;
-  const ws = names.map(g => htxtWidth(g.n, 6.5, 0.10));
-  for (const w of ws) total += w;
-  total += sepW * (names.length - 1);
-  const lead = 'RARITY   ', leadW = htxtWidth(lead, 6.5, 0.22);
-  let x = W / 2 - (total + leadW) / 2;
-  htxt(lead, x, y, 'rgba(120,110,102,0.7)', 'left', 6.5, { track: 0.22, mid: 1, noShadow: true });
-  x += leadW;
-  names.forEach((g, i) => {
-    const isTop = i === top;
-    htxt(g.n, x, y, g.col, 'left', 6.5,
-         { track: 0.10, mid: 1, alpha: isTop ? 1 : 0.55, glow: isTop ? g.col : null, glowSize: 9, noShadow: !isTop });
-    x += ws[i];
-    if (i < names.length - 1) {
-      htxt(sep, x, y, 'rgba(110,100,94,0.5)', 'left', 6.5, { track: 0.04, mid: 1, noShadow: true });
-      x += sepW;
-    }
-  });
-  htxt('◆  RARE or better also unlocks the card\'s rider — a second, bigger effect',
-       W / 2, y + 10, 'rgba(126,114,104,0.75)', 'center', 6.5, { track: 0.04, mid: 1, noShadow: true });
 }
 
 /* ---------- THE COLD ROOM ----------
@@ -5394,10 +5472,15 @@ function frame(now) {
 /* ---------- presentation: never render below 200% ---------- */
 function fitCanvas() {
   const sx = window.innerWidth / W, sy = window.innerHeight / H;
-  /* Steps of RS, not of 1: the backing store is already RS times the logical
-     grid, so only multiples of RS land one render pixel on a whole number of
-     screen pixels. Anything else reintroduces the shimmer this was fixing. */
-  const scale = Math.max(RS, Math.floor(Math.min(sx, sy) / RS) * RS);
+  /* Fill the limiting axis completely, fractional scale and all. The game
+     grid is exactly 16:9, so on a 16:9 display in fullscreen this is the
+     whole screen with zero letterboxing — integer-only snapping was leaving
+     bars on every screen whose ideal scale was 3.2x or 3.5x, which is every
+     Windows laptop running 125% DPI. A fractional scale means game pixels
+     alternate 3px/4px wide instead of being uniform; the render store is
+     already 2x the grid, so in practice the unevenness lands on the fine
+     detail, and a full screen beats a ruler-perfect grid with bars on it. */
+  const scale = Math.max(RS, Math.min(sx, sy));
   const cssW = W * scale, cssH = H * scale;
   cv.style.width = cssW + 'px';
   cv.style.height = cssH + 'px';
