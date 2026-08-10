@@ -42,10 +42,13 @@ COMMON · UNCOMMON · RARE · EPIC · LEGENDARY
 > tells you it sits above CHOICE, so the ladder had to be explained every time
 > it was shown.
 
-LEGENDARY has weight 0 and cannot be **rolled**. Two things reach it anyway:
-[[#Off-cuts|off-cuts]], and any card carrying the `leg` flag — which is
-[[#SPLIT|SPLIT]] and nothing else. A `leg` card does not roll a grade at all;
-it is dealt LEGENDARY or it is not dealt.
+LEGENDARY has weight 0 and cannot be **rolled**. Three things reach it anyway:
+[[#Off-cuts|off-cuts]]; any card carrying the `leg` flag — which is
+[[#SPLIT|SPLIT]] and nothing else, and does not roll a grade at all, it is
+dealt LEGENDARY or it is not dealt; and an
+[[Economy#What a rung pays out|EVOLVE rung]] once the roster holds a gun of
+every rarity, which deals three cards at LEGENDARY and hands you the one you
+take **at the start of every run afterwards**.
 
 ## Riders — the reason rarity is a moment
 

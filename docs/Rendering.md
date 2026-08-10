@@ -287,6 +287,41 @@ line, the two lines of control listing, the secrets teaser and the fonts
 warning are all gone. The last two had been drawn on top of each other at the
 bottom edge for two commits.
 
+**One centred row of three same-sized buttons** — PLAY, COSMETICS, CONTRACTS
+— with a single quiet `EVOLUTION n / 10` line beneath it. EVOLVE and RESET EVO
+used to sit up here too, which forced a **second row centred on a different
+axis depending on whether you had evolved**: the row physically shifted under
+the cursor between visits, so the button you were reaching for moved while you
+reached. Both are on the [[Controls#Two things called a menu|pause screen]]
+now, where the run they cost you is the thing behind them. The death screen is
+the same shape: RETRY, COSMETICS, TITLE.
+
+## The evolution pick screen
+
+`drawEvoPick()` — its own mode (`S.mode = 'evolve'`), because taking a rung is
+not a dialog on top of a run, it is the moment between two runs.
+
+The whole screen is washed in the colour of what is being offered: violet for
+a gun, [[The Deck#Rarity, and why it matters|LEGENDARY orange]] for a card, as
+a radial gradient under fourteen rising motes. Panels land staggered —
+`S.evoIn * 3 - i * 0.4`, cubic-eased — so they arrive one after another rather
+than all at once.
+
+A gun panel is a `frameBox` with the rarity's colour on its header bar, the
+sprite floating over an additive glow at 2.4×, the name, the flavour line, and
+`PACI wanted <price>` at the foot — the price it is *not* costing you.
+
+The footer is the part that does work: it names the rarities your roster is
+still missing, and says that holding one of each turns the rungs into cards.
+Without it the switch from guns to cards at rung ~7 looks like the game
+changing its mind.
+
+> [!warning] This screen cannot be escaped
+> There is no back button, `Esc` does not leave it and `C` is explicitly
+> blocked from opening [[Cosmetics]] over it. The rung is already paid for —
+> `S.evo` went up and the wallet went to zero before it drew — so a way out
+> would be a way to lose the pick. It exits by taking something.
+
 ## Menus
 
 Buttons (`uiBtn()`) ease toward their hover state over several frames rather

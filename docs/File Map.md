@@ -8,7 +8,7 @@ tags: [reference, engine]
 ```
 SLOP/
 ├── index.html         shell: two stacked canvases (#game, #overlay), boot screen
-├── serve.js            30-line static server (node serve.js → :8123)
+├── serve.js            21-line static server (node serve.js → :8123)
 ├── js/
 │   ├── font.js          two typeface slots + VT323 inlined as the fallback
 │   ├── sprites.js       every sprite as a character grid, plus the bake pipeline
@@ -29,13 +29,16 @@ SLOP/
 
 ## `js/game.js` — rough section order
 
-~5,500 lines, one IIFE, no modules.
+~6,400 lines, one IIFE, no modules.
 
 1. Setup: render scale (`RS`, `subCanvas`, `blit`), crisp UI text (`htxt`),
    input handling
 2. Content tables: `ROOMS` + `roomDef()`/`SHOP_ROOM`/`curRoom()`, `ETYPE`,
    `BOSSES`, `MINIS`, `ITEMS`, `GRADE`, `WEP`, `COSMETICS`
-3. Save/vault (`loadSave`, `persist`, `evolve`, `resetEvolution`)
+3. Save/vault (`loadSave`, `persist`) and **[[Economy#Evolution|EVOLVE]]**
+   (`canEvolve`, `evolve`, `resetEvolution`, the `evoGuns`/`evoCards` roster
+   helpers, `evoGunPool`/`evoCardPool`, `evoReward`, `openEvoPick`,
+   `takeEvoGun`/`takeEvoCard`, `applyEvoLoadout`)
 4. State (`freshState`) and derived stats (`ST()`, `diff()`)
 5. **[[The Deck|THE MENU]]**: `AISLES`, `CARDS`, riders (`riderOn`/`rd`), aisle
    mastery (`recalcAisles`, `aisleT1/T2`), `FUSIONS` and the off-cut reads,
@@ -51,7 +54,8 @@ SLOP/
 11. Juice helpers (`part`, `gib`, `blood`, `shred`, `ring`, `deathBurst`,
     `float`, `shake`)
 12. Collision (`collideWalls`, `pointInWall`, `freeSpot`)
-13. Weapons (`fire`, `emit`, `updateBeam`) and grenades (`throwNade`, `explode`)
+13. Weapons (`fire`, `emit`, `updateBeam`, `chainZap`, `singularityPop`) and
+    grenades (`throwNade`, `explode`)
 14. Damage (`damageEnemy`, `killEnemy`, `hurtPlayer`) and pickups
 15. Waves (`startWave`, `updateWaves`)
 16. The big `update(dt)` loop, `updateEnemy`, `updateBoss`
@@ -59,8 +63,8 @@ SLOP/
 18. Drawing: `drawWorld`, `drawPlayer`, `drawEnemy`, `drawTomce`, `drawLight`,
     `post`
 19. HUD + every screen (`drawHUD`, `drawTitle`, `drawCosmetics`, `drawDeck`,
-    `drawLevelUp`, `drawColdRoom`, `drawAugments`, `drawContracts`,
-    `drawPause`, `drawDead`)
+    `drawLevelUp`, `drawColdRoom`, `drawEvoPick`, `drawAugments`,
+    `drawContracts`, `drawPause`, `drawDead`)
 20. Main loop (`frame`), `fitCanvas`, boot
 
 ## Dev console hook

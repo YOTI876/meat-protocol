@@ -7,8 +7,8 @@ tags: [moc, index]
 
 A top-down pixel-art horror wave shooter. Zero dependencies, no build step, no
 asset files — every sprite is plotted in code and every sound is synthesized
-at runtime. Ten waves a floor, two elites and a boss on the way through, a
-shop before every descent, and no bottom to it.
+at runtime. Ten waves a floor, two elites and a two-phase boss on the way
+through, PACI at half time and again at the end, and no bottom to it.
 
 > [!info] Live
 > Play: https://meat-protocol.vercel.app
@@ -32,12 +32,12 @@ shop before every descent, and no bottom to it.
 
 ## Systems
 
-- [[Weapons]] — the eleven guns
+- [[Weapons]] — the thirteen guns, and the three LEGENDARIES
 - [[The Shop]] — PACI, the only place guns are sold, and his temper
 - [[Enemies]] — the six types and how they think
-- [[Bosses]] — the five floor bosses, six elites, and the APEX
+- [[Bosses]] — the ten two-phase floor bosses, six elites, and the APEX
 - [[Pickups]] — everything that drops
-- [[Economy]] — coins, cards, the vault, evolution
+- [[Economy]] — coins, cards, the vault, and the ten rungs of evolution
 - [[Cosmetics]] — what the vault buys
 - [[Difficulty Scaling]] — every formula that makes it harder
 
@@ -51,7 +51,7 @@ shop before every descent, and no bottom to it.
 ## Records
 
 - [[Changelog]] — every release, in order
-- [[Bugs Found]] — real defects, what caused each, and two still open
+- [[Bugs Found]] — fourteen real defects, what caused each, and three still open
 - [[Tuning Values]] — the single-number knobs
 - [[Deployment]] — GitHub and Vercel setup
 

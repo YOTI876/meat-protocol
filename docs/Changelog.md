@@ -114,7 +114,7 @@ became [[Controls#Two things called a menu|THE DECK]]. The
 [[Rendering#The title screen|title screen]] is a poster again: everything
 below the buttons is gone.
 
-## *(uncommitted)* — Ten two-phase bosses, wave-hours PACI, and a slower ladder
+## `3f2c232` — Ten two-phase bosses, wave-hours PACI, and a slower ladder
 A balance pass, top to bottom.
 
 **[[Bosses|Bosses]].** The wave-10 roster went from five to **ten**, so a run
@@ -145,7 +145,7 @@ already hand out free picks, so the old curve was dealing seven or eight cards
 a floor and the hand had stopped being a decision. The **MEAT SPLITTER**'s
 knockback dropped 300→140. The wave banner lost its `N SIGNATURES` subtitle.
 
-## *(uncommitted)* — THE FISH, elites that read your build, and a tighter purse
+## `3f2c232` — THE FISH, elites that read your build, and a tighter purse
 A second balance pass on top of the one above.
 
 **[[Bosses#They scale to your build, not just to the floor|Elites]] scale to
@@ -179,7 +179,7 @@ it catches every source including boss piles. Measured at 0.12 coins a kill.
 > [!warning] Cards no longer buy anything
 > The beam was their only sink. See [[Economy#Cards]].
 
-## *(uncommitted)* — EVOLVE becomes a roster, and moves to the pause screen
+## `9124da9` — EVOLVE becomes a roster, and moves to the pause screen
 [[Economy#Evolution|EVOLVE]] was a title-screen button that bought a
 difficulty number. It is now a ten-rung ladder that pays out a **permanent
 arsenal**, and it lives on the pause screen because pressing it **restarts the
@@ -225,7 +225,7 @@ rather than a hierarchy. Rows rather than columns for a second reason: stacked
 groups cost a header each, and the worst case — five signatures and THE THIRD
 EYE above them — pushed the tallest column straight through the wallet strip.
 
-## *(uncommitted)* — An empty floor, two more legendaries, and a fish that looks like one
+## `9124da9` — An empty floor, two more legendaries, and a fish that looks like one
 
 **The floor could come up empty, and EVOLVE made it easy.** Reported as *"there
 are no enemies when I evolve"*. Wave 1 was started by a wall-clock `setTimeout`
