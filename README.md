@@ -29,7 +29,7 @@ no dependencies — but fonts in `fonts/` won't load that way.
 | SHIFT / SPACE | dash (i-frames) |
 | **B** | THE DECK — everything you're holding |
 | C | cosmetics |
-| ESC / P | pause |
+| ESC / P | pause — and where EVOLVE lives |
 | M | mute |
 
 ## How a run goes
@@ -118,7 +118,7 @@ he nods, he was not going to insist.
 
 ## Guns
 
-Eleven, bought from PACI, not found lying around. Walk onto a pedestal, press
+Thirteen, bought from PACI, not found lying around. Walk onto a pedestal, press
 **E**, pay. Coins are scarce and bosses are the reliable source.
 
 He will not carry everything from the start: the crate opens one rung a floor,
@@ -139,8 +139,15 @@ can skip five floors of progression.
 | **THE ROTISSERIE** | 165 | fires in a spinning circle. it does not care where you point it |
 | GOD FINGER | 190 | railgun, charges, pierces the entire room |
 | **THE FISH** | **500 coins** | a fish. it opens its mouth and a laser comes out, and the laser cycles colour |
+| **THE FLYKILLER** | **380** | the current chains through up to five more throats |
+| **BLACK FRIDAY** | **460** | a singularity. it drags the room into one place, then goes off there |
 
 THE ROTISSERIE isn't in the crate at all until its contract is signed.
+
+**The three LEGENDARIES each own a verb.** THE FISH *holds*, THE FLYKILLER
+*chains*, BLACK FRIDAY *gathers*. None of them is just the biggest number —
+GOD FINGER still beats both of the new ones against a single target. They are
+what you buy when the room stops being one thing at a time.
 
 **THE FISH is the long game.** 500 coins, floor 5 at the earliest, and coins
 come in at about one per eight kills — you will spend most of a run deciding
@@ -185,9 +192,32 @@ decision rather than a milestone you walk past.
 **Cosmetics**: GOLD BAND (1000), TOXIC BAND (2500), VOID (5000), BONE MASK
 (9000), LIVING FLAME (15000, and it actually burns).
 
-**EVOLVE** wipes your coins and cards and permanently raises the world one
-notch: +38% enemy HP, +26% damage, +5% speed, +50% score. It stacks forever
-and it never resets.
+## EVOLVE
+
+**Ten rungs, and it is a pause-screen button.** It used to be on the title
+screen, where it was a lever with no visible price. Pressing it now **restarts
+the run you are in** — that is the cost, alongside every coin and card you were
+holding — and the world permanently gets harder: +46% enemy HP, +30% damage,
++6% speed, +15% more of them, per rung.
+
+**Every rung hands you something you keep forever.** Take one and you pick a
+gun from the rarity that rung opened — COMMON at first, and the rarity climbs
+as you go — and it is in your hands from the first frame of every run
+afterwards. **No LEGENDARIES.** The ladder stops at EPIC: the fish, the
+flykiller and BLACK FRIDAY are bought, and they are the only reason the coin
+economy has to keep climbing past a few hundred.
+
+Once your roster holds a gun of **every** rarity there is nothing left in the
+crate, so the rungs above that deal you **three LEGENDARY cards** instead and
+you start every run holding the one you took.
+
+```
+150, 350, 600, 900, 1250, 1650, 2100, 2600, 3150, 3750  —  16,500 for all ten
+```
+
+**RESET EVOLUTION** (also pause) puts it all back: the level, the roster, the
+starting hand. It restarts the run too, because you cannot keep holding guns
+you no longer own.
 
 ## The secrets
 

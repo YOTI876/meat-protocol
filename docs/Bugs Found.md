@@ -123,6 +123,40 @@ in the gate too. Live count now holds at 83–87 out to floor 26 while the
 per-wave total keeps climbing past 679 — see the table in
 [[Difficulty Scaling#Concurrent cap]].
 
+## 14. A menu inside the first 2.2 seconds killed the floor permanently
+**Found:** reported as *"there are no enemies when I evolve"*, and it was not
+an [[Economy#Evolution|EVOLVE]] bug at all — EVOLVE only made an old one easy
+to hit.
+
+Wave 1 was started from a wall-clock `setTimeout` at the bottom of
+`startRun()`:
+
+```js
+setTimeout(() => { if (S.mode === 'play' && S.wave === 0) startWave(1); }, 2200);
+```
+
+Wall-clock keeps running while you are on a menu, and the timer fires **once**.
+Open the pause screen, THE DECK, or a level-up hand inside that opening window
+and the `S.mode === 'play'` guard threw away the only `startWave(1)` call the
+run was ever going to get. The floor then sat there for as long as you cared to
+stand in it: no enemies, so no kills, so no drops and no coins — which is
+exactly the three symptoms that got reported.
+
+Reproduced deterministically by pausing 30 frames into a run and holding it
+past the window: `wave=0, queue=0, en=0` and no recovery, ever.
+
+Rare on a cold start, because nobody opens a menu two seconds into a run they
+just started. Common after EVOLVE, which drops you into a brand new run
+*straight off a menu*, holding a gun you have every reason to want to look at.
+`nextRoom()` carried the same defect on a 2600ms timer.
+
+**Fix:** `S.introT` / `S.introMsgT`, counted down in `update()` — which only
+ticks in play, so a menu **pauses** the opening beat instead of consuming it.
+They are also held while a room fade is in flight, so a wave can never land in
+the half-built room the fade is hiding, and `freshState()` clears both, so
+restarting can no longer leave an orphaned timer from an abandoned run pointing
+at the new one.
+
 ---
 
 # Open

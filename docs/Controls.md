@@ -27,11 +27,12 @@ tags: [reference]
 `E` is context-sensitive: it's whatever you're standing next to. There is no
 separate key for TOMCE.
 
-> [!note] Eleven guns, ten number keys
-> `WORDER` has eleven entries but `Digit1`–`Digit0` only reach the first ten
-> slots. [[Weapons#THE FISH|THE FISH]] sits last, so once you own everything
-> it is wheel-or-`Q` only. Not a bug worth a key for — by the time you have
-> found 500 coins for a fish you are not swapping off it.
+> [!note] Thirteen guns, ten number keys
+> `WORDER` has thirteen entries but `Digit1`–`Digit0` only reach the first ten
+> slots. The three [[Weapons#The three LEGENDARIES|LEGENDARIES]] sit last, so
+> once you own everything they are wheel-or-`Q` only. Not a bug worth three
+> keys for — by the time you have found 380, 460 and 500 coins you are not
+> swapping off them by accident.
 
 ## Two things called a menu
 
@@ -40,6 +41,7 @@ separate key for TOMCE.
 | **THE MENU** | the level-up screen — the supermarket you order from |
 | **THE DECK** | what you've already picked (`B`, or the pause button) |
 | **MAIN MENU** | the pause button that abandons the run |
+| **EVOLVE** | the pause button that *restarts* it — see [[Economy#Evolution]] |
 
 The pause button used to be called THE MENU, which stopped working the moment
 MAIN MENU appeared two buttons away on the same row: two buttons both called
@@ -53,6 +55,18 @@ and animate a lift before you click. See [[Rendering#Menus]].
 
 `B` reaches the deck from **play or pause**; `CONTRACTS` is on the title
 screen; `Esc` walks back out of whichever one you're in.
+
+The **title screen is three buttons on one centred row** — PLAY, COSMETICS,
+CONTRACTS — and the **death screen** is RETRY, COSMETICS, TITLE. EVOLVE and
+RESET EVO used to sit on both, which forced a second row that was centred on a
+different axis depending on whether you had evolved: the row physically shifted
+under the cursor between visits.
+
+> [!warning] The evolution pick has no exit
+> Taking a rung opens a pick screen (a gun, or three LEGENDARY cards) that owes
+> you something on the way out and restarts the run when you take it. `Esc`
+> does nothing there, and `C` is deliberately blocked from reaching cosmetics
+> out of it — leaving would strand a rung you already paid for.
 
 **MAIN MENU** (pause) abandons the run. Coins, cards, the vault and every
 [[Contracts|contract]] counter are persisted continuously, so quitting costs

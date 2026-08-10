@@ -5,9 +5,10 @@ tags: [reference, systems]
 
 # Weapons
 
-Eleven guns. Damjan starts with **THE SIDEARM** and nothing else — everything
-above it is bought from [[The Shop|PACI]], and guns are never scattered on the
-arena floor.
+Thirteen guns. Damjan starts with **THE SIDEARM** and nothing else — everything
+above it is bought from [[The Shop|PACI]], or kept forever off the
+[[Economy#What a rung pays out|evolution ladder]]. Guns are never scattered on
+the arena floor.
 
 | gun | rarity | cost | mag | dmg | what it does |
 |---|---|---|---|---|---|
@@ -22,10 +23,73 @@ arena floor.
 | **THE ROTISSERIE** | EPIC | 165 | 70 | 14 | **fires in a spinning circle** regardless of aim, burn 10 |
 | **GOD FINGER** | EPIC | 190 | 5 | 165 | railgun, 0.5s charge, pierces everything |
 | **THE FISH** | LEGENDARY | **500 coins** | 300 (as fuel) | 720/s | a fish. it opens its mouth and a laser comes out, and the laser cycles colour |
+| **THE FLYKILLER** | LEGENDARY | **380** | 24 | 44 | the current **chains** up to five more throats — *the blue light above the deli. it has opinions.* |
+| **BLACK FRIDAY** | LEGENDARY | **460** | 5 | 250 | a singularity that **drags the room together** and then goes off in the middle of it — *everything comes to the sale* |
 
 Rarity is the same ladder the [[The Deck#Rarity, and why it matters|cards]]
 use, and it's what a gun shines at on the pedestal — `gr` in `WEP`. Full
 definitions live in `js/game.js`; `WORDER` is the slot order.
+
+## The three LEGENDARIES
+
+A LEGENDARY has to **do something the rack cannot already do**, or it is an
+EPIC that costs more. Each one owns a verb nothing else has, and none of them
+is simply the biggest number in its column — GOD FINGER still out-damages both
+of the new ones against a single target.
+
+| | verb | best into | worst into |
+|---|---|---|---|
+| **THE FISH** | *holds* | anything you can keep the line on | anything that makes you move |
+| **THE FLYKILLER** | *chains* | a queue | one large thing |
+| **BLACK FRIDAY** | *gathers* | a scattered room | one large thing |
+
+Measured against eight packed dummies, one trigger pull each:
+
+| gun | targets hit | damage dealt |
+|---|---|---|
+| SCAR-L *(control)* | 1 / 8 | 13 |
+| GOD FINGER | 1 / 8 | 165 |
+| **THE FLYKILLER** | **6 / 8** | 162 |
+| **BLACK FRIDAY** | **8 / 8** | **1342** |
+
+### THE FLYKILLER
+
+`chain: 5, chainR: 132`. On a hit, `chainZap()` walks **outward from the thing
+you actually hit** — each link is the nearest enemy the arc has not already
+touched — so it snakes through a crowd rather than hitting a disc. It sheds
+**a fifth of its bite per hop**, which is what stops five links being five full
+shots. A per-cast `seen` list means a chain can never fold back and double-dip.
+
+Draws on `S.arcs`, the same lightning primitive
+[[The Deck|BUTCHER'S BILL]] uses.
+
+### BLACK FRIDAY
+
+`sing: { r: 96, pull: 340 }`. The round is a **ghost**: `b.ghost` skips the
+enemy-collision block entirely, so it passes through everything and only pays
+out where it stops. While it flies it drags every enemy within 96px toward
+itself, hardest at the rim and falling off toward the round, so a crowd
+collapses into a ball instead of orbiting a point it can never reach.
+
+**It decelerates.** This is the whole trick and it was wrong in the first
+version: fired at a constant speed it gathered a crowd on the way past and then
+detonated on the far wall, well clear of the crowd it had just built — all of
+the setup and none of the payoff. It now coasts to a halt (`×0.22/sec`),
+stalls in the middle of what it gathered, and takes a last 0.42s of pull before
+it lands. Damage falls to a third at the rim, so the reward for the drag is
+that everything is at the centre when it goes.
+
+> [!note] Bosses are pulled at 22%
+> Dragging a boss off its own pattern would make BLACK FRIDAY the answer to
+> every fight in the game rather than the answer to a crowd, and a boss that
+> can be kited into a corner by a 460-coin purchase stops being a boss. They
+> take full damage; they just do not come when called.
+
+> [!note] Neither is on the evolution ladder
+> `EVO_TIER` stops at EPIC, so a rung can never offer a LEGENDARY — same rule
+> that keeps [[#THE FISH|THE FISH]] a purchase. See
+> [[Economy#What a rung pays out]]. Verified: ten rungs, every pool, no grade-4
+> gun ever offered.
 
 > [!note] Two numbers moved
 > **THE SIDEARM** fires 15% slower (`rate` 0.155 → 0.178 — `rate` is the delay
@@ -42,6 +106,40 @@ definitions live in `js/game.js`; `WORDER` is the slot order.
 It used to be the OMEGA BEAM: a violet line, bought with **50
 [[Economy#Cards|cards]]**. It is now a fish, held by the tail, that opens its
 mouth and emits a laser, bought with **500 coins**.
+
+### Making it read as a fish
+
+The first pass was a violet rectangle with an eye in it, and nobody was going
+to call that a fish. Five things do the work at 16×6 (32×12 baked), and the
+order matters:
+
+1. **A forked tail.** The one silhouette feature that says *fish* and nothing
+   else. The fist is wrapped round the tail, so the two prongs spread above and
+   below the knuckles — which is how you hold a fish you have just picked up.
+2. **A caudal peduncle** — the dark pinch between tail and body. Without the
+   narrowing, a tail is just more fish.
+3. **Fins breaking the outline**, dorsal and pelvic, offset from each other so
+   the body does not read as symmetrical.
+4. **An eye high on the head**, where a fish keeps it, not centred like a
+   cartoon.
+5. **An open mouth.** The centre line *alone* reaches the muzzle, with a tooth
+   glint behind it — and that single-pixel tip is where the beam comes out.
+
+The taper is what separates the two passes: the body now ends two columns short
+on the rows above and below the centre, so the snout juts. Baked silhouette:
+
+```
+.............##....####.........
+............####..######........
+.....         #############.....
+....          ##############....
+....          ##################
+....          ##################
+....          ##############....
+.....         #############.....
+.....     ..#####..######.......
+.......    ..##......##.........
+```
 
 The beam draw takes a `prism` flag off the weapon. Four stacked strokes —
 widest and dimmest first, so the line reads as a hot core inside a haze —
@@ -71,7 +169,8 @@ all at once.
 | **floor 4** | FREEZER BURN |
 | **floor 5** | THE HOG, **THE FISH** |
 | **floor 6** | THE ROTISSERIE *(and its contract)* |
-| **floor 7** | GOD FINGER |
+| **floor 7** | GOD FINGER, **THE FLYKILLER** |
+| **floor 9** | **BLACK FRIDAY** |
 
 So a floor-1 shop offers three things totalling 130 coins against a floor of
 roughly 60 coins income: enough to buy one and want the others.
@@ -91,7 +190,7 @@ SEAL** (8 floor bosses) is signed. `WEP.rot.lock = 'seal'` names the contract;
 > unconditionally, so the contract signs, toasts, displays as signed, and
 > changes nothing. This predates the depth gate; `floor: 3` is now the only
 > thing holding FREEZER BURN back. Same failure mode as
-> [[Bugs Found#B. THE FULL MENU's reward does not exist|THE FULL MENU]].
+> [[Bugs Found#B. THE FULL MENU contract has no reward|THE FULL MENU]].
 
 ## Handling notes
 

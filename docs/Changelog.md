@@ -179,6 +179,89 @@ it catches every source including boss piles. Measured at 0.12 coins a kill.
 > [!warning] Cards no longer buy anything
 > The beam was their only sink. See [[Economy#Cards]].
 
+## *(uncommitted)* — EVOLVE becomes a roster, and moves to the pause screen
+[[Economy#Evolution|EVOLVE]] was a title-screen button that bought a
+difficulty number. It is now a ten-rung ladder that pays out a **permanent
+arsenal**, and it lives on the pause screen because pressing it **restarts the
+run**.
+
+**Where it lives.** Off the title and death screens entirely; both are now
+three same-sized buttons on one centred row. The old second row was centred on
+a different axis depending on whether you had evolved, so it physically shifted
+under the cursor between visits. EVOLVE on the title was a lever with no
+visible price and nothing to lose by pulling it; on pause the run and the
+wallet are both on screen, and a line under the row says exactly what the
+button wants and what it will do.
+
+**What a rung pays.** One gun, kept in every run forever, drawn from the
+rarity that rung opened — two rungs a tier, COMMON up to EPIC. **THE FISH is
+never offered at any rung**: the LEGENDARY tier is the long game the coin
+economy has left
+and handing it out for evolving would retire it. Once the roster holds one gun
+of every rarity there is nothing left in the crate, so the rungs above deal
+**three cards at LEGENDARY** and you start every run holding the one you took.
+A tier down to its last gun opens the tier above it, because a pick screen with
+one card on it is a receipt, not a choice.
+
+**The ceiling and the curve.** `EVO_MAX = 10`, and the cost stopped doubling:
+`150 + 175*evo + 25*evo²` — 150 up to 3750, **16,500 for the whole ladder**.
+Doubling is the right shape for something unbounded and the wrong one for
+something that ends; rung 10 would have wanted 51,200 coins.
+
+**RESET EVOLUTION** moved to pause too and now empties the roster and the
+starting hand as well as the level, then restarts the run — you cannot keep
+holding guns you no longer own.
+
+**The world got heavier to match.** `diff()`'s evolution terms went
+`0.38/0.26/0.05` → **`0.46/0.30/0.06`**, and spawn count `0.12` → `0.15`. A
+floor-1 CRAWLER carries 26 HP at EVO 0 and **146 at EVO 10**, hitting 4× as
+hard. Elites needed no new term: `powerMul()` already counts guns held and
+cards in the deck, so the roster prices them up by itself.
+
+**The pause arsenal is divided by rarity** — one row per rung, guns laid along
+it, with `EVO` rather than `OWNED` on anything you keep. It used to be a flat
+run of eleven names down two columns ordered by `WORDER`, which is draw order
+rather than a hierarchy. Rows rather than columns for a second reason: stacked
+groups cost a header each, and the worst case — five signatures and THE THIRD
+EYE above them — pushed the tallest column straight through the wallet strip.
+
+## *(uncommitted)* — An empty floor, two more legendaries, and a fish that looks like one
+
+**The floor could come up empty, and EVOLVE made it easy.** Reported as *"there
+are no enemies when I evolve"*. Wave 1 was started by a wall-clock `setTimeout`
+that fired exactly once and was thrown away if you were on a menu when it
+landed — so opening pause, THE DECK or a level-up hand inside the opening 2.2
+seconds killed the floor permanently: no enemies, so no kills, so no drops and
+no coins. EVOLVE drops you into a new run *straight off a menu* holding a gun
+you want to look at, which is why it surfaced there. Replaced with `S.introT`,
+counted in `update()`, which only ticks in play — a menu now **pauses** the
+opening beat instead of consuming it, and `freshState()` clears it so an
+abandoned run can no longer leave an orphaned timer pointing at the new one.
+Full write-up:
+[[Bugs Found#14. A menu inside the first 2.2 seconds killed the floor permanently|Bugs Found #14]].
+
+**Two more [[Weapons#The three LEGENDARIES|LEGENDARIES]].** A LEGENDARY has to
+do something the rack cannot already do or it is an EPIC that costs more, so
+each owns a verb: **THE FLYKILLER** (380, floor 7) *chains* — the current walks
+outward from the thing you hit, five links, shedding a fifth of its bite a hop.
+**BLACK FRIDAY** (460, floor 9) *gathers* — a ghost round that passes through
+everything, drags the room toward itself, **decelerates**, and goes off in the
+middle of what it collected. Neither out-damages GOD FINGER single-target; both
+are the answer to a crowd. Neither is on the evolution ladder — `EVO_TIER` stops
+at EPIC.
+
+> [!note] BLACK FRIDAY's deceleration is the whole gun
+> The first version flew at a constant speed, gathered a crowd on the way past,
+> and detonated on the far wall — all of the setup and none of the payoff.
+> Measured at **0 damage** against eight dummies it had just dragged together.
+> Coasting to a halt puts it in the middle of them: **1342**.
+
+**[[Weapons#Making it read as a fish|THE FISH looks like a fish]].** It was a
+violet rectangle with an eye in it. Now: a forked tail spreading above and below
+the fist that holds it, a caudal peduncle, offset dorsal and pelvic fins, an eye
+high on the head, and a tapered snout where the centre line alone reaches the
+muzzle — which is where the beam comes out.
+
 ## Related
 - [[Bugs Found]] — the defects behind each fix above, and three still open
 - [[Tuning Values]] — where the numbers stand today

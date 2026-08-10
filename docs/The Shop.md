@@ -9,14 +9,17 @@ Guns are not lying around the abattoir. Clear **wave 5** or **wave 10** and the
 next door leads *sideways* instead of onward, into a small purple room with a
 very large man in it.
 
-> [!info] Cadence
-> ```js
-> SHOP_WAVES = [5, 10]
-> ```
-> **Twice a floor**, on the fives. The first is floor 1, wave 5.
->
-> He used to keep boss hours — `SHOP_EVERY = 3` against an `S.bossKills` that
-> counted elites and floor bosses alike, which worked out to exactly one shop
+## Cadence
+
+```js
+SHOP_WAVES = [5, 10]
+```
+
+**Twice a floor**, on the fives. The first is floor 1, wave 5.
+
+> [!note] He used to keep boss hours
+> `SHOP_EVERY = 3`, counted against an `S.bossKills` that tallied
+> elites and floor bosses alike, which worked out to exactly one shop
 > a floor, always after the wave-10 boss. That meant every purchase happened
 > on the way *out* of a floor: you spent the whole floor carrying money you had
 > no way to put down, and the gun you bought was tested on the next floor's

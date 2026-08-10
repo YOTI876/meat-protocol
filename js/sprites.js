@@ -381,20 +381,60 @@ SPR.rail = SPRITE([         // GOD FINGER
    laser. The grip column on the left is the same six-pixel `g/G` gunmetal
    silhouette every other weapon in the rack uses, so it still reads as
    "something Damjan is holding" from the hip — everything right of it is
-   fish. The tail fin is the wedge at x2-4, the body swells to the dorsal
-   ridge, and the mouth is the open notch at the muzzle end where the beam
-   comes out.
+   fish.
+
+   The first pass was a violet rectangle with an eye in it, and nobody was
+   going to call that a fish. Five things do the actual work at this size, and
+   the order matters:
+
+     1. a FORKED TAIL. It is the one silhouette feature that says fish and
+        nothing else. The fist is wrapped round the tail, so the two prongs
+        (x6, rows 0 and 4) spread above and below the knuckles — which is
+        exactly how you hold a fish you have just picked up.
+     2. a CAUDAL PEDUNCLE — the dark `W` pinch at x7 between tail and body.
+        Without the narrowing, a tail is just more fish.
+     3. FINS breaking the outline: dorsal on top, pelvic underneath, both
+        offset from each other so the body does not read as symmetrical.
+     4. an EYE high on the head, where a fish keeps it, not centred like a
+        cartoon.
+     5. a MOUTH that is open — the snout reaches furthest on the centre line
+        alone, with a tooth glint behind it, and that single-pixel tip is
+        where the beam comes out.
 
    `M`/`W` stay the omega violet in the sprite itself. The beam is what cycles
    colour — see the beam draw in game.js. A fish that strobed through the
    spectrum in your hand would fight the arena palette every frame; a fish
    that is one colour firing every colour is the joke. */
 SPR.omega = SPRITE([        // THE FISH
-  '.......M.MMMM...',   // tail tip, dorsal fin
-  '..gggggMMMMMMMM.',
-  '..gGGGgMMMMMeMMM',   // the snout reaches furthest on the centre line
-  '..GGgggMMMMMMMM.',
-  '...GG..M..MM....',   // tail bottom, pelvic fin
+  '......MM.MMM....',   // tail top prong, dorsal fin
+  '..gggggWMMMMep..',   // peduncle, body, eye and pupil high on the head
+  '..gGGGgMMMMMM!MM',   // the centre line ALONE reaches the open mouth
+  '..GGgggWMMMMMW..',   // belly turning away from the light
+  '...GG.MM..MM....',   // tail bottom prong, pelvic fin
+  '....GG..........'
+]);
+
+/* THE FLYKILLER — the blue lamp above the deli, taken off the wall.
+   A steel frame round an electrified mesh: `i` bright and `Z` dark, alternated
+   so it reads as a grid rather than a panel. */
+SPR.zap = SPRITE([          // THE FLYKILLER
+  '.......TTTTTTT..',
+  '..gggggTiZiZiTT.',
+  '..gGGGgTZiZiZiT.',
+  '..GGgggTiZiZiTT.',
+  '...GG..TTTTTTT..',
+  '....GG..........'
+]);
+
+/* BLACK FRIDAY — a black housing with a hole in the end of it. The `o` at the
+   muzzle is the universal outline colour doing its other job: at this size the
+   only way to draw a singularity is to draw nothing, ringed. */
+SPR.void = SPRITE([         // BLACK FRIDAY
+  '.........WMW....',
+  '..gggggqqWMMMW..',
+  '..gGGGgqqWMoMW..',
+  '..GGgggqqWMMMW..',
+  '...GG....WMW....',
   '....GG..........'
 ]);
 
@@ -1232,6 +1272,7 @@ const PROP_MAP = {
   n: ['n', 'N'], N: ['n', 'N'], w: ['w', 'U']
 };
 for (const k of ['scar', 'saw', 'nail', 'micro', 'hog', 'rail', 'omega', 'pistol',
+                 'zap', 'void',
                  'price', 'chill', 'rot', 'mag', 'grenade', 'coin', 'card',
                  'shield', 'pedestal', 'ammo', 'medkit']) {
   const s = SPR[k];

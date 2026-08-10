@@ -141,7 +141,8 @@ addEventListener('keydown', e => {
   }
   if (e.code === 'Escape' && S.mode === 'augment') refuseAugments();
   // cosmetics are reachable from anywhere that isn't a firefight
-  if (e.code === 'KeyC' && S.mode !== 'cos' && S.mode !== 'play') { S.cosReturn = S.mode; S.mode = 'cos'; }
+  // ...but not out of the evolution pick, which owes you something on the way out
+  if (e.code === 'KeyC' && S.mode !== 'cos' && S.mode !== 'play' && S.mode !== 'evolve') { S.cosReturn = S.mode; S.mode = 'cos'; }
   if (S.mode === 'title' && (e.code === 'Enter' || e.code === 'Space')) startRun();
   if (S.mode === 'dead' && e.code === 'KeyR') startRun();
   if (S.mode === 'play') {
@@ -258,7 +259,33 @@ const CONTACT_CD = 0.74;   // still a shorter fuse than the 0.78 it used to be
    rather than a number you pass on the way to floor 6. */
 const COIN_RATE = 0.70;
 const OMEGA_COINS = 500;   // THE FISH is the long game now
-const EVO_COST = ev => 100 * Math.pow(2, ev);   // 100, 200, 400, 800 ...
+/* ---- EVOLUTION ----
+   Ten rungs and no more. The cost used to double forever (100, 200, 400 ...),
+   which is the right shape for something unbounded and the wrong one for
+   something that ends: rung 10 would have wanted 51,200 coins, and at
+   COIN_RATE that is several hundred thousand kills. A capped ladder wants a
+   quadratic instead — the differences grow, the total does not run away.
+
+     150, 350, 600, 900, 1250, 1650, 2100, 2600, 3150, 3750  →  16,500 all-in
+
+   which is roughly ten good runs for the whole ladder, and the first rung
+   inside one. */
+const EVO_MAX = 10;
+const EVO_COST = ev => 150 + 175 * ev + 25 * ev * ev;
+/* Which weapon rarity each rung opens up, indexed by the evolution you are
+   *buying* (rung 1 reads slot 0). Two rungs a tier, so the middle tiers are a
+   real choice rather than a formality — RARE holds three guns and you only
+   ever take two of them.
+
+     1-2 COMMON   3-4 UNCOMMON   5-6 RARE   7-8 EPIC
+
+   Past that the roster holds one of every rarity and the reward changes shape
+   entirely; see evoReward(). LEGENDARY is not on this ladder at all — THE FISH
+   is bought with 500 coins by a player who went and got them, and handing it
+   out for evolving would retire the whole tier — and with it the only reason
+   the coin economy has to keep climbing past a few hundred. */
+const EVO_TIER = [0, 0, 1, 1, 2, 2, 3, 3, 3, 3];
+const EVO_TIERS_ALL = [0, 1, 2, 3];             // what "one of every rarity" means
 
 /* THE WAVE-TEN ROSTER.
 
@@ -394,12 +421,26 @@ const WEP = {
   rail:  { id: 'rail',  name: 'GOD FINGER',    spr: SPR.rail,  gr: 3, floor: 6, price: 190, mag: 5,   rate: 0.55,  dmg: 165, spread: 0,    spd: 950, pellets: 1, reload: 2.4,  sfx: 'railgun',  col: '#a8e8ff', charge: 0.5, pierce: 99, size: 3, knock: 200, tag: 'points. things stop existing.' },
   // THE FISH. Coins, not cards — 500 of them, which at COIN_RATE is most of a
   // deep run. `prism: 1` is what makes its beam cycle colour; see drawWorld.
-  omega: { id: 'omega', name: 'THE FISH',      spr: SPR.omega, gr: 4, floor: 4, price: OMEGA_COINS, mag: 300, rate: 0.02, dmg: 720, spread: 0, spd: 0, pellets: 0, reload: 2.6, sfx: 'beam', col: '#c05cff', beam: 1, prism: 1, girth: 11, tag: 'it is a fish. it fires a laser. do not ask.' }
+  omega: { id: 'omega', name: 'THE FISH',      spr: SPR.omega, gr: 4, floor: 4, price: OMEGA_COINS, mag: 300, rate: 0.02, dmg: 720, spread: 0, spd: 0, pellets: 0, reload: 2.6, sfx: 'beam', col: '#c05cff', beam: 1, prism: 1, girth: 11, tag: 'it is a fish. it fires a laser. do not ask.' },
+  /* ---- the other two LEGENDARIES ----
+     Both are deep, both are expensive, and neither is a bigger number than the
+     gun below it — that is the point of the rung. A LEGENDARY has to do
+     something the rack cannot already do, or it is just an EPIC that costs
+     more, so each one owns a verb nothing else has: THE FLYKILLER *chains*,
+     BLACK FRIDAY *gathers*. Neither is on the evolution ladder; EVO_TIER stops
+     at EPIC and these are bought, like the fish. */
+  zap:   { id: 'zap',   name: 'THE FLYKILLER', spr: SPR.zap,   gr: 4, floor: 6, price: 380, mag: 24,  rate: 0.30,  dmg: 44, spread: 0.02,  spd: 620, pellets: 1, reload: 2.2,  sfx: 'plasma',   col: '#9cf0ff', size: 2, chain: 5, chainR: 132, pin: 0.22, tag: 'the blue light above the deli. it has opinions.' },
+  // `void` is a reserved word but a perfectly legal property name, and every
+  // use of it here is string-keyed. Consistency with SPR.void wins.
+  void:  { id: 'void',  name: 'BLACK FRIDAY',  spr: SPR.void,  gr: 4, floor: 8, price: 460, mag: 5,   rate: 0.95,  dmg: 250, spread: 0,    spd: 330, pellets: 1, reload: 3.1,  sfx: 'railgun',  col: '#c46bff', size: 4, life: 2.4, sing: { r: 96, pull: 340 }, knock: 0, tag: 'everything comes to the sale' }
 };
-const WORDER = ['pistol', 'scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot', 'rail', 'omega'];
+const WORDER = ['pistol', 'scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot', 'rail', 'omega', 'zap', 'void'];
 /* Two of these are behind contracts and simply are not in PACI's crate until
-   you have earned them — see CONTRACTS. */
-const BUYABLE = ['scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot', 'rail'];
+   you have earned them — see CONTRACTS. The three LEGENDARIES are here too:
+   they go through exactly the same depth/price gates as everything else, and
+   `evoPickable()` reads this list but only ever asks it for grades 0-3, so a
+   LEGENDARY can never fall out of an evolution rung. */
+const BUYABLE = ['scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot', 'rail', 'zap', 'void'];
 
 /* ---- COSMETICS. bought from the vault, kept forever. ---- */
 const COSMETICS = [
@@ -432,13 +473,151 @@ function persist() {
     deep: Math.max(s.deep || 0, S.room + 1),
     vault: Math.max(s.vault || 0, S.vault),
     coins: S.coins, cards: S.cards, evo: S.evo | 0,
+    evoGuns: (S.evoGuns || []).slice(), evoCards: (S.evoCards || []).slice(),
     godFound: s.godFound || S.god,
     modagaz: Math.max(s.modagaz || 0, S.modagazFound),
     goro: s.goro || S.goro
   });
 }
-/* Evolving has to be earned: 100 coins the first time, doubling after. */
-function canEvolve() { return S.coins >= EVO_COST(S.evo | 0); }
+
+/* ============================================================
+   EVOLUTION
+
+   It is not a title-screen button any more. Evolving restarts the run, and a
+   button that restarts the run belongs where you can see what you are giving
+   up — you press it from the pause screen, mid-floor, holding the coins it is
+   about to take. From the title it was a free lever with no cost on screen.
+
+   What it pays out is a permanent roster. Each rung hands you one gun that is
+   yours from the first frame of every run afterwards, drawn from the rarity
+   that rung opened. Once the roster holds one gun of every rarity there is
+   nothing left to hand over in the crate, so the rungs above that deal three
+   cards at LEGENDARY instead and you start every run holding the one you took.
+   ============================================================ */
+function evoGuns() { return S.evoGuns || (S.evoGuns = []); }
+function evoCards() {
+  if (!S.evoCards) S.evoCards = [];
+  return S.evoCards;
+}
+function evoCardDef(id) { return CARDS.find(c => c.id === id); }
+/* Everything in PACI's crate except the fish, minus anything still behind an
+   unsigned contract — evolution is a different door into the same crate, not
+   a way around the lock on it. */
+function evoPickable() {
+  return BUYABLE.filter(id => !WEP[id].lock || contractDone(WEP[id].lock));
+}
+/* True once every rarity on the ladder is represented in the roster. */
+function evoFullSet() {
+  const have = evoGuns().map(id => WEP[id].gr);
+  return EVO_TIERS_ALL.every(g => have.indexOf(g) >= 0);
+}
+/* The guns rung `ev` is allowed to offer: the tier it opened, minus whatever
+   the roster already holds.
+
+   Tiers hold two or three guns and a rung takes one, so the back half of a
+   tier would otherwise be a screen with a single card on it — which is not a
+   choice, it is a receipt. When the tier is down to its last gun the pool
+   opens the tier *above* it too, and only falls back downward when there is
+   nothing above. A locked ROTISSERIE is handled by the same widening. */
+function evoGunPool(ev) {
+  const tier = EVO_TIER[clamp((ev | 0) - 1, 0, EVO_TIER.length - 1)];
+  const held = evoGuns(), stock = evoPickable();
+  const at = g => stock.filter(id => WEP[id].gr === g && held.indexOf(id) < 0);
+  const pool = at(tier);
+  for (let g = tier + 1; g <= 3 && pool.length < 2; g++) for (const id of at(g)) pool.push(id);
+  for (let g = tier - 1; g >= 0 && pool.length < 2; g--) for (const id of at(g)) pool.push(id);
+  return pool;
+}
+/* What rung `ev` is about to pay out: 'gun', 'card', or nothing left to give. */
+function evoReward(ev) {
+  if (!evoFullSet() && evoGunPool(ev).length) return 'gun';
+  if (evoCardPool().length) return 'card';
+  return null;
+}
+/* Cards you could still be handed at LEGENDARY. A card already banked at its
+   own max rank has nothing left to give, and the depth gates do not apply —
+   you are not on a floor yet. */
+function evoCardPool() {
+  const taken = evoCards();
+  return CARDS.filter(c => {
+    let n = 0;
+    for (const id of taken) if (id === c.id) n++;
+    return n < c.max;
+  });
+}
+
+/* Open the pick screen for the rung just bought. Returns false when the rung
+   has nothing to offer, so the caller can restart without an empty door. */
+function openEvoPick() {
+  const kind = evoReward(S.evo | 0);
+  if (!kind) return false;
+  if (kind === 'gun') {
+    S.evoOffer = { kind: 'gun', guns: evoGunPool(S.evo | 0),
+                   tier: EVO_TIER[clamp((S.evo | 0) - 1, 0, EVO_TIER.length - 1)] };
+  } else {
+    /* Three cards, every one of them LEGENDARY. Weighted the same way a hand
+       is, so SPLIT stays the event it is meant to be even here. */
+    const bag = evoCardPool().slice(), out = [];
+    while (out.length < 3 && bag.length) {
+      let total = 0;
+      for (const c of bag) total += c.w === undefined ? 1 : c.w;
+      let r = Math.random() * total, idx = bag.length - 1;
+      for (let i = 0; i < bag.length; i++) { r -= bag[i].w === undefined ? 1 : bag[i].w; if (r <= 0) { idx = i; break; } }
+      const c = bag.splice(idx, 1)[0];
+      out.push({ c, g: 4, val: cardVal(c, 4) });
+    }
+    S.evoOffer = { kind: 'card', cards: out };
+  }
+  S.mode = 'evolve';
+  S.evoIn = 0;
+  if (A.duck) A.duck(0.6, 3.2);
+  A.doorOpen();
+  return true;
+}
+function takeEvoGun(id) {
+  if (S.mode !== 'evolve' || evoGuns().indexOf(id) >= 0) return;
+  evoGuns().push(id);
+  evoGuns().sort((a, b) => WORDER.indexOf(a) - WORDER.indexOf(b));
+  persist();
+  S.evoOffer = null;
+  A.buy(); A.bigpickup();
+  startRun();
+  // after, not before: startRun -> freshState() zeroes the flash
+  S.flash = 0.7; S.flashCol = WEP[id].col;
+}
+function takeEvoCard(o) {
+  if (S.mode !== 'evolve' || !o) return;
+  evoCards().push(o.c.id);
+  persist();
+  S.evoOffer = null;
+  A.god(); A.roar();
+  startRun();
+  S.flash = 0.9; S.flashCol = GRADE[4].col;
+}
+/* Fold the permanent roster into a run that has just been built. Cards go in
+   before guns on purpose: magazine size reads ST().magMul, which reads the
+   deck, so a TOOLS card in the starting hand has to be banked before any
+   magazine is filled. */
+function applyEvoLoadout() {
+  for (const id of evoCards()) {
+    const c = evoCardDef(id); if (!c) continue;
+    const d = S.deck[c.id] || (S.deck[c.id] = { rank: 0, amt: 0, g: 0 });
+    d.rank++;
+    d.amt = Math.round((d.amt + cardVal(c, 4)) * 10) / 10;
+    d.g = 4;
+  }
+  recalcAisles();
+  for (const id of evoGuns()) {
+    if (!WEP[id] || S.p.owned.indexOf(id) >= 0) continue;
+    S.p.owned.push(id);
+    S.p.mags[id] = magCap(WEP[id]);
+  }
+  S.p.owned.sort((a, b) => WORDER.indexOf(a) - WORDER.indexOf(b));
+  S.p.wi = 0;
+}
+
+/* Evolving has to be earned, and it ends at EVO_MAX. */
+function canEvolve() { return (S.evo | 0) < EVO_MAX && S.coins >= EVO_COST(S.evo | 0); }
 function evolve() {
   if (!canEvolve()) { A.denied(); return false; }
   S.evo = (S.evo | 0) + 1;
@@ -446,15 +625,23 @@ function evolve() {
   persist();
   A.god(); A.roar();
   S.flash = 1.0; S.flashCol = '#b028ff';
+  /* The pick screen restarts the run on its way out. If the rung has nothing
+     left to offer — every gun taken and every card at max — restart straight
+     away rather than opening an empty door. */
+  if (!openEvoPick()) startRun();
   return true;
 }
-/* ...and undoing it puts the world back to plain, ordinary awful. */
+/* ...and undoing it puts the world back to plain, ordinary awful: the level,
+   the roster and the starting hand all go, and the run restarts without them
+   because you cannot keep holding guns you no longer own. */
 function resetEvolution() {
   if (!(S.evo | 0)) { A.denied(); return false; }
   S.evo = 0;
+  S.evoGuns = []; S.evoCards = [];
   persist();
   A.bigpickup();
   S.flash = 0.8; S.flashCol = '#9fe08a';
+  startRun();
   return true;
 }
 function ownedCos() { const s = loadSave(); return s.cosOwned || ['crimson']; }
@@ -479,6 +666,14 @@ function freshState() {
     items: {}, god: false,
     coins: sv.coins || 0, cards: sv.cards || 0, vault: sv.vault || 0,
     evo: sv.evo || 0, modagazFound: sv.modagaz || 0,
+    /* The permanent roster. Both survive freshState because both are the
+       whole point of evolving — they are wallet, not run state. Guns are
+       filtered against WEP here; cards cannot be, because freshState runs
+       above CARDS in the file and a `const` in its own dead zone throws.
+       evoCards() does that filtering at the point of use instead. */
+    evoGuns: (sv.evoGuns || []).filter(id => !!WEP[id]),
+    evoCards: (sv.evoCards || []).slice(),
+    evoOffer: null,
     goro: false, goroHits: 0, goroT: 0, vacuum: 0,
     /* THE MENU. `deck` is the run's whole build; `luck` tilts every hand.
        `aisle` is the per-aisle rank tally THE ORDER reads, `fused` the
@@ -500,6 +695,9 @@ function freshState() {
     jump: 0, jumpSpr: null, muzzle: null, beamHit: null,
     msg: '', msgT: 0, sub: '', banner: null, prompt: null,
     fade: 0, fadeDir: 0, pending: null, cosReturn: 'title',
+    /* The floor's opening beat. Both count down in game time inside update(),
+       which is the whole point — see startRun(). */
+    introT: 0, introMsgT: 0,
     whisperT: rnd(6, 14), beatT: 0, breathT: 0, ui: []
   });
 }
@@ -1144,13 +1342,24 @@ function checkContracts() {
   }
   if (changed) writeSave({ cDone: seen });
 }
-/* One knob for how hard the floor hits. Evolutions stack on top forever. */
+/* One knob for how hard the floor hits.
+
+   The evolution terms went up with the payout. A rung used to buy a flat
+   world-difficulty increase and nothing else; it now hands over a gun you
+   keep forever, and past the full roster a LEGENDARY card you open every run
+   holding. Ten rungs of that is a different character, so ten rungs of this
+   has to be a different building — at EVO_MAX enemies carry 5.6x health, hit
+   4x as hard and arrive 2.5x as thick.
+
+   Elites need no term here: powerMul() already counts the guns in your hands
+   and the cards in your deck, so an evolved roster prices them up on its own.
+   See spawnMini. */
 function diff() {
   const ev = S.evo | 0;
   return {
-    hp: (1 + S.room * 1.25) * (1 + ev * 0.38),
-    dmg: (1 + S.room * 0.72) * (1 + ev * 0.26),
-    spd: (1 + S.room * 0.11) * (1 + ev * 0.05),
+    hp: (1 + S.room * 1.25) * (1 + ev * 0.46),
+    dmg: (1 + S.room * 0.72) * (1 + ev * 0.30),
+    spd: (1 + S.room * 0.11) * (1 + ev * 0.06),
     score: (1 + S.room * 0.7) * (1 + ev * 0.5)
   };
 }
@@ -1309,8 +1518,14 @@ function shopSlots() { return contractDone('reg') ? 4 : 3; }
 function shopStock() {
   /* Three gates, and they are not the same gate. `lock` is a contract you
      signed, `floor` is how deep you are, and price is whether you can afford
-     what is actually on the pallet. The beam ignores depth entirely — it costs
-     cards, which are their own long game. */
+     what is actually on the pallet.
+
+     A fourth thing now thins the crate from outside it: anything already in
+     your permanent evolution roster is owned from the first frame, so PACI
+     stops carrying it. That is the intended shape — an evolved run walks in
+     holding what a fresh one has to buy — but it does mean a deep enough
+     roster can leave him with an empty pallet, and the pedestal loop below is
+     written to survive that rather than assume three things exist. */
   const pool = BUYABLE.filter(id => S.p.owned.indexOf(id) < 0 &&
                                     (!WEP[id].lock || contractDone(WEP[id].lock)) &&
                                     S.room >= (WEP[id].floor | 0));
@@ -1892,11 +2107,15 @@ function emit(w) {
       const a = aim + off + rnd(-base, base);
       S.bul.push({
         x: mx, y: my, vx: Math.cos(a) * w.spd, vy: Math.sin(a) * w.spd,
-        dmg: fdmg, pierce: (w.pierce || 0) + st.pierce, hitIds: [], life: 1.4,
+        dmg: fdmg, pierce: (w.pierce || 0) + st.pierce, hitIds: [], life: w.life || 1.4,
         col, size: (w.size || 1) + (evo && S.scarLv > 3 ? 1 : 0) + (rd('caliber') ? 1 : 0),
-        knock: w.knock || 60, pin: w.pin || 0, burn: (w.burn || 0) + st.burn,
+        knock: w.knock === undefined ? 60 : w.knock, pin: w.pin || 0, burn: (w.burn || 0) + st.burn,
         bounce: (w.bounce || 0) + st.bounce, mark: w.mark || 0, chill: w.chill || 0,
         home: homing, lock: rd('guidance') ? null : undefined,
+        /* THE FLYKILLER and BLACK FRIDAY. `ghost` is what makes a singularity
+           a singularity: it does not collide, it arrives. */
+        chain: w.chain || 0, chainR: w.chainR || 0,
+        sing: w.sing || null, ghost: !!w.sing,
         crit: forceCrit, spd: w.spd, god: S.god
       });
     }
@@ -1917,6 +2136,64 @@ function emit(w) {
   if (!w.beam) A.shell();
   const ca = p.ang + Math.PI / 2 + rnd(-0.4, 0.4);
   S.gibs.push({ x: mx, y: my, vx: Math.cos(ca) * 70, vy: Math.sin(ca) * 70, col: '#c9a227', life: 0.9, s: 1 });
+}
+
+/* ---- THE FLYKILLER's chain ----
+   Walks outward from the thing you actually hit rather than splashing from it:
+   each link is the nearest enemy the arc has not already touched, so it snakes
+   through a crowd instead of hitting a disc. It sheds a fifth of its bite per
+   hop, which is what keeps a five-link chain from being five full shots — the
+   gun is enormous into a queue and mediocre into one large thing, and that is
+   the whole character of it.
+
+   `seen` is per-cast, so a chain cannot fold back and double-dip. */
+function chainZap(from, dmg, hops, radius, col) {
+  const seen = [from];
+  let cur = from, d = dmg;
+  for (let h = 0; h < hops; h++) {
+    let best = null, bd = radius;
+    for (const o of S.en) {
+      if (o.dead || seen.indexOf(o) >= 0) continue;
+      const dd = Math.hypot(o.x - cur.x, o.y - cur.y);
+      if (dd < bd) { bd = dd; best = o; }
+    }
+    if (!best) break;
+    d *= 0.8;
+    S.arcs.push({ x1: cur.x, y1: cur.y, x2: best.x, y2: best.y, life: 0.16, col });
+    damageEnemy(best, d, false, Math.atan2(best.y - cur.y, best.x - cur.x), true);
+    best.stun = Math.max(best.stun, 0.16);          // the twitch, not a stunlock
+    part(best.x, best.y, col, 3, 60, 0.22);
+    seen.push(best); cur = best;
+  }
+  if (seen.length > 1 && A.plasma) A.plasma();
+  return seen.length - 1;
+}
+
+/* ---- BLACK FRIDAY's singularity ----
+   The round itself is a ghost: it passes through everything, drags the room
+   toward it on the way past, and only pays out when it lands. Damage falls to
+   a third at the rim, so the reward for the drag is that everything is at the
+   centre when it goes.
+
+   Bosses are pulled at a fraction. Dragging a boss off its own pattern would
+   make the gun the answer to every fight in the game rather than the answer to
+   a crowd, and a boss that can be kited into a corner by a 460-coin purchase
+   stops being a boss. */
+function singularityPop(b) {
+  const r = b.sing.r;
+  ring(b.x, b.y, r, b.col, 0.55, 3);
+  ring(b.x, b.y, r * 0.55, '#ffffff', 0.28, 2);
+  part(b.x, b.y, b.col, 26, 200, 0.6);
+  shake(11); punch(0.05);
+  if (A.roar) A.roar();
+  for (const e of S.en) {
+    if (e.dead) continue;
+    const d = Math.hypot(e.x - b.x, e.y - b.y);
+    if (d > r) continue;
+    damageEnemy(e, b.dmg * (1 - 0.66 * (d / r)), false,
+                Math.atan2(e.y - b.y, e.x - b.x), true);
+    if (!e.dead) e.stun = Math.max(e.stun, 0.45);
+  }
 }
 
 /* continuous beam (OMEGA) */
@@ -2474,7 +2751,7 @@ function startWave(n) {
     const levelled = 1 + Math.max(0, S.level - 1) * 0.06;   // the stronger you get, the more come
     // gentler inside a floor, much steeper between them
     const count = Math.round((7 + n * 2.6 + n * n * 0.26) * (1 + S.room * 0.72)
-                             * (1 + (S.evo | 0) * 0.12) * armed * levelled * ST().swarm);
+                             * (1 + (S.evo | 0) * 0.15) * armed * levelled * ST().swarm);
     // Weights shift toward the nastier things as the wave and floor climb.
     const pool = [['crawler', 10]];
     if (n >= 2 || S.room > 0) pool.push(['shrieker', 3 + n * 0.4 + S.room]);
@@ -2622,6 +2899,19 @@ function update(rdt) {
   if (S.mode !== 'play') { updateCam(rdt); return; }
 
   const p = S.p, st = ST(), w = curW();
+
+  /* The floor's opening beat. Ticks only here, so it is paused by every menu
+     rather than lost to one — see startRun() for the bug this replaced. */
+  // held rather than spent while a room fade is in flight, so a wave can never
+  // land in the half-built room the fade is hiding
+  if (S.introT > 0 && !S.fadeDir) {
+    S.introT -= rdt;
+    if (S.introT <= 0 && S.wave === 0) startWave(1);
+  }
+  if (S.introMsgT > 0) {
+    S.introMsgT -= rdt;
+    if (S.introMsgT <= 0) msg('', 'something breathes inside the north wall.', 4);
+  }
 
   /* The hand is dealt from here rather than from gainXP, so a boss can add its
      guaranteed pick and its luck bonus before the cards are turned over. The
@@ -2888,6 +3178,35 @@ function update(rdt) {
       }
       if (Math.random() < dt * 40) part(b.x, b.y, b.col, 1, 18, 0.3);
     }
+    /* BLACK FRIDAY drags on the way past. Strongest at the rim of nothing and
+       falling off toward the round itself, so a crowd collapses into a ball
+       rather than orbiting a point it can never reach. */
+    if (b.sing) {
+      /* It coasts to a halt and goes off where it stopped.
+         Fired at a constant speed it would drag a crowd together on the way
+         past and then detonate on the far wall, well clear of the crowd it had
+         just built — all of the setup and none of the payoff. Decelerating
+         means the round stalls in the middle of what it gathered, which is the
+         entire trick of the gun. The stall then buys a last 0.42s of pull
+         before it lands. */
+      const k = Math.pow(0.22, dt);
+      b.vx *= k; b.vy *= k;
+      if (!b.stalled && Math.hypot(b.vx, b.vy) < 34) {
+        b.stalled = 1;
+        b.life = Math.min(b.life, 0.42);
+      }
+      for (const e of S.en) {
+        if (e.dead) continue;
+        const dx = b.x - e.x, dy = b.y - e.y, d = Math.hypot(dx, dy);
+        if (d > b.sing.r || d < 2) continue;
+        const f = b.sing.pull * (1 - d / b.sing.r) * dt * (e.boss ? 0.22 : 1);
+        e.vx += dx / d * f; e.vy += dy / d * f;
+      }
+      if (Math.random() < dt * 70) {
+        const a2 = Math.random() * TAU, rr = b.sing.r * rnd(0.4, 1);
+        part(b.x + Math.cos(a2) * rr, b.y + Math.sin(a2) * rr, b.col, 1, 12, 0.3);
+      }
+    }
     let removed = false;
     for (let sub = 0; sub < 2; sub++) {
       const px = b.x, py = b.y;
@@ -2921,7 +3240,8 @@ function update(rdt) {
           A.nadeBounce();
           continue;
         }
-        spray(b.x, b.y, Math.atan2(-b.vy, -b.vx), '#d8c8b0', 6, 110, 0.28, 0.7);
+        if (b.sing) singularityPop(b);      // it lands on the wall it reached
+        else spray(b.x, b.y, Math.atan2(-b.vy, -b.vx), '#d8c8b0', 6, 110, 0.28, 0.7);
         S.bul.splice(i, 1); removed = true; break;
       }
       /* PACI is not an enemy and has no health bar. He is a very large man
@@ -2931,7 +3251,8 @@ function update(rdt) {
         angerPaci(b.x, b.y);
         S.bul.splice(i, 1); removed = true; break;
       }
-      for (const e of S.en) {
+      // a singularity passes through everything; it pays out where it stops
+      for (const e of b.ghost ? [] : S.en) {
         if (e.dead || b.hitIds.indexOf(e) >= 0) continue;
         if (Math.hypot(e.x - b.x, e.y - b.y) < e.r + 3.5 + b.size) {
           const a = Math.atan2(b.vy, b.vx);
@@ -2953,17 +3274,25 @@ function update(rdt) {
           if (rd('ricochet') && b.bounced) hd *= 1 + 0.30 * b.bounced;
           damageEnemy(e, hd, true, a, false, b.crit);
           float(b.x, b.y - 6, Math.round(hd), b.god ? '#ff5cf0' : hd > 60 ? '#ff8a3a' : '#ffe8b0', hd > 60);
+          // THE FLYKILLER: the round stops here, the current does not
+          if (b.chain) chainZap(e, hd, b.chain, b.chainR, b.col);
           b.hitIds.push(e);
           if (b.hitIds.length > b.pierce) { S.bul.splice(i, 1); removed = true; }
           break;
         }
       }
       if (removed) break;
-      if (b.x < 0 || b.y < 0 || b.x > S.aw || b.y > S.ah) { S.bul.splice(i, 1); removed = true; break; }
+      if (b.x < 0 || b.y < 0 || b.x > S.aw || b.y > S.ah) {
+        if (b.sing) singularityPop(b);
+        S.bul.splice(i, 1); removed = true; break;
+      }
     }
     if (removed) continue;
     b.life -= dt;
-    if (b.life <= 0) S.bul.splice(i, 1);
+    if (b.life <= 0) {
+      if (b.sing) singularityPop(b);       // it does not fizzle, it arrives
+      S.bul.splice(i, 1);
+    }
   }
 
   /* ---- grenades ---- */
@@ -3661,6 +3990,8 @@ function startRun() {
   S.mode = 'play';
   buildRoom(0);
   S.p = makePlayer();
+  applyEvoLoadout();                 // the permanent roster, before anything reads it
+  S.p.hp = ST().maxhp;               // a starting ROUGHAGE should be health you have, not a ceiling
   S.cam.cx = S.p.x; S.cam.cy = S.p.y;
   recalcLuck();
   /* Signed contracts pay out here, at the top of the run. */
@@ -3670,8 +4001,22 @@ function startRun() {
   A.setDread(0.2);
   if (A.music) { A.music.setFloor(0); A.music.setBoss(false); A.music.setIntensity(0.15); A.music.start(); }
   msg(roomDef(0).name, roomDef(0).sub, 3.4);
-  setTimeout(() => { if (S.mode === 'play' && S.wave === 0) startWave(1); }, 2200);
-  setTimeout(() => { if (S.mode === 'play') msg('', 'something breathes inside the north wall.', 4); }, 6200);
+  /* Wave 1 is on GAME time, not wall-clock.
+     These were two `setTimeout`s, and that was a real defect rather than a
+     style choice. A wall-clock timer keeps running while you are on a menu and
+     it fires exactly once: pause, open THE DECK, or sit on a level-up hand
+     inside the opening 2.2 seconds and the `S.mode === 'play'` guard threw the
+     only wave-1 call the run was ever going to get. The floor then sat there,
+     empty, forever — no enemies, no drops, no way back.
+
+     Rare on a cold start, and much less rare after EVOLVE, which drops you
+     into a brand new run straight off a menu holding a gun you have every
+     reason to want to look at. They are counted down in update() instead,
+     which only ticks in play, so pausing pauses them. They also cannot
+     accumulate: freshState() clears both, so restarting cannot leave an
+     orphaned timer from the run you abandoned pointing at the new one. */
+  S.introT = 2.2;
+  S.introMsgT = 6.2;
 }
 
 function nextRoom() {
@@ -3703,7 +4048,8 @@ function nextRoom() {
     A.setDread(0.5 + nr * 0.15);
     if (A.music) { A.music.setFloor(nr); A.music.setBoss(false); A.music.setIntensity(0.2 + nr * 0.16); }
     persist();
-    setTimeout(() => { if (S.mode === 'play' && S.wave === 0) startWave(1); }, 2600);
+    S.introT = 2.6;              // game time — see startRun()
+    S.introMsgT = 0;
   };
 }
 
@@ -5016,15 +5362,22 @@ function drawTitle() {
   ctx.globalAlpha = 1;
   updateParticles(1 / 60);
 
-  uiBtn(W / 2 - 150, 150, 96, 22, 'PLAY', '#e8b25a', () => startRun());
-  uiBtn(W / 2 - 48, 150, 96, 22, 'COSMETICS', '#b558ff', () => { S.cosReturn = 'title'; S.mode = 'cos'; });
-  uiBtn(W / 2 + 54, 150, 96, 22, 'EVOLVE ' + (S.evo | 0), '#ff4a54', () => evolve(), !canEvolve());
-  if (S.evo | 0) {
-    uiBtn(W / 2 - 100, 176, 96, 16, 'CONTRACTS', '#f0c65a', () => { S.cosReturn = 'title'; S.mode = 'contracts'; });
-    uiBtn(W / 2 + 4, 176, 96, 16, 'RESET EVO', '#7fe08a', () => resetEvolution());
-  } else {
-    uiBtn(W / 2 - 48, 176, 96, 16, 'CONTRACTS', '#f0c65a', () => { S.cosReturn = 'title'; S.mode = 'contracts'; });
-  }
+  /* Three buttons, one centred row, all the same size.
+     EVOLVE and RESET EVO used to sit here, which forced a second row that was
+     centred on a different axis depending on whether you had evolved — the
+     row physically shifted under the cursor between visits. Both moved to the
+     pause screen, where evolving costs you the run it is interrupting; see
+     drawPause. What is left is a poster with one door in it. */
+  const tb = [['PLAY', '#e8b25a', () => startRun()],
+              ['COSMETICS', '#b558ff', () => { S.cosReturn = 'title'; S.mode = 'cos'; }],
+              ['CONTRACTS', '#f0c65a', () => { S.cosReturn = 'title'; S.mode = 'contracts'; }]];
+  const tbw = 96, tgap = 8, trow = tb.length * tbw + (tb.length - 1) * tgap;
+  tb.forEach((b, i) => uiBtn(W / 2 - trow / 2 + i * (tbw + tgap), 152, tbw, 22, b[0], b[1], b[2]));
+  if (S.evo | 0)
+    htxt('EVOLUTION ' + (S.evo | 0) + ' / ' + EVO_MAX +
+         (evoGuns().length ? '  ·  ' + evoGuns().length + ' guns kept' : '') +
+         (evoCards().length ? '  ·  ' + evoCards().length + ' cards kept' : ''),
+         W / 2, 184, 'rgba(255,106,114,0.7)', 'center', 7, { track: 0.16, noShadow: true });
 
   /* Below the buttons: nothing. The wallet, the contract count, the best
      score, the control listing, the secrets teaser and the font warning all
@@ -5112,10 +5465,10 @@ function drawDead() {
       { v: 'KILLS ' + S.kills, col: '#9d8a7a' }
     ], 128);
     const sv = loadSave();
-    const evoCost = EVO_COST(S.evo | 0);
+    const evoNext = (S.evo | 0) >= EVO_MAX ? 'MAX' : EVO_COST(S.evo | 0) + ' coins';
     htxt('guns ' + S.p.owned.length + '/' + WORDER.length + '  ·  cards ' + S.cardsTaken +
          '  ·  level ' + S.level + (S.god ? '  ·  THE EYE' : '') + '  ·  best ' + (sv.best || 0) +
-         '  ·  EVO ' + (S.evo | 0) + ' / NEXT ' + evoCost,
+         '  ·  EVO ' + (S.evo | 0) + '/' + EVO_MAX + ' — next ' + evoNext,
          W / 2, 142, '#5f5044', 'center', 7, { track: 0.10 });
 
     /* The nearest unsigned contract, so there is always one visible reason to
@@ -5131,11 +5484,13 @@ function drawDead() {
     }
 
     if (S.deadT > 1.0) {
-      uiBtn(W / 2 - 150, 156, 96, 22, 'RETRY', '#e8b25a', () => startRun());
-      uiBtn(W / 2 - 48, 156, 96, 22, 'COSMETICS', '#b558ff', () => { S.cosReturn = 'dead'; S.mode = 'cos'; });
-      uiBtn(W / 2 + 54, 156, 96, 22, 'EVOLVE ' + (S.evo | 0), '#ff4a54', () => evolve(), !canEvolve());
-      if (S.evo | 0) uiBtn(W / 2 - 150, 182, 96, 18, 'RESET EVO', '#7fe08a', () => resetEvolution());
-      uiBtn(W / 2 + 54, 182, 96, 18, 'TITLE', '#8b7a68', () => { S.mode = 'title'; });
+      /* Also centred, also without EVOLVE. There is no run here to restart, so
+         the button had nothing to cost you — it belongs on pause. */
+      const db = [['RETRY', '#e8b25a', () => startRun()],
+                  ['COSMETICS', '#b558ff', () => { S.cosReturn = 'dead'; S.mode = 'cos'; }],
+                  ['TITLE', '#8b7a68', () => { S.mode = 'title'; }]];
+      const dbw = 96, dgap = 8, drow = db.length * dbw + (db.length - 1) * dgap;
+      db.forEach((b, i) => uiBtn(W / 2 - drow / 2 + i * (dbw + dgap), 160, dbw, 22, b[0], b[1], b[2]));
       htxt('R retry · C cosmetics', W / 2, 208, 'rgba(120,106,94,0.6)', 'center', 7, { track: 0.10, noShadow: true });
     }
   }
@@ -5475,6 +5830,116 @@ function drawColdRoom() {
   crosshair();
 }
 
+/* ---------- THE EVOLUTION PICK ----------
+   What a rung actually pays for. Either the guns of the rarity it opened, or
+   — once the roster covers every rarity — three cards at LEGENDARY to open
+   the next run holding. Whatever you take, the run restarts on the way out;
+   that is the price of the rung, and the screen says so on both counts. */
+function drawEvoPick() {
+  S.ui = []; uiWipe();
+  const off = S.evoOffer;
+  ctx.fillStyle = 'rgba(6,2,10,0.95)'; ctx.fillRect(0, 0, W, H);
+  const wash = off && off.kind === 'card' ? GRADE[4].col : '#b028ff';
+  const bg = ctx.createRadialGradient(W / 2, H / 2, 8, W / 2, H / 2, 240);
+  bg.addColorStop(0, hexA(wash, 0.20)); bg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  // rising motes, because something has just happened to the world
+  for (let i = 0; i < 14; i++) {
+    const y = H - ((S.t * 22 + i * 43) % (H + 30));
+    ctx.globalAlpha = 0.10 + (i % 3) * 0.04;
+    ctx.fillStyle = wash;
+    ctx.fillRect((i * 71 + Math.sin(S.t * 0.7 + i) * 26) % W | 0, y | 0, 2, 2);
+  }
+  ctx.globalAlpha = 1;
+  S.evoIn = Math.min(1, (S.evoIn || 0) + 0.05);
+
+  htxt('EVOLUTION ' + (S.evo | 0), W / 2, 22, '#ff6a72', 'center', 22,
+       { weight: '700', mid: 1, glow: '#8c0a14', glowSize: 22, track: 0.18 });
+  if (!off) { crosshair(); return; }
+
+  if (off.kind === 'gun') {
+    const tier = off.tier | 0;
+    htxt('the crate opens a rung. one of these is yours, in every run, forever.',
+         W / 2, 38, '#8d7f92', 'center', 7.5, { track: 0.08, mid: 1 });
+    htxt(GRADE[tier].n, W / 2, 50, GRADE[tier].col, 'center', 9,
+         { track: 0.30, mid: 1, glow: GRADE[tier].col, glowSize: 10 });
+
+    const n = off.guns.length;
+    const gap = 12, CW = Math.min(150, Math.floor((W - 40 - gap * (n - 1)) / n)), CH = 126, cy = 60;
+    const x0 = W / 2 - (CW * n + gap * (n - 1)) / 2;
+    off.guns.forEach((id, i) => {
+      const w = WEP[id], col = GRADE[w.gr].col;
+      const a = clamp(S.evoIn * 3 - i * 0.4, 0, 1), ease = 1 - Math.pow(1 - a, 3);
+      const x = x0 + i * (CW + gap);
+      const key = 'evog' + id;
+      const hot = a >= 1 && mouse.x > x && mouse.x < x + CW && mouse.y > cy - 6 && mouse.y < cy + CH;
+      hoverT[key] = clamp((hoverT[key] || 0) + (hot ? 0.20 : -0.16), 0, 1);
+      const t = hoverT[key], y = cy - t * 4 + (1 - ease) * 22;
+      ctx.save(); ctx.globalAlpha = ease;
+
+      frameBox(x, y, CW, CH, col, t, GRADE[w.gr].glow);
+      ctx.fillStyle = col; ctx.globalAlpha = ease * (0.14 + t * 0.12);
+      ctx.fillRect(x + 2, y + 3, CW - 3, 12);
+      ctx.globalAlpha = ease;
+      htxt(GRADE[w.gr].n, x + CW / 2, y + 9, col, 'center', 6.5,
+           { track: 0.26, mid: 1, glow: col, glowSize: 10 });
+
+      // the gun, lit from underneath and floating like a grocery
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = ease * (0.10 + t * 0.10 + Math.sin(S.t * 2.4) * 0.03);
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(x + CW / 2, y + 40, 24, 0, TAU); ctx.fill();
+      ctx.restore();
+      drawSpr(ctx, w.spr, x + CW / 2, y + 40 + Math.sin(S.t * 2 + i) * 1.5, 2.4);
+
+      htxt(w.name, x + CW / 2, y + 68, t > 0.4 ? '#ffffff' : '#e8dcc8', 'center', 10.5,
+           { weight: '700', mid: 1, glow: col, glowSize: 10 + 14 * t, track: 0.04 });
+      wrapped(w.tag, x + CW / 2, y + 82, CW - 20, '#c8bba8', 7);
+      htxt('PACI wanted ' + w.price, x + CW / 2, y + CH - 10, 'rgba(150,132,118,0.8)', 'center', 6.5,
+           { track: 0.04, mid: 1, noShadow: true });
+      ctx.restore();
+      if (a >= 1) S.ui.push({ x, y: cy - 6, w: CW, h: CH + 6, fn: () => takeEvoGun(id) });
+    });
+
+    const need = EVO_TIERS_ALL.filter(g => evoGuns().every(id => WEP[id].gr !== g));
+    htxt(need.length
+           ? 'still missing: ' + need.map(g => GRADE[g].n).join(', ') +
+             '  —  hold one of every rarity and the rungs start dealing cards'
+           : 'the roster is complete. the next rung deals LEGENDARY cards.',
+         W / 2, H - 24, 'rgba(150,132,118,0.75)', 'center', 7, { track: 0.06, mid: 1, noShadow: true });
+  } else {
+    htxt('the roster holds one of every rarity. take one into every run.',
+         W / 2, 38, '#8d7f92', 'center', 7.5, { track: 0.08, mid: 1 });
+    htxt('LEGENDARY', W / 2, 50, GRADE[4].col, 'center', 9,
+         { track: 0.30, mid: 1, glow: GRADE[4].col, glowSize: 12 });
+
+    const hand = off.cards;
+    const gap = 10, CW = Math.min(118, Math.floor((W - 28 - gap * (hand.length - 1)) / Math.max(1, hand.length)));
+    const CH = 138, cy = 60;
+    const x0 = W / 2 - (CW * hand.length + gap * (hand.length - 1)) / 2;
+    hand.forEach((o, i) => {
+      const a = clamp(S.evoIn * 3.2 - i * 0.5, 0, 1), ease = 1 - Math.pow(1 - a, 3);
+      const x = x0 + i * (CW + gap), y = cy + (1 - ease) * 24;
+      const key = 'evoc' + o.c.id;
+      const hot = a >= 1 && mouse.x > x && mouse.x < x + CW && mouse.y > y - 6 && mouse.y < y + CH;
+      hoverT[key] = clamp((hoverT[key] || 0) + (hot ? 0.22 : -0.18), 0, 1);
+      ctx.save(); ctx.globalAlpha = ease;
+      cardFace(o, x, y, CW, CH, hoverT[key], true);
+      ctx.restore();
+      if (a >= 1) S.ui.push({ x, y: y - 6, w: CW, h: CH + 6, fn: () => takeEvoCard(o) });
+    });
+
+    const held = evoCards().map(id => (evoCardDef(id) || {}).name).filter(Boolean);
+    if (held.length)
+      htxt('already starting with  ' + held.join('  ·  '), W / 2, H - 24,
+           'rgba(150,132,118,0.75)', 'center', 7, { track: 0.06, mid: 1, noShadow: true });
+  }
+
+  htxt('taking it starts the run over. that is what the coins were for.',
+       W / 2, H - 10, 'rgba(126,114,124,0.6)', 'center', 7, { track: 0.10, mid: 1, noShadow: true });
+  crosshair();
+}
+
 /* THE MENU, read-only: everything the run has picked up so far.
 
    Each aisle is a PANEL — a boxed section with its own header bar — instead
@@ -5708,16 +6173,36 @@ function drawPause() {
      the same row, two buttons both called menu read as the same door. THE
      MENU stays the name of the level-up screen — the supermarket you pick
      from — and this button is the deck you picked, so it says so. */
+  /* EVOLVE lives here and nowhere else now. It restarts the run, so it belongs
+     on the screen where the run is in front of you and the coins it costs are
+     on the same screen — from the title it was a lever with no visible price
+     and nothing to lose by pulling it. */
+  const maxed = (S.evo | 0) >= EVO_MAX;
   const btns = [['THE DECK', '#f0c65a', () => { S.mode = 'deck'; }],
-                ['COSMETICS', '#b558ff', () => { S.cosReturn = 'pause'; S.mode = 'cos'; }]];
+                ['COSMETICS', '#b558ff', () => { S.cosReturn = 'pause'; S.mode = 'cos'; }],
+                [maxed ? 'EVOLVE MAX' : 'EVOLVE ' + (S.evo | 0), '#ff4a54', () => evolve(), !canEvolve()]];
   if (S.evo | 0) btns.push(['RESET EVO', '#7fe08a', () => resetEvolution()]);
   btns.push(['MAIN MENU', '#ff6a72', () => quitToTitle()]);
-  const bw = 96, gap = 8, rowW = btns.length * bw + (btns.length - 1) * gap;
-  btns.forEach((b, i) => uiBtn(W / 2 - rowW / 2 + i * (bw + gap), 40, bw, 18, b[0], b[1], b[2]));
+  const gap = 7, bw = Math.min(96, Math.floor((W - 36 - gap * (btns.length - 1)) / btns.length));
+  const rowW = btns.length * bw + (btns.length - 1) * gap;
+  btns.forEach((b, i) => uiBtn(W / 2 - rowW / 2 + i * (bw + gap), 40, bw, 18, b[0], b[1], b[2], b[3]));
 
-  let y = 76;
+  /* One line under the row saying exactly what the red button wants, because
+     a disabled button that will not say why is a bug as far as a player is
+     concerned. */
+  const cost = EVO_COST(S.evo | 0);
+  htxt(maxed
+         ? 'EVOLUTION ' + EVO_MAX + ' — there is no eleventh rung'
+         : (canEvolve()
+              ? 'EVOLVE  ·  ' + cost + ' coins  ·  restarts the run  ·  ' +
+                (evoReward((S.evo | 0) + 1) === 'card' ? 'deals three LEGENDARY cards' : 'opens the crate a rung')
+              : 'EVOLVE  ·  ' + cost + ' coins  ·  you have ' + S.coins),
+       W / 2, 66, canEvolve() ? 'rgba(255,120,124,0.85)' : 'rgba(130,112,104,0.75)', 'center', 7,
+       { track: 0.08, noShadow: true });
+
+  let y = 84;
   sectionRule('SIGNATURE CARDS', y);
-  y += 13;
+  y += 12;
   let any = false;
   for (const k of ['banana', 'melon', 'coolade', 'glock', 'bike']) {
     const lv = S.items[k] | 0; if (!lv) continue; any = true;
@@ -5726,26 +6211,55 @@ function drawPause() {
     htxt(nm, 50, y + 1, ITEMS[k].col, 'left', 8, { track: 0.06 });
     htxt(ITEMS[k].d[Math.min(lv - 1, 1)], 50 + htxtWidth(nm, 8, 0.06) + 6, y + 1,
          'rgba(140,120,106,0.85)', 'left', 7, { track: 0.03, noShadow: true });
-    y += 12;
+    y += 10;
   }
-  if (S.god) { drawSpr(ctx, SPR.eye, 38, y - 2, 0.8); htxt('THE THIRD EYE — you cannot die', 50, y + 1, '#ff5b5b', 'left', 8); y += 12; any = true; }
-  if (!any) { htxt('none yet. put down a floor boss and the cold room opens.', 38, y + 1, '#5f5044', 'left', 7.5); y += 12; }
+  if (S.god) { drawSpr(ctx, SPR.eye, 38, y - 2, 0.8); htxt('THE THIRD EYE — you cannot die', 50, y + 1, '#ff5b5b', 'left', 8); y += 10; any = true; }
+  if (!any) { htxt('none yet. put down a floor boss and the cold room opens.', 38, y + 1, '#5f5044', 'left', 7.5); y += 10; }
 
-  /* Arsenal in two columns: seven guns stacked in one column ran into the
-     footer once you owned them all. */
-  y += 10;
+  /* Arsenal, divided by rarity — one row per rung, guns laid along it.
+
+     It used to be one flat run of eleven names down two columns ordered by
+     WORDER, which is draw order rather than a hierarchy: the only thing that
+     told you a GOD FINGER outranked a STAPLER was the colour of its name, and
+     nothing at all told you which rarity evolution was about to open.
+
+     Rows, not columns, and for a reason beyond taste. Stacking the five
+     groups into columns cost a header per group, and the worst case here —
+     five signatures and THE THIRD EYE stacked above — pushed the tallest
+     column straight through the wallet strip at the bottom. Along a row the
+     header is the row, so five rarities cost five lines instead of five
+     headers plus eleven rows. */
+  y += 6;
   sectionRule('ARSENAL', y);
-  y += 13;
-  const colX = [30, 250], colW = 200, half = Math.ceil(WORDER.length / 2);
-  WORDER.forEach((id, i) => {
-    const w = WEP[id], has = S.p.owned.indexOf(id) >= 0;
-    const cx = colX[Math.floor(i / half)], ry = y + (i % half) * 12;
-    drawSpr(ctx, w.spr, cx + 12, ry - 1, 0.9, false, has ? 1 : 0.22);
-    htxt(w.evolve ? scarName() : w.name, cx + 28, ry + 2,
-         has ? (w.evolve ? scarCol() : GRADE[w.gr].col) : '#4a3f36', 'left', 8, { track: 0.06 });
-    htxt(has ? 'OWNED' : (w.cards ? w.cards + ' cards' : w.price + ' coins'),
-         cx + colW - 4, ry + 2, has ? 'rgba(126,150,112,0.85)' : '#6b5a4e', 'right', 7,
-         { track: 0.04, noShadow: true });
+  y += 11;
+  const byGrade = [[], [], [], [], []];
+  for (const id of WORDER) byGrade[WEP[id].gr | 0].push(id);
+  const LABX = 30, GUNX = 92;
+  byGrade.forEach((list, g) => {
+    if (!list.length) return;
+    // a tick of the rarity's colour, then the rarity, then its guns
+    ctx.fillStyle = GRADE[g].col; ctx.globalAlpha = 0.55;
+    ctx.fillRect(LABX - 6, y - 5, 2, 7); ctx.globalAlpha = 1;
+    htxt(GRADE[g].n, LABX, y + 1, GRADE[g].col, 'left', 7, { track: 0.18, noShadow: true });
+
+    let gx = GUNX;
+    for (const id of list) {
+      const w = WEP[id], has = S.p.owned.indexOf(id) >= 0;
+      const perm = evoGuns().indexOf(id) >= 0;
+      const nm = w.evolve ? scarName() : w.name;
+      drawSpr(ctx, w.spr, gx + 6, y - 2, 0.8, false, has ? 1 : 0.22);
+      htxt(nm, gx + 13, y + 1, has ? (w.evolve ? scarCol() : GRADE[g].col) : '#4a3f36',
+           'left', 7.5, { track: 0.04 });
+      gx += 13 + htxtWidth(nm, 7.5, 0.04) + 3;
+      /* EVO outranks OWNED as a label: it says you keep it, not merely that
+         you are holding it this run. */
+      const tag = perm ? 'EVO' : has ? 'OWNED' : (w.cards ? w.cards + 'c' : String(w.price));
+      htxt(tag, gx, y + 1,
+           perm ? 'rgba(255,120,124,0.9)' : has ? 'rgba(126,150,112,0.85)' : '#6b5a4e',
+           'left', 6, { track: 0.04, noShadow: true });
+      gx += htxtWidth(tag, 6, 0.04) + 13;
+    }
+    y += 11;
   });
 
   statRow([
@@ -5797,6 +6311,7 @@ function frame(now) {
     if (S.mode === 'deck') drawDeck();
     if (S.mode === 'levelup') drawLevelUp();
     if (S.mode === 'coldroom') drawColdRoom();
+    if (S.mode === 'evolve') drawEvoPick();
     if (S.mode === 'augment') drawAugments();
     if (S.mode === 'dead') drawDead();
   }
@@ -5851,7 +6366,10 @@ requestAnimationFrame(frame);
 // dev hook
 window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantItem, grantGod, breakSecret,
                 giveWeapon, explode, triggerModagaz, triggerGoromania,
-                evolve, resetEvolution, canEvolve, EVO_COST, OMEGA_COINS, COIN_RATE, powerMul,
+                evolve, resetEvolution, canEvolve, EVO_COST, EVO_MAX, EVO_TIER,
+                evoGuns, evoCards, evoGunPool, evoCardPool, evoReward, evoFullSet,
+                openEvoPick, takeEvoGun, takeEvoCard, applyEvoLoadout,
+                OMEGA_COINS, COIN_RATE, powerMul,
                 gainXP, openLevelUp, takeCard, dealCards, rerollHand, scarName, scarCol, ST,
                 ITEMS, BOSSES, WEP, WORDER, COSMETICS, frame, nextRoom,
                 enterShop, exitShop, shopStock, shopSlots, roomDef, curRoom, buildRoom,

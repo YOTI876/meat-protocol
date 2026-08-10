@@ -24,7 +24,7 @@ generative score system.
 Each [[Weapons|weapon]]'s `sfx` field maps to a dedicated function —
 `shotgun()`, `nailgun()`, `plasma()`, `minigun()`, `railgun()`, `beam()`. The
 base rifle uses `scarMk(lv)` instead, which **morphs** its own timbre based on
-the [[Progression#The evolving rifle|current mark]] — the noise body thins,
+the [[Progression#The evolving sidearm|current mark]] — the noise body thins,
 pitch rises, and a laser-like tone layer fades in as `lv` climbs from 1 to 10.
 
 ## Formant speech

@@ -92,10 +92,18 @@ Death is permanent for the run's level, deck, augments, items and weapons —
 but **coins, cards, the vault and every [[Contracts|contract]] survive**. See
 [[Economy#What resets, and when]].
 
-The death screen offers RETRY, COSMETICS, EVOLVE, RESET EVO, and TITLE. Pause
-also carries **MAIN MENU**, which abandons the run deliberately: everything
-that survives death is persisted continuously, so quitting costs exactly the
-floor you're standing on. It is the death path minus the death.
+The death screen offers RETRY, COSMETICS and TITLE, centred on one row. Pause
+carries THE DECK, COSMETICS, **EVOLVE**, RESET EVO and **MAIN MENU** — the
+last of which abandons the run deliberately: everything that survives death is
+persisted continuously, so quitting costs exactly the floor you're standing on.
+It is the death path minus the death.
+
+> [!note] EVOLVE is a pause-screen button now
+> It was on the title and death screens. It **restarts the run**, so it belongs
+> on the one screen where the run is in front of you and the coins it takes are
+> on the same strip — see [[Economy#Evolution]]. RESET EVO moved with it, and
+> for the same reason: it empties the permanent roster, so the run has to go
+> too.
 
 ## Related
 - [[Difficulty Scaling]] — every formula behind "harder"

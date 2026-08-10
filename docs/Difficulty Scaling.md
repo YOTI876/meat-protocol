@@ -14,19 +14,33 @@ Six independent axes stack multiplicatively.
 |---|---|---|
 | **floor** (`S.room`) | descending, unbounded | HP, damage, speed, score, spawn count, spawn cap, boss add-cap, elite adds, arena size |
 | **wave** (`S.wave`) | 1→10 per floor | spawn count (quadratic), enemy type mix |
-| **evolution** (`S.evo`) | [[Economy#Evolution]] | HP, damage, speed, score, spawn count, boss add-cap |
-| **weapons owned** | buying guns | spawn count (+10%/gun), spawn cap |
+| **evolution** (`S.evo`) | [[Economy#Evolution]], capped at 10 | HP, damage, speed, score, spawn count, boss add-cap, spawn cap |
+| **weapons owned** | buying guns, **and the [[Economy#What a rung pays out\|evolution roster]]** | spawn count (+10%/gun), spawn cap |
 | **player level** | [[Progression#XP & levels]] | spawn count (+6%/level), spawn cap |
 | **LOUDMOUTH** | [[Augments]] | spawn count (+18%/rank) |
 
 ## `diff()` — enemy stat multipliers
 
 ```js
-hp    = (1 + floor*1.25) * (1 + evo*0.38)
-dmg   = (1 + floor*0.72) * (1 + evo*0.26)
-spd   = (1 + floor*0.11) * (1 + evo*0.05)
+hp    = (1 + floor*1.25) * (1 + evo*0.46)
+dmg   = (1 + floor*0.72) * (1 + evo*0.30)
+spd   = (1 + floor*0.11) * (1 + evo*0.06)
 score = (1 + floor*0.70) * (1 + evo*0.50)
 ```
+
+> [!note] The evolution terms went up with the payout
+> They were `0.38 / 0.26 / 0.05`. A rung used to buy a flat world-difficulty
+> increase and nothing else; it now hands over a
+> [[Economy#What a rung pays out|gun you keep forever]], and past the full
+> roster a LEGENDARY card you open every run holding. Ten rungs of that is a
+> different character, so ten rungs of this had to be a different building.
+>
+> Measured on a floor-1 CRAWLER: **26 HP / 16 damage** at EVO 0, **86 / 40** at
+> EVO 5, **146 / 64** at EVO 10 — 5.6× and 4×.
+>
+> Elites need no term here at all. `powerMul()` counts guns held and cards in
+> the deck, so an evolved roster prices them up on its own. See
+> [[Bosses#They scale to your build, not just to the floor]].
 
 Applied per-spawn in `spawnEnemy()`/`spawnBoss()`, on top of each type's base
 stats in [[Enemies]]/[[Bosses]]. **None of these terms is capped** — floor 8

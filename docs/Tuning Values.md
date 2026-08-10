@@ -47,10 +47,17 @@ All in `js/game.js` unless noted.
 |---|---|---|---|
 | shop cadence | `SHOP_WAVES = [5, 10]` | top of file | which wave-clears open [[The Shop\|PACI]]. Twice a floor. Was `SHOP_EVERY = 3` counted against boss kills |
 | gun depth gate | `WEP[id].floor` | `WEP` / `shopStock()` | how deep before PACI carries a gun at all — see [[Weapons#When PACI starts carrying it]] |
+| chain length / reach | `chain: 5`, `chainR: 132` | `WEP.zap` / `chainZap()` | how far [[Weapons#THE FLYKILLER\|THE FLYKILLER]] snakes. Each hop keeps 80% of the last |
+| singularity pull / reach | `sing: { r: 96, pull: 340 }` | `WEP.void` | how hard [[Weapons#BLACK FRIDAY\|BLACK FRIDAY]] gathers. Bosses get 22% of it |
+| singularity drag | `Math.pow(0.22, dt)` | bullet loop | how far the round coasts before it stalls and goes off. Lower = it lands nearer you |
+| floor intro delay | `S.introT` — 2.2s / 2.6s | `startRun()` / `nextRoom()` | the beat before wave 1. **Game** time, on purpose — see [[Bugs Found#14. A menu inside the first 2.2 seconds killed the floor permanently]] |
 | boss phase break | `hp <= max * 0.5` | `updateBoss()` | where a floor boss switches to `pat2` — see [[Bosses#Two phases]] |
 | phase-2 buff | ×1.28 speed, ×1.18 damage, ×0.7 summon timer | `enterPhase2()` | how much angrier the second half is |
 
-| evolution cost | `100 * 2^evo` | `EVO_COST` | how fast [[Economy#Evolution]] gates |
+| evolution cost | `150 + 175*evo + 25*evo²` | `EVO_COST` | how fast [[Economy#Evolution]] gates. Was `100 * 2^evo`, which wanted 51,200 at the top rung |
+| evolution ceiling | `EVO_MAX = 10` | top of file | how many rungs exist at all |
+| rarity per rung | `EVO_TIER` | top of file | which weapon rarity each rung opens — see [[Economy#What a rung pays out]] |
+| evolution difficulty | `×0.46 / 0.30 / 0.06` HP/dmg/spd | `diff()` | how much harder a rung makes the world. Was `0.38 / 0.26 / 0.05` |
 | coin rate | `COIN_RATE = 0.70` | top of file | a flat 30% cut on every coin from every source, applied once inside `coinMul` |
 | beam price | `OMEGA_COINS = 500` | top of file | the long game, in coins now |
 | elite share | `ELITE_SHARE = 0.22` | top of file | what fraction of the floor boss an elite is worth before [[#the build multiplier|powerMul]] |
