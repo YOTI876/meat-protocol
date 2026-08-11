@@ -144,7 +144,7 @@ addEventListener('keydown', e => {
   // ...but not out of the evolution pick, which owes you something on the way out
   if (e.code === 'KeyC' && S.mode !== 'cos' && S.mode !== 'play' && S.mode !== 'evolve') { S.cosReturn = S.mode; S.mode = 'cos'; }
   if (S.mode === 'title' && (e.code === 'Enter' || e.code === 'Space')) startRun();
-  if (S.mode === 'dead' && e.code === 'KeyR') startRun();
+  if ((S.mode === 'dead' || S.mode === 'win') && e.code === 'KeyR') startRun();
   if (S.mode === 'play') {
     if (e.code === 'KeyQ') cycleWeapon(-1);
     const n = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Digit5: 4,
@@ -173,47 +173,97 @@ cv.addEventListener('wheel', e => { e.preventDefault(); if (S.mode === 'play') c
 /* ============================================================
    CONTENT
    ============================================================ */
+/* ============================================================
+   THE TEN FLOORS
+
+   The building used to have no bottom: four hand-built floors and then a
+   generator that kept minting new ones off the floor index forever. It made
+   the run infinite and it made the run *shapeless* — floor 14 was floor 9 in a
+   different hue, there was nothing to beat, and every fight past about floor 6
+   was the same fight with bigger numbers on it.
+
+   Ten floors, and the tenth ends. That gives the descent an act structure it
+   could not have while it was endless:
+
+     1-3   you learn the game            2 teaches darkness, 3 teaches footing
+     4-6   the game learns you back      hazards, cold, numbers
+     7-9   it stops being fair           blackouts, thin skin, being hunted
+     10    THE KILLING FLOOR
+
+   Every floor owns four things nothing else has: a palette, an arena SIZE, a
+   fixed LAYOUT archetype, and a TWIST — one rule change that is true for that
+   floor and nowhere else. The layout is fixed rather than rolled because a
+   floor you can learn the shape of is a floor you can outplay; rolling it made
+   every arena "some boxes, at random".
+
+   `motif` is the decor pass, `vat` recolours the crates, `twist` is read in
+   half a dozen places — search `S.twist`.
+   ============================================================ */
 const ROOMS = [
+  /* ---- ACT ONE: it is only a building ---- */
   { name: 'THE ABATTOIR', sub: 'floor 01 // where the meat is hung',
     aw: 940, ah: 660, floor: ['#4a382f', '#42302a', '#392722'], grout: '#241a16',
-    wall: ['#5e4840', '#3a2c28', '#725648'], fog: 'rgba(48,8,12,0.12)', dark: 0.76 },
+    wall: ['#5e4840', '#3a2c28', '#725648'], fog: 'rgba(48,8,12,0.12)', dark: 0.76,
+    layout: 'scatter', motif: 'hook', vat: '#78121a', twist: null,
+    // The one floor with no rule of its own. You have enough to learn already.
+    tw: '' },
   { name: 'THE HOLLOW', sub: 'floor 02 // it goes down further than it should',
     aw: 1020, ah: 720, floor: ['#2f3a43', '#27313a', '#212a31'], grout: '#141c22',
-    wall: ['#425460', '#28343c', '#556878'], fog: 'rgba(10,30,50,0.13)', dark: 0.78 },
+    wall: ['#425460', '#28343c', '#556878'], fog: 'rgba(10,30,50,0.13)', dark: 0.80,
+    layout: 'pillars', motif: 'drip', vat: '#1d4a58', twist: 'dark',
+    tw: 'THE LIGHT DOES NOT REACH' },
   { name: 'THE MEAT LOOP', sub: 'floor 03 // you have been here before',
     aw: 1080, ah: 760, floor: ['#42313c', '#392833', '#30212b'], grout: '#1c1319',
-    wall: ['#583f50', '#342532', '#6d5062'], fog: 'rgba(60,0,50,0.13)', dark: 0.80 },
+    wall: ['#583f50', '#342532', '#6d5062'], fog: 'rgba(60,0,50,0.13)', dark: 0.80,
+    layout: 'ring', motif: 'rust', vat: '#5a1848', twist: 'slick',
+    tw: 'THE FLOOR IS GREASED' },
+  /* ---- ACT TWO: it starts taking an interest ---- */
   { name: 'THE RED KITCHEN', sub: 'floor 04 // dinner',
     aw: 1120, ah: 780, floor: ['#4e2d2a', '#432422', '#391d1c'], grout: '#20100f',
-    wall: ['#6a3835', '#3e2020', '#84463f'], fog: 'rgba(90,0,10,0.16)', dark: 0.82 }
+    wall: ['#6a3835', '#3e2020', '#84463f'], fog: 'rgba(90,0,10,0.16)', dark: 0.82,
+    layout: 'corridors', motif: 'ember', vat: '#8a2410', twist: 'heat',
+    tw: 'THE BURNERS ARE STILL ON' },
+  { name: 'THE FREEZER', sub: 'floor 05 // nothing in here has finished dying',
+    aw: 1140, ah: 800, floor: ['#39474e', '#31404a', '#2a3740'], grout: '#16232b',
+    wall: ['#5a7280', '#33454f', '#8aa8b8'], fog: 'rgba(150,220,255,0.10)', dark: 0.74,
+    layout: 'bunkers', motif: 'frost', vat: '#2a6a80', twist: 'frost',
+    tw: 'THE COLD COMES IN WAVES' },
+  { name: 'THE RENDERING', sub: 'floor 06 // everything they could not sell',
+    aw: 1200, ah: 830, floor: ['#38412a', '#303924', '#28301e'], grout: '#171c10',
+    wall: ['#4e5a34', '#2d3520', '#68783f'], fog: 'rgba(90,130,20,0.13)', dark: 0.80,
+    layout: 'scatter', motif: 'sludge', vat: '#4a6a12', twist: 'swarm',
+    tw: 'MORE OF THEM. LESS OF EACH.' },
+  /* ---- ACT THREE: it stops pretending ---- */
+  { name: 'THE LONG TABLE', sub: 'floor 07 // twelve places, all of them set',
+    aw: 1240, ah: 850, floor: ['#4a3c22', '#41341d', '#382c18'], grout: '#211a0d',
+    wall: ['#6a5528', '#3d3018', '#8a7038'], fog: 'rgba(120,80,0,0.13)', dark: 0.82,
+    layout: 'corridors', motif: 'candle', vat: '#7a5410', twist: 'blackout',
+    tw: 'THE LIGHTS GO OUT ON A COUNT' },
+  { name: 'THE SALT LINE', sub: 'floor 08 // it cures. it does not heal.',
+    aw: 1280, ah: 880, floor: ['#4a4640', '#413d38', '#383430'], grout: '#201e1b',
+    wall: ['#6a6459', '#3d3a34', '#8f887a'], fog: 'rgba(220,210,190,0.09)', dark: 0.78,
+    layout: 'pillars', motif: 'salt', vat: '#6a6050', twist: 'frail',
+    tw: 'EVERYTHING CUTS DEEPER HERE' },
+  { name: 'THE LAST AISLE', sub: 'floor 09 // there is nothing after this one',
+    aw: 1320, ah: 900, floor: ['#2e2438', '#281f31', '#221a2a'], grout: '#130e19',
+    wall: ['#463c5a', '#2a2134', '#5e4a78'], fog: 'rgba(90,20,140,0.15)', dark: 0.84,
+    layout: 'ring', motif: 'eye', vat: '#4a1c6a', twist: 'hunt',
+    tw: 'SOMETHING IS WALKING THE AISLE WITH YOU' },
+  { name: 'THE KILLING FLOOR', sub: 'floor 10 // this is what the building is for',
+    aw: 1180, ah: 820, floor: ['#3a1416', '#321012', '#2a0d0f'], grout: '#160607',
+    wall: ['#6a1c22', '#380f12', '#a02a30'], fog: 'rgba(160,0,10,0.18)', dark: 0.86,
+    layout: 'bunkers', motif: 'hook', vat: '#a01018', twist: 'final',
+    tw: 'IT HAS BEEN WAITING THE WHOLE TIME' }
 ];
-
-/* Past the four hand-built floors the building keeps going. Names, palettes and
-   arena size are generated from the floor index, so there is no bottom — the
-   descent just keeps widening and getting darker. */
-const DEEP_NAMES = ['THE RENDERING', 'THE COLD ROOM', 'THE LONG TABLE', 'THE UNDERCUT',
-                    'THE SALT LINE', 'THE GRINDER', 'THE LAST AISLE', 'THE FLOOR BELOW'];
-const DEEP_SUBS = ['it is still going down', 'nobody built this part',
-                   'the walls are further apart here', 'you have stopped counting',
-                   'something is keeping the lights off', 'it knows the way you walk',
-                   'there was never a bottom', 'deeper than the plans allow'];
-function roomDef(idx) {
-  if (idx < ROOMS.length) return ROOMS[idx];
-  const d = idx - ROOMS.length;
-  const h = (200 + d * 47) % 360;
-  const hs = (off, s, l) => 'hsl(' + (((h + off) % 360 + 360) % 360) + ',' + s + '%,' + l + '%)';
-  const cyc = Math.floor(d / DEEP_NAMES.length);
-  return {
-    name: DEEP_NAMES[d % DEEP_NAMES.length] + (cyc ? ' ' + roman(cyc + 1) : ''),
-    sub: 'floor ' + String(idx + 1).padStart(2, '0') + ' // ' + DEEP_SUBS[d % DEEP_SUBS.length],
-    aw: Math.min(1560, 1140 + d * 36), ah: Math.min(1080, 790 + d * 26),
-    floor: [hs(0, 17, 20), hs(9, 19, 17), hs(-9, 15, 14)],
-    grout: hs(0, 26, 8),
-    wall: [hs(7, 19, 31), hs(0, 17, 17), hs(13, 22, 41)],
-    fog: 'hsla(' + h + ',72%,32%,0.16)',
-    dark: Math.min(0.88, 0.82 + d * 0.008)
-  };
-}
+const FLOORS = ROOMS.length;                 // the run ends when this one does
+const isLastFloor = idx => idx >= FLOORS - 1;
+/* Past the last floor there is nothing, so the descent clamps rather than
+   generating. Anything that asks for a deeper room gets the killing floor. */
+function roomDef(idx) { return ROOMS[clamp(idx | 0, 0, ROOMS.length - 1)]; }
+/* The twist of the floor you are standing in — the shop is not a floor and has
+   no twist of its own, which is exactly what makes it a breather. */
+function twist() { return S.inShop ? null : roomDef(S.room).twist; }
+const isTwist = k => twist() === k;
 /* PACI's back room. Not a floor — it never appears in the descent count. */
 const SHOP_ROOM = {
   name: "PACI'S", sub: 'the back room // he was expecting you',
@@ -287,49 +337,118 @@ const EVO_COST = ev => 150 + 175 * ev + 25 * ev * ev;
 const EVO_TIER = [0, 0, 1, 1, 2, 2, 3, 3, 3, 3];
 const EVO_TIERS_ALL = [0, 1, 2, 3];             // what "one of every rarity" means
 
-/* THE WAVE-TEN ROSTER.
+/* ============================================================
+   THE ROSTER
 
-   Ten of them, one per floor, cycling forever. Five is not enough variety for
-   a run that never ends: with the old roster you had met everything the game
-   had by floor 5 and floors 6-10 were the same five fights with bigger
-   numbers.
+   Nine of them for nine floors, dealt in a DIFFERENT ORDER every run, plus the
+   thing on floor 10 that is not on this list.
 
-   Every one of these has TWO PHASES. `pat` is how it opens; at half health it
-   breaks and switches to `pat2`, faster and angrier — see enterPhase2(). A
-   boss that does one thing for its whole bar is a health sponge; a boss that
-   changes its mind halfway is a fight you have to re-read.
+   ---- why they are shuffled, and what had to change first ----
 
-   The HP band is deliberately narrow (1400 → 3000 across ten). Floor scaling
-   does the escalating; the roster does the variety. A steep roster ramp only
-   buys a sawtooth, because floor 11 wraps back to the first entry.
+   Fixed order meant floor 3 was THE PITCHER, every time, forever. The roster
+   was the only part of a run that could not surprise you, on the one wave
+   where surprise is the entire point. But you cannot simply shuffle a list
+   whose HP climbs down it — that is how you get a 3000-health boss on floor 1
+   and a 1400 on floor 9.
 
-   addT/addN: how often each boss calls for help, and how much. Every boss
-   summons, but the cap in updateBoss keeps the arena from silting up. */
+   So HP left the roster. DEPTH decides how much health the floor boss has
+   (BOSS_HP below); the ROSTER decides who is carrying it. `bulk` is the only
+   thing an entry says about its own size and it is a nudge — 0.92 to 1.12 —
+   for a fight that should feel heavier or nimbler than its neighbours. Speed,
+   summons and patterns stay with the identity, because those are the identity.
+
+   ---- the patterns ----
+
+   `pat` is how it opens; at half health it breaks and switches to `pat2` —
+   see enterPhase(). Every entry below has a UNIQUE PAIR. That matters more
+   than every pattern being unique: eight verbs across two slots is what makes
+   ten fights instead of ten health bars, and a boss is remembered for its
+   combination ("the one that mines the floor and then sweeps you off it")
+   rather than for any single move.
+
+   Half of the verbs are new — hook, brood, mortar, curtain, sweep, mines — and
+   they exist because the old five were all "walk at the player and emit a ring
+   of projectiles" with different timings. See updateBoss.
+
+   addT/addN: how often each calls for help, and how much. Every boss summons,
+   but the cap in updateBoss keeps the arena from silting up.
+   ============================================================ */
 const BOSSES = [
-  { key: 'butcher', name: 'THE BUTCHER',      bank: SPR.anim.bossA, tint: null,                     hp: 1400, spd: 40, r: 15, item: 'banana',  pat: 'charge',  pat2: 'burst',   addT: 6.5, addN: 3, adds: ['crawler'],                        cry: 'IT REMEMBERS YOUR NAME',              cry2: 'IT HAS STOPPED BEING CAREFUL' },
-  { key: 'mother',  name: 'MOTHER OF MELONS', bank: SPR.anim.bossB, tint: null,                     hp: 1550, spd: 26, r: 15, item: 'melon',   pat: 'spawner', pat2: 'nova',    addT: 4.2, addN: 4, adds: ['crawler', 'crawler', 'shrieker'], cry: 'SHE IS FULL OF CHILDREN',             cry2: 'SHE IS EMPTYING HERSELF' },
-  { key: 'pitcher', name: 'THE PITCHER',      bank: SPR.anim.bossA, tint: 'rgba(224,40,50,0.55)',   hp: 1700, spd: 46, r: 15, item: 'coolade', pat: 'blink',   pat2: 'rush',    addT: 7.0, addN: 3, adds: ['stalker', 'crawler'],            cry: 'IT CAME THROUGH THE WALL',            cry2: 'IT IS NOT BOTHERING WITH WALLS NOW' },
-  { key: 'hog',     name: 'THE HOGFATHER',    bank: SPR.anim.bossB, tint: 'rgba(255,130,142,0.55)', hp: 1900, spd: 32, r: 15, item: 'glock',   pat: 'burst',   pat2: 'spiral',  addT: 6.0, addN: 4, adds: ['crawler', 'shrieker', 'bloater'], cry: 'HE IS CARRYING SOMETHING',            cry2: 'HE PUT IT DOWN. IT IS FOR YOU.' },
-  { key: 'courier', name: 'THE COURIER',      bank: SPR.anim.bossA, tint: 'rgba(90,200,255,0.5)',   hp: 2100, spd: 62, r: 15, item: 'bike',    pat: 'circle',  pat2: 'rush',    addT: 6.8, addN: 4, adds: ['stalker', 'stalker', 'crawler'],  cry: 'IT HAS BEEN CIRCLING FOR HOURS',      cry2: 'THE ROUND IS OVER. DELIVERY.' },
-  /* ---- the second five: everything past floor 5 used to be a repeat ---- */
-  { key: 'fishwife',name: 'THE FISHWIFE',     bank: SPR.anim.bossB, tint: 'rgba(90,220,210,0.5)',   hp: 2300, spd: 38, r: 15, item: 'coolade', pat: 'blink',   pat2: 'spiral',  addT: 5.4, addN: 4, adds: ['shrieker', 'crawler', 'husk'],    cry: 'SHE HAS BEEN ON ICE SINCE FRIDAY',    cry2: 'SHE HAS THAWED ALL THE WAY THROUGH' },
-  { key: 'trim',    name: 'THE TRIMMINGS',    bank: SPR.anim.bossA, tint: 'rgba(200,150,160,0.5)',  hp: 2500, spd: 30, r: 15, item: 'melon',   pat: 'spawner', pat2: 'rush',    addT: 3.6, addN: 5, adds: ['crawler', 'husk', 'husk'],        cry: 'IT IS EVERY PART THEY DID NOT SELL',  cry2: 'ALL OF IT AT ONCE, THEN' },
-  { key: 'roast',   name: 'SUNDAY ROAST',     bank: SPR.anim.bossB, tint: 'rgba(255,150,50,0.55)',  hp: 2650, spd: 34, r: 15, item: 'banana',  pat: 'burst',   pat2: 'nova',    addT: 5.8, addN: 4, adds: ['bloater', 'crawler', 'shrieker'], cry: 'IT HAS BEEN IN THERE SINCE SUNDAY',   cry2: 'IT IS DONE. IT IS VERY DONE.' },
-  { key: 'shelf',   name: 'THE NIGHT SHELF',  bank: SPR.anim.bossA, tint: 'rgba(70,90,200,0.55)',   hp: 2800, spd: 54, r: 15, item: 'glock',   pat: 'circle',  pat2: 'spiral',  addT: 6.2, addN: 5, adds: ['stalker', 'stalker', 'husk'],     cry: 'IT ONLY RESTOCKS AFTER CLOSING',      cry2: 'IT IS PUTTING YOU OUT ON THE FRONT' },
-  { key: 'bestby',  name: 'THE BEST BEFORE',  bank: SPR.anim.bossB, tint: 'rgba(150,230,60,0.55)',  hp: 3000, spd: 44, r: 15, item: 'bike',    pat: 'rush',    pat2: 'nova',    addT: 5.0, addN: 5, adds: ['bloater', 'cyst', 'husk'],        cry: 'THE DATE PASSED AND IT KEPT GOING',   cry2: 'THERE IS NO DATE LEFT TO PASS' }
+  { key: 'butcher', name: 'THE BUTCHER',      bank: SPR.anim.bossA, tint: null,                     bulk: 1.10, spd: 40, r: 15, item: 'banana',  pat: 'hook',    pat2: 'rush',    addT: 6.5, addN: 3, adds: ['crawler'],                        cry: 'IT REMEMBERS YOUR NAME',              cry2: 'IT HAS STOPPED BEING CAREFUL' },
+  { key: 'mother',  name: 'MOTHER OF MELONS', bank: SPR.anim.bossB, tint: null,                     bulk: 1.06, spd: 26, r: 15, item: 'melon',   pat: 'brood',   pat2: 'nova',    addT: 4.2, addN: 4, adds: ['crawler', 'crawler', 'shrieker'], cry: 'SHE IS FULL OF CHILDREN',             cry2: 'SHE IS EMPTYING HERSELF' },
+  { key: 'pitcher', name: 'THE PITCHER',      bank: SPR.anim.bossA, tint: 'rgba(224,40,50,0.55)',   bulk: 0.94, spd: 46, r: 15, item: 'coolade', pat: 'blink',   pat2: 'curtain', addT: 7.0, addN: 3, adds: ['stalker', 'crawler'],            cry: 'IT CAME THROUGH THE WALL',            cry2: 'IT IS NOT BOTHERING WITH WALLS NOW' },
+  { key: 'hog',     name: 'THE HOGFATHER',    bank: SPR.anim.bossB, tint: 'rgba(255,130,142,0.55)', bulk: 1.12, spd: 32, r: 15, item: 'glock',   pat: 'mortar',  pat2: 'burst',   addT: 6.0, addN: 4, adds: ['crawler', 'shrieker', 'bloater'], cry: 'HE IS CARRYING SOMETHING',            cry2: 'HE PUT IT DOWN. IT IS FOR YOU.' },
+  { key: 'courier', name: 'THE COURIER',      bank: SPR.anim.bossA, tint: 'rgba(90,200,255,0.5)',   bulk: 0.92, spd: 62, r: 15, item: 'bike',    pat: 'circle',  pat2: 'mines',   addT: 6.8, addN: 4, adds: ['stalker', 'stalker', 'crawler'],  cry: 'IT HAS BEEN CIRCLING FOR HOURS',      cry2: 'THE ROUND IS OVER. DELIVERY.' },
+  { key: 'fishwife',name: 'THE FISHWIFE',     bank: SPR.anim.bossB, tint: 'rgba(90,220,210,0.5)',   bulk: 1.00, spd: 38, r: 15, item: 'coolade', pat: 'sweep',   pat2: 'blink',   addT: 5.4, addN: 4, adds: ['shrieker', 'crawler', 'husk'],    cry: 'SHE HAS BEEN ON ICE SINCE FRIDAY',    cry2: 'SHE HAS THAWED ALL THE WAY THROUGH' },
+  { key: 'trim',    name: 'THE TRIMMINGS',    bank: SPR.anim.bossA, tint: 'rgba(200,150,160,0.5)',  bulk: 1.08, spd: 30, r: 15, item: 'melon',   pat: 'spawner', pat2: 'rush',    addT: 3.6, addN: 5, adds: ['crawler', 'husk', 'husk'],        cry: 'IT IS EVERY PART THEY DID NOT SELL',  cry2: 'ALL OF IT AT ONCE, THEN' },
+  { key: 'roast',   name: 'SUNDAY ROAST',     bank: SPR.anim.bossB, tint: 'rgba(255,150,50,0.55)',  bulk: 1.04, spd: 34, r: 15, item: 'banana',  pat: 'charge',  pat2: 'spiral',  addT: 5.8, addN: 4, adds: ['bloater', 'crawler', 'shrieker'], cry: 'IT HAS BEEN IN THERE SINCE SUNDAY',   cry2: 'IT IS DONE. IT IS VERY DONE.' },
+  { key: 'shelf',   name: 'THE NIGHT SHELF',  bank: SPR.anim.bossA, tint: 'rgba(70,90,200,0.55)',   bulk: 0.96, spd: 54, r: 15, item: 'glock',   pat: 'mines',   pat2: 'curtain', addT: 6.2, addN: 5, adds: ['stalker', 'stalker', 'husk'],     cry: 'IT ONLY RESTOCKS AFTER CLOSING',      cry2: 'IT IS PUTTING YOU OUT ON THE FRONT' },
+  { key: 'bestby',  name: 'THE BEST BEFORE',  bank: SPR.anim.bossB, tint: 'rgba(150,230,60,0.55)',  bulk: 1.02, spd: 44, r: 15, item: 'bike',    pat: 'brood',   pat2: 'sweep',   addT: 5.0, addN: 5, adds: ['bloater', 'cyst', 'husk'],        cry: 'THE DATE PASSED AND IT KEPT GOING',   cry2: 'THERE IS NO DATE LEFT TO PASS' }
 ];
+
+/* ---- THE FINAL BOSS ----
+   Not in the roster, never shuffled, and the only thing in the game with three
+   phases. Floor 10, wave 10. See enterPhase() and the `final` branches in
+   updateBoss — it does not reuse a roster pattern for any of its three. */
+const BOSS_FINAL = {
+  key: 'protocol', name: 'THE MEAT PROTOCOL', bank: SPR.anim.bossB,
+  tint: 'rgba(255,40,50,0.42)', bulk: 1, spd: 44, r: 19, item: null,
+  final: 1, phases: 3,
+  pat: 'p1', pat2: 'p2', pat3: 'p3',
+  addT: 5.2, addN: 4, adds: ['crawler', 'husk', 'shrieker'],
+  cry: 'IT IS WHAT THE BUILDING IS FOR',
+  cry2: 'IT IS OPENING',
+  cry3: 'THERE IS NOTHING LEFT OF IT BUT THE APPETITE'
+};
+
+/* How much health the FLOOR's boss has, before diff().hp multiplies it.
+   Indexed by floor, not by identity — see the roster comment. Nine rungs for
+   nine floors; floor 10 has its own number. */
+const BOSS_HP = [1350, 1520, 1700, 1880, 2060, 2250, 2440, 2640, 2850];
+const FINAL_HP = 4200;
+/* The single place that answers "how much boss is this floor worth". Both
+   spawnBoss and spawnMini go through it, so an elite can never be priced
+   against a different number than the boss it is a share of. */
+function bossBudget(floor) {
+  if (isLastFloor(floor)) return FINAL_HP;
+  const i = clamp(floor | 0, 0, BOSS_HP.length - 1);
+  return BOSS_HP[i] * (BOSSES[bossIndexFor(i)].bulk || 1);
+}
+
 /* Bosses used to land on five of the ten waves, which made them furniture.
    One floor boss on wave 10, two elites on the way there, and every fifth
    floor the boss comes up as an APEX instead. */
 const BOSS_WAVE = 10;
 const MINI_WAVES = [4, 8];
+/* THE LAST AISLE puts a third one on wave 6 — the wave that has never had
+   anything in it, on the floor where you have stopped expecting surprises. */
+const HUNT_WAVES = [3, 6, 8];
+function miniWaves() { return isTwist('hunt') ? HUNT_WAVES : MINI_WAVES; }
 /* What fraction of the floor's boss an elite is worth, before the build
    multiplier. See spawnMini — this is what keeps a wave-8 elite from
    outlasting the wave-10 boss at depth. */
 const ELITE_SHARE = 0.22;
-const APEX_EVERY = 5;                       // floors 5, 10, 15 ... are apex floors
-function bossIndexFor(floor) { return floor % BOSSES.length; }
-function isApexFloor(floor) { return (floor + 1) % APEX_EVERY === 0; }
+const APEX_EVERY = 5;                       // floor 5 is the apex floor
+/* One shuffle per run, so the roster is a hand you are dealt rather than a
+   list you memorise. Built lazily and cached on S so a mid-run read (the HUD,
+   a docs query, a save) can never reshuffle the run you are inside. */
+function rollRoster() {
+  const a = BOSSES.map((_, i) => i);
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = a[i]; a[i] = a[j]; a[j] = t;
+  }
+  S.roster = a;
+  return a;
+}
+function bossIndexFor(floor) {
+  const r = S.roster || rollRoster();
+  return r[clamp(floor | 0, 0, r.length - 1)];
+}
+/* Floor 10 is the finale, not an apex — the apex treatment (bigger, meaner,
+   worth an obscene card) would be a downgrade applied to the last boss in the
+   game. Floor 5 keeps it. */
+function isApexFloor(floor) { return !isLastFloor(floor) && (floor + 1) % APEX_EVERY === 0; }
 
 /* Elites: a regular enemy that came up wrong. Named, tracked on the boss bar,
    and worth a card. */
@@ -341,19 +460,6 @@ const MINIS = [
   { key: 'husk',     name: 'THE HOLLOW MAN',  col: '#d8d0c0', tint: 'rgba(235,228,212,0.45)' },
   { key: 'cyst',     name: 'THE BROODMOTHER', col: '#a8e04a', tint: 'rgba(160,225,70,0.5)' }
 ];
-
-const ITEMS = {
-  banana:  { spr: SPR.banana,  col: '#f7dc55', n: ['BANANA', 'BANANA SPLIT'],
-             d: ['potassium overload: +35% speed, you drop peels', 'peels DETONATE, +70% speed'] },
-  melon:   { spr: SPR.melon,   col: '#63b04a', n: ['MELON', 'MELON ARMOR'],
-             d: ['+55 max hp, rind shield (3)', '+110 max hp, rind shield (6), fast regrow'] },
-  coolade: { spr: SPR.coolade, col: '#e02832', n: ['COOLADE', 'PURPLE COOLADE'],
-             d: ['sugar rush: x1.6 damage, bullets pierce', 'x2.3 damage, pierce 3'] },
-  glock:   { spr: SPR.glock,   col: '#8a9099', n: ['GLOCK-18', 'AKIMBO GLOCK-18s'],
-             d: ['a second gun fires itself at whatever is closest', 'two of them. they never stop.'] },
-  bike:    { spr: SPR.bike,    col: '#c9232c', n: ['STOLEN BICYCLE', 'STOLEN MOTORCYCLE'],
-             d: ['+25% speed, your dash RAMS things', 'ram harder, leave a burning trail'] }
-};
 
 /* ============================================================
    GRADE — one rarity ladder, shared by guns and cards.
@@ -404,11 +510,18 @@ function rollGrade(luck, cap) {
 const WEP = {
   // rate is the delay between shots, so 0.155 -> 0.178 is 15% SLOWER. The gun
   // you are given free should be the one you are trying to stop needing.
-  pistol:{ id: 'pistol',name: 'THE SIDEARM',   spr: SPR.pistol,gr: 0, price: 0,   mag: 18,  rate: 0.178, dmg: 21, spread: 0.020, spd: 470, pellets: 1, reload: 1.15, sfx: 'shoot',    col: '#c8ccd4', evolve: 1, tag: 'it was in the drawer. it will do.' },
+  // 18 rounds -> 12. Twelve is the number that makes the reload a decision:
+  // a wave-1 crawler pack costs most of a magazine, so HOPPER, QUICK HANDS and
+  // the first thing PACI puts on a pedestal all have something to answer.
+  pistol:{ id: 'pistol',name: 'THE SIDEARM',   spr: SPR.pistol,gr: 0, price: 0,   mag: 12,  rate: 0.178, dmg: 21, spread: 0.020, spd: 470, pellets: 1, reload: 1.15, sfx: 'shoot',    col: '#c8ccd4', evolve: 1, tag: 'it was in the drawer. it will do.' },
   scar:  { id: 'scar',  name: 'SCAR-L',        spr: SPR.scar,  gr: 0, floor: 0, price: 20,  mag: 30,  rate: 0.088, dmg: 13, spread: 0.026, spd: 430, pellets: 1, reload: 1.45, sfx: 'shoot',    col: '#ffe9a8', tag: 'reliable. boring. yours.' },
-  // knock was 300: it threw the room across the arena and shoved Damjan back
-  // hard enough that a point-blank shot was a retreat you did not ask for.
-  saw:   { id: 'saw',   name: 'MEAT SPLITTER', spr: SPR.saw,   gr: 0, floor: 0, price: 30,  mag: 2,   rate: 0.62,  dmg: 12, spread: 0.24,  spd: 380, pellets: 9, reload: 1.9,  sfx: 'shotgun',  col: '#ffcf8a', knock: 140, tag: 'nine reasons to stand still' },
+  /* knock 300 -> 140 -> 45. Even at 140 the shotgun was a crowd-control tool
+     that happened to do damage: nine pellets each shoving, so a point-blank
+     barrel emptied a circle whether or not anything died in it, and the recoil
+     pushed Damjan a third of the way across a room he was trying to hold. At
+     45 the shove is a flinch — it staggers the thing you hit and leaves the
+     positioning to you. */
+  saw:   { id: 'saw',   name: 'MEAT SPLITTER', spr: SPR.saw,   gr: 0, floor: 0, price: 30,  mag: 2,   rate: 0.62,  dmg: 12, spread: 0.24,  spd: 380, pellets: 9, reload: 1.9,  sfx: 'shotgun',  col: '#ffcf8a', knock: 45, tag: 'nine reasons to stand still' },
   // 45 -> 80. It does almost no damage itself and then multiplies everything
   // else you own by 1.6x on a marked target, which made it the strongest coin
   // in the game at the cheapest tier — a floor-1 no-brainer rather than a buy.
@@ -418,7 +531,9 @@ const WEP = {
   chill: { id: 'chill', name: 'FREEZER BURN',  spr: SPR.chill, gr: 2, floor: 3, price: 95,  mag: 55,  rate: 0.055, dmg: 9,  spread: 0.14,  spd: 400, pellets: 1, reload: 2.2,  sfx: 'plasma',   col: '#9fe4ff', chill: 2.2, size: 2, tag: 'the cold aisle, weaponised' },
   hog:   { id: 'hog',   name: 'THE HOG',       spr: SPR.hog,   gr: 2, floor: 4, price: 120, mag: 120, rate: 0.032, dmg: 10, spread: 0.13,  spd: 500, pellets: 1, reload: 3.4,  sfx: 'minigun',  col: '#ffd28a', spin: 1, slow: 0.45, tag: 'spins up. never stops.' },
   rot:   { id: 'rot',   name: 'THE ROTISSERIE',spr: SPR.rot,   gr: 3, floor: 5, price: 165, mag: 70,  rate: 0.050, dmg: 14, spread: 0.05,  spd: 330, pellets: 1, reload: 2.6,  sfx: 'plasma',   col: '#ff9a3a', radial: 0.55, burn: 10, size: 2, lock: 'seal', tag: 'it does not care where you point it' },
-  rail:  { id: 'rail',  name: 'GOD FINGER',    spr: SPR.rail,  gr: 3, floor: 6, price: 190, mag: 5,   rate: 0.55,  dmg: 165, spread: 0,    spd: 950, pellets: 1, reload: 2.4,  sfx: 'railgun',  col: '#a8e8ff', charge: 0.5, pierce: 99, size: 3, knock: 200, tag: 'points. things stop existing.' },
+  // knock 200 -> 110. A rail slug should still throw what it hits; it should
+  // not clear the lane it punched through.
+  rail:  { id: 'rail',  name: 'GOD FINGER',    spr: SPR.rail,  gr: 3, floor: 6, price: 190, mag: 5,   rate: 0.55,  dmg: 165, spread: 0,    spd: 950, pellets: 1, reload: 2.4,  sfx: 'railgun',  col: '#a8e8ff', charge: 0.5, pierce: 99, size: 3, knock: 110, tag: 'points. things stop existing.' },
   // THE FISH. Coins, not cards — 500 of them, which at COIN_RATE is most of a
   // deep run. `prism: 1` is what makes its beam cycle colour; see drawWorld.
   omega: { id: 'omega', name: 'THE FISH',      spr: SPR.omega, gr: 4, floor: 4, price: OMEGA_COINS, mag: 300, rate: 0.02, dmg: 720, spread: 0, spd: 0, pellets: 0, reload: 2.6, sfx: 'beam', col: '#c05cff', beam: 1, prism: 1, girth: 11, tag: 'it is a fish. it fires a laser. do not ask.' },
@@ -660,10 +775,10 @@ function freshState() {
     queue: [], spawnT: 0,
     aw: 0, ah: 0, walls: [], deco: [],
     p: null, bul: [], eb: [], en: [], part: [], gibs: [], props: [], drops: [],
-    peels: [], floats: [], cracks: [], nades: [], rings: [], shops: [],
+    floats: [], cracks: [], nades: [], rings: [], shops: [],
     boss: null, door: null, secret: null, corner: null,
     cam: { cx: 0, cy: 0, z: 1, punch: 0, sh: 0, shx: 0, shy: 0, shPh: 0, seed: 0 },
-    items: {}, god: false,
+    god: false,
     coins: sv.coins || 0, cards: sv.cards || 0, vault: sv.vault || 0,
     evo: sv.evo || 0, modagazFound: sv.modagaz || 0,
     /* The permanent roster. Both survive freshState because both are the
@@ -681,7 +796,7 @@ function freshState() {
     xp: 0, level: 1, xpNext: 80, upgPts: 0,
     deck: {}, hand: null, lvlLuck: 0, rerolls: 0, cardsTaken: 0, luck: 0,
     aisle: {}, fused: {}, fusedOrder: [], dealt: 0, handTop: 0, handIn: 0,
-    sigOffer: null, sigDue: false, orbs: [], pools: [], arcs: [],
+    orbs: [], pools: [], arcs: [],
     moveT: 0, holdT: 0, waveKills: 0, waveHit: false, frostT: 0, shotN: 0, bleedT: 0,
     augs: {}, augOffer: null, tomce: null,
     floorBosses: 0, apexKills: 0, fx: [], coinFrac: 0,
@@ -698,6 +813,18 @@ function freshState() {
     /* The floor's opening beat. Both count down in game time inside update(),
        which is the whole point — see startRun(). */
     introT: 0, introMsgT: 0,
+    /* THE FLOOR TWIST. `twistT` counts to the next beat, `twistOn` is how long
+       the beat still has to run, `twistN` is which beat this is — a couple of
+       the twists alternate. All game time, so a menu pauses the weather. */
+    twistT: 0, twistOn: 0, twistN: 0, chillT: 0,
+    won: false, winT: 0,
+    /* Boss hazards that are not simple projectiles: telegraphed mortar strikes,
+       proximity mines and sweeping beams. One array with a `k` discriminator
+       rather than three, because they share a lifetime, a draw pass and a
+       "clear the room" moment. See updateHaz. */
+    haz: [],
+    /* Which boss is on which floor THIS RUN. Shuffled in startRun. */
+    roster: null,
     whisperT: rnd(6, 14), beatT: 0, breathT: 0, ui: []
   });
 }
@@ -706,14 +833,27 @@ freshState();
 /* ============================================================
    DERIVED STATS
    ============================================================ */
-/* Grocery bonuses are deliberately smaller than they were: the XP upgrade tree
-   now supplies a chunk of your power, and stacking both at full strength made
-   floor 2 trivial. */
+/* THE GROCERIES ARE GONE.
+
+   Five signature items — BANANA, MELON, COOLADE, GLOCK-18, STOLEN BICYCLE —
+   used to drop off floor bosses and live in their own screen (THE COLD ROOM).
+   They were a second progression system running in parallel with the deck,
+   awarding bigger numbers than any card for no decision beyond "take the one
+   you haven't got", and their bonuses were multiplicative on top of everything
+   the deck already gave you. Two systems both answering "what makes you
+   stronger" is one too many.
+
+   The whole apparatus is removed: the items, the cold room, the drop kind, the
+   HUD strip. What is left is the deck, which is the system that was actually
+   designed.
+
+   Two of their VERBS were worth keeping, so they became cards rather than
+   dying with the groceries — see SIDEARM and IGNITION in CARDS. Everything
+   else (the peels, the rind shield, the pierce) already had a card doing the
+   same job. */
 function ST() {
-  const it = S.items;
-  const b = it.banana | 0, m = it.melon | 0, k = it.coolade | 0, g = it.glock | 0, bk = it.bike | 0;
-  const maxhp = Math.max(30, Math.round((100 + (m === 1 ? 38 : m >= 2 ? 76 : 0) + dk('roughage')
-                            + (aisleT1('produce') ? 20 : 0))
+  const maxhp = Math.max(30, Math.round((100 + dk('roughage')
+                            + (aisleT1('produce') ? 20 : 0) + (aisleT3('produce') ? 45 : 0))
                            * (1 - Math.min(0.24, dkr('pricehike') * 0.08))
                            * (1 - ag('glass') * 0.15 - ag('hollow') * 0.10 + ag('ballast') * 0.22)));
   /* Missing health feeds RAW NERVE. Guarded because ST() is called before the
@@ -724,39 +864,48 @@ function ST() {
      MOMENTUM ramps while you move (update keeps S.moveT), THE LONG PIG counts
      the wave's dead, ARTERY reads the same wound RAW NERVE does. */
   const momentum = rd('adrenaline') ? clamp(S.moveT / 2.2, 0, 1) * 0.18 : 0;
-  const longpig = dkr('longpig') ? Math.min(dkc('longpig') / 100 * Math.floor(S.waveKills / 10), 1.2) : 0;
+  /* THE LONG PIG. One kill in ten for up to +120% damage, and NO LEFTOVERS
+     stopped the counter ever resetting inside a floor — so from the middle of
+     wave 3 onward it simply sat at its ceiling and the card stopped being a
+     wave-by-wave gamble at all. One in fourteen, ceiling +85%: it still gets
+     there on a long wave, and it takes most of one to do it. */
+  const longpig = dkr('longpig') ? Math.min(dkc('longpig') / 100 * Math.floor(S.waveKills / 14), 0.85) : 0;
   return {
-    speed: 94 * (1 + (b === 1 ? 0.22 : b >= 2 ? 0.44 : 0) + (bk === 1 ? 0.16 : bk >= 2 ? 0.30 : 0))
-              * (1 + dk('adrenaline') / 100)
+    speed: 94 * (1 + dk('adrenaline') / 100)
+              * (1 + (aisleT3('produce') ? 0.10 : 0))
               * clamp(1 - ag('tinnitus') * 0.09 - ag('ballast') * 0.08 + ag('sleepless') * 0.14, 0.4, 2),
     maxhp,
-    dmgMul: (k === 1 ? 1.38 : k >= 2 ? 1.85 : 1) * (S.god ? 3 : 1) * (S.goro ? 1.25 : 1)
+    dmgMul: (S.god ? 3 : 1) * (S.goro ? 1.25 : 1)
               * (1 + dkc('malice') / 100)
               * (1 + dkc('nerve') / 100 * hurt)
               * (1 + dkc('debtcard') / 100)
               * (1 + momentum + longpig)
               * (1 + (aisleT1('butchery') ? 0.12 : 0))
+              * (1 + (aisleT3('butchery') ? 0.28 : 0))
               * (1 + (rd('pricehike') ? 0.18 : 0))
               * (1 + (fz('primecut') ? 0.25 : 0))
               * (1 + ag('cataract') * 0.15 + ag('glass') * 0.24 + ag('thinskin') * 0.30),
     flatDmg: dkc('caliber'),
-    crit: dkc('cleaver') / 100 + ag('coldblood') * 0.09,
+    crit: dkc('cleaver') / 100 + ag('coldblood') * 0.09 + (aisleT3('butchery') ? 0.15 : 0),
     critMul: 2.0 + dkc('deepcut') / 100,
     /* TUNNEL VISION pays out exactly where RAW NERVE is loudest. */
     resist: (1 - dkc('callus') / 100) * (1 - (aisleT1('frozen') ? 0.10 : 0))
+              * (1 - (aisleT3('frozen') ? 0.16 : 0))
               * ((rd('nerve') && hp01 < 0.34) ? 0.75 : 1)
               * (1 + ag('thinskin') * 0.22 + ag('grease') * 0.11),
     dodge: dkc('aegis') / 100,
-    pierce: (k === 1 ? 1 : k >= 2 ? 2 : 0) + dkc('carve'),
-    shieldMax: (m === 1 ? 2 : m >= 2 ? 4 : 0) + dkc('apron'),
-    shieldCd: (m >= 2 ? 8 : 14) * (dkr('apron') ? 0.75 : 1),
-    peel: b > 0, peelBoom: b >= 2,
-    glocks: g === 1 ? 1 : g >= 2 ? 2 : 0,
-    glockRate: g >= 2 ? 0.11 : 0.20,
+    pierce: dkc('carve'),
+    shieldMax: dkc('apron') + (aisleT3('frozen') ? 1 : 0),
+    shieldCd: 14 * (dkr('apron') ? 0.75 : 1),
+    /* Inherited from the GLOCK-18 and the STOLEN BICYCLE, now bought as cards.
+       Both kept their numbers roughly where the grocery had them, spread over
+       more ranks so they ramp instead of arriving whole. */
+    glocks: dkc('sidearm'),
+    glockRate: rd('sidearm') ? 0.12 : 0.20,
     glockDmg: 13,
-    ram: bk === 1 ? 40 : bk >= 2 ? 95 : 0,
-    ramFire: bk >= 2,
-    dashCd: (bk ? 0.45 : (b ? 0.58 : 0.85)) * (1 - dkc('wind') / 100) * (1 - ag('grease') * 0.30),
+    ram: dkc('ignition'),
+    ramFire: rd('ignition'),
+    dashCd: 0.85 * (1 - dkc('wind') / 100) * (1 - ag('grease') * 0.30),
     /* ---- deck-driven weapon mods. These used to be bought per gun in the
        armory; they are cards now and they apply to whatever you are holding.
        WOUND UP and ARTERY both push the same dial from different directions. */
@@ -765,8 +914,9 @@ function ST() {
                     + (fz('artery') ? hurt * 0.60 : 0)
                     + ag('tinnitus') * 0.16),
     split: dkc('split'),
-    magMul: Math.max(0.35, 1 + dkc('hopper') / 100 + (aisleT1('hardware') ? 0.15 : 0) - ag('shortfuse') * 0.16),
-    reloadMul: Math.max(0.2, 1 - dkc('quick') / 100 - ag('shortfuse') * 0.22),
+    magMul: Math.max(0.35, 1 + dkc('hopper') / 100 + (aisleT1('hardware') ? 0.15 : 0)
+                     + (aisleT3('hardware') ? 0.35 : 0) - ag('shortfuse') * 0.16),
+    reloadMul: Math.max(0.2, 1 - dkc('quick') / 100 - (aisleT3('hardware') ? 0.22 : 0) - ag('shortfuse') * 0.22),
     bounce: dkc('ricochet') + (fz('crosscut') ? 2 : 0),
     home: dkc('guidance'),
     burn: dkc('spoiled'),
@@ -778,7 +928,7 @@ function ST() {
     graze: dkc('grazing') + ag('feeder') * 1.5,
     regen: dkc('regrowth') * ((rd('regrowth') && hp01 < 0.5) ? 2 : 1),
     lootMul: 1 + dkc('clearance') / 100,
-    novaEvery: dkr('flashpoint') ? Math.max(8, 22 - dkc('flashpoint') * 5) : 0,
+    novaEvery: dkr('flashpoint') ? Math.max(30, 65 - dkc('flashpoint') * 17) : 0,
     /* ---- the new verbs ---- */
     hooks: dkc('hooks'),
     tender: dkc('tender') / 100,
@@ -796,7 +946,11 @@ function ST() {
               * (1 - ag('debt') * 0.14 - ag('feeder') * 0.18 + ag('loudmouth') * 0.45)),
     coinMul: COIN_RATE * (1 + ag('debt') * 0.40) * (rd('clearance') ? 2 : 1),
     sight: clamp(1 - ag('cataract') * 0.11 - ag('sleepless') * 0.10, 0.5, 1),
+    /* WINDFALL used to be unconditional room-wide vacuum. It is a radius now —
+       a big one, but a radius — so RIPE's rider is "loot comes to you" rather
+       than "loot is collected". See the drop loop. */
     magnet: clamp((1 + dkc('ripe') / 100) * (1 - ag('coldblood') * 0.30), 0.3, 3),
+    reach: rd('ripe') ? 190 : 0,
     swarm: 1 + ag('loudmouth') * 0.18,
     /* the sidearm gains a mark every FLOOR: new colour, new voice, +20% each */
     scarMul: 1 + 0.20 * (S.scarLv - 1)
@@ -841,20 +995,37 @@ const rd = riderOn;                 // short name, used all over the engine hook
    a glance which colour means "quality" and which means "category". Nothing
    on a card is ever drawn in an aisle colour — the aisle colours live on THE
    ORDER strip and the deck headings, and nowhere else. */
+/* ---- THREE RUNGS, NOT TWO ----
+
+   THE ORDER stopped at eight ranks, which was a ceiling you hit around floor 5
+   with any focused build and then never thought about again — the aisle you had
+   committed to went quiet for the whole back half of the run. A third rung at
+   FOURTEEN is deliberately past what a casual spread reaches: it is the rung
+   you only see if you have refused cards from other aisles on purpose, and it
+   pays like it.
+
+   Rung 3 is a NAMED STATE, not another percentage. Each one turns the aisle
+   into the thing it has been hinting at all run, and the deck screen prints the
+   name — MASTERED is a tier, ABSOLUTE is an identity. */
 const AISLES = {
   butchery: { n: 'BLADES', col: '#a8564e', sub: 'hurting things',
-              p1: '+12% damage', p2: 'crits cleave everything behind the target' },
+              p1: '+12% damage', p2: 'crits cleave everything behind the target',
+              t3: 'THE RED WORK', p3: '+28% damage, +15% crit, and crits ignite' },
   produce:  { n: 'FRESH',  col: '#6f9450', sub: 'health and speed',
-              p1: '+20 max health', p2: 'clearing a wave heals a quarter of it back' },
+              p1: '+20 max health', p2: 'clearing a wave heals a quarter of it back',
+              t3: 'IN SEASON', p3: '+45 max health, +10% speed, and you regrow 2/s' },
   frozen:   { n: 'FROZEN', col: '#5486a0', sub: 'armour and slowing them down',
-              p1: '-10% damage taken', p2: 'anything that dies slowed shatters for 45' },
+              p1: '-10% damage taken', p2: 'anything that dies slowed shatters for 45',
+              t3: 'DEEP STORAGE', p3: '-16% more damage taken, +1 rind, and taking a hit freezes the room' },
   hardware: { n: 'TOOLS',  col: '#a8823c', sub: 'whatever gun you are holding',
-              p1: '+15% magazine',  p2: 'finishing a reload throws out a shockwave' },
+              p1: '+15% magazine',  p2: 'finishing a reload throws out a shockwave',
+              t3: 'THE WHOLE RACK', p3: '+35% magazine, -22% reload, and every gun you own fires with you' },
   expired:  { n: 'JUNK',   col: '#8a5f96', sub: 'bad for you. worth it.',
-              p1: '+1 LUCK',        p2: 'every fourth card dealt comes up a rarity better' }
+              p1: '+1 LUCK',        p2: 'every fourth card dealt comes up a rarity better',
+              t3: 'PAST THE DATE', p3: '+2 LUCK, and one card in every hand is dealt RARE or better' }
 };
 const AISLE_ORDER = ['butchery', 'produce', 'frozen', 'hardware', 'expired'];
-const AISLE_T1 = 4, AISLE_T2 = 8;
+const AISLE_T1 = 4, AISLE_T2 = 8, AISLE_T3 = 14;
 /* Recomputed on every pick rather than derived on read — ST() runs many times
    a frame and this would otherwise walk the whole card list each time. */
 function recalcAisles() {
@@ -864,6 +1035,7 @@ function recalcAisles() {
 const ais = k => S.aisle ? (S.aisle[k] | 0) : 0;
 const aisleT1 = k => ais(k) >= AISLE_T1;
 const aisleT2 = k => ais(k) >= AISLE_T2;
+const aisleT3 = k => ais(k) >= AISLE_T3;
 
 /* Every entry: `d(v)` is what one more rank does, `r` is the rider that only
    exists at RARE or better. Riders are deliberately verbs — they change what
@@ -877,7 +1049,20 @@ const CARDS = [
     r: { n: 'FOLLOW-THROUGH', d: 'crits splash everything within 26' } },
   { id: 'deepcut',   name: 'DEEP CUT',      aisle: 'butchery', max: 4, b: 1, v: 18,  d: v => '+' + v + '% critical damage',
     r: { n: 'HAMSTRUNG', d: 'a crit stuns whatever it lands on' } },
-  { id: 'overkill',  name: 'OVERKILL',      aisle: 'butchery', max: 3, b: 2, v: 18,  d: v => 'kills burst for ' + v + ' damage',
+  /* OVERKILL. 18/rank at radius 42 with a full screen-shake on every kill.
+     Three things were wrong with that and only one of them was the number.
+
+     The damage: 54 at max rank is more than a CRAWLER has (26) and most of a
+     SHRIEKER (38), so every kill killed its neighbours, and each of those
+     kills bursts too — a queued chain, but still a chain that cleared packs
+     you never shot at. 10/rank tops out at 30, which finishes wounded things
+     and softens healthy ones.
+
+     The radius: see killEnemy — 42 covered a pack and the pack behind it.
+
+     The camera: see explode(`quiet`). A passive that fires on every kill does
+     not get to shake the screen. */
+  { id: 'overkill',  name: 'OVERKILL',      aisle: 'butchery', max: 3, b: 2, v: 10,  d: v => 'kills burst for ' + v + ' damage',
     r: { n: 'RENDERED', d: 'the burst sets the ground alight' } },
   { id: 'nerve',     name: 'RAW NERVE',     aisle: 'butchery', max: 3, b: 1, v: 15, cap: 80,  d: v => 'up to +' + v + '% damage as you bleed',
     r: { n: 'TUNNEL VISION', d: 'under a third health, -25% damage taken' } },
@@ -898,8 +1083,17 @@ const CARDS = [
     r: { n: 'GORGED', d: 'healing past full banks a shield instead' } },
   { id: 'wind',      name: 'SECOND WIND',   aisle: 'produce', max: 3, b: 0, v: 15, cap: 50, d: v => '+' + v + '% dash rate, and dashes chill',
     r: { n: 'THROUGH THEM', d: 'dashing through something opens it up' } },
+  /* WINDFALL was "every drop on the floor, wherever it is, comes to you" —
+     which is not a rider, it is the removal of a system. Loot placement stops
+     mattering, the wave-end vacuum stops mattering, and there is no reason to
+     walk anywhere ever again. It is a very large RADIUS now (190px, roughly
+     two-fifths of the arena's short side) so the fantasy survives: you still
+     hoover up the room around you, you just have to be in the room. */
   { id: 'ripe',      name: 'RIPE',          aisle: 'produce', max: 3, b: 0, v: 12, cap: 45, d: v => '+' + v + '% experience and pickup reach',
-    r: { n: 'WINDFALL', d: 'the floor gives up its loot from anywhere' } },
+    r: { n: 'WINDFALL', d: 'loot comes to you from most of the room' } },
+  /* ---- inherited from the STOLEN BICYCLE ---- */
+  { id: 'ignition',  name: 'IGNITION',      aisle: 'produce', max: 3, b: 1, v: 32, cap: 100, d: v => 'your dash RAMS things for ' + v,
+    r: { n: 'BURNOUT', d: 'and leaves a trail of fire behind you' } },
   { id: 'marrow',    name: 'MARROW',        aisle: 'produce', max: 3, b: 1, v: 6, cap: 24, d: v => 'clearing a wave heals ' + v + '% of your health',
     r: { n: 'BONE BROTH', d: 'and hands you a frag with it' } },
   /* ---- FROZEN: taking less, slowing them down ---- */
@@ -944,16 +1138,31 @@ const CARDS = [
     r: { n: 'LOCK', d: 'they pick their own target and keep it' } },
   { id: 'munitions', name: 'MUNITIONS',     aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 2, d: v => '+' + v + ' frag every wave',
     r: { n: 'INCENDIARY', d: 'frags leave the ground burning' } },
+  /* ---- inherited from the GLOCK-18 ---- */
+  { id: 'sidearm',   name: 'THE OTHER HAND',aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 2,
+    d: v => v + ' spare gun' + (v > 1 ? 's fire' : ' fires') + ' itself at whatever is closest',
+    r: { n: 'AKIMBO', d: 'and they never stop to think about it' } },
   /* ---- EXPIRED: the bad idea aisle ---- */
   { id: 'clearance', name: 'CLEARANCE',     aisle: 'expired', max: 3, b: 1, v: 18, cap: 70, d: v => '+' + v + '% loot, and better cards',
     r: { n: 'DOUBLE COUPON', d: 'coins are worth two' } },
   { id: 'pricehike', name: 'PRICE HIKE',    aisle: 'expired', max: 2, b: 1, v: 30, cap: 80, d: v => '+' + v + '% experience, -8% max health',
     r: { n: 'WORTH IT', d: 'and +18% damage on top' } },
-  { id: 'spoiled',   name: 'SPOILED',       aisle: 'expired', max: 3, b: 0, v: 6, cap: 30,  d: v => 'your hits burn for ' + v + '/s',
+  // 6 -> 5 a rank. Burn is applied by every pellet and ticks whether or not you
+  // keep shooting, so on a nine-pellet shotgun it was doing more work than the
+  // gun was; CONTAGION then spread that to the pack for free.
+  { id: 'spoiled',   name: 'SPOILED',       aisle: 'expired', max: 3, b: 0, v: 5, cap: 26,  d: v => 'your hits burn for ' + v + '/s',
     r: { n: 'CONTAGION', d: 'a burning thing sets its neighbours alight' } },
   { id: 'seconds',   name: 'SECOND HELPING',aisle: 'expired', max: 1, b: 2, v: 1, int: 1, cap: 1, d: v => 'survive ' + v + ' fatal hit a floor',
     r: { n: 'FULL PLATE', d: 'and you come back at full health' } },
-  { id: 'flashpoint',name: 'FLASHPOINT',    aisle: 'expired', max: 2, b: 2, v: 1, int: 1, cap: 2, d: v => 'a nova every ' + Math.max(8, 22 - v * 5) + ' kills',
+  /* FLASHPOINT was a nova every 17 kills, then every 12 at rank 2 — and a nova
+     kills more than twelve things. That is not a card, it is a loop: the nova
+     pays for the next nova, and from the moment you take the second rank the
+     rest of the floor is you walking through detonations you did not ask for.
+     A kill-triggered effect has to cost more kills than it makes, or it never
+     stops. 48 / 31 sits above what a (now weaker — see fireNova) nova clears
+     in a dense wave, so it fires two or three times a wave at full stack and
+     each one is a moment again. Floor 3 at the earliest. */
+  { id: 'flashpoint',name: 'FLASHPOINT',    aisle: 'expired', max: 2, b: 2, floor: 2, v: 1, int: 1, cap: 2, d: v => 'a nova every ' + Math.max(30, 65 - v * 17) + ' kills',
     r: { n: 'FALLOUT', d: 'the nova leaves the floor burning' } },
   { id: 'debtcard',  name: 'BLOOD DEBT',    aisle: 'expired', max: 2, b: 1, v: 14, cap: 30, d: v => '+' + v + '% damage. the debt bleeds you',
     r: { n: 'PAID FORWARD', d: 'every kill gives 3 health back' } },
@@ -1172,8 +1381,13 @@ function gainXP(n) {
     float(S.p.x, S.p.y - 26, 'LEVEL ' + S.level, '#9fe08a', true);
   }
 }
-/* How many cards you get to look at. The APEX contract widens the hand. */
-function handSize() { return (contractDone('apex') ? 4 : 3) + ag('hollow'); }
+/* How many cards you get to look at. APEX PREDATOR and CLOSING TIME each widen
+   the hand, and they do not stack — the second one you sign is a fourth card
+   you already had. `Math.max` rather than a sum, because five is HOLLOW's job
+   and a six-card hand does not fit the screen. */
+function handSize() {
+  return ((contractDone('apex') || contractDone('menu')) ? 4 : 3) + ag('hollow');
+}
 function rerollCost() { return 20 + S.rerolls * 15; }
 /* A hand arrives with the weight of the best thing in it. A screen of three
    COMMONs should open quietly; an EPIC should announce itself before you have
@@ -1234,6 +1448,16 @@ function takeCard(o) {
   const after = ais(c.aisle), ai = AISLES[c.aisle];
   if (before < AISLE_T1 && after >= AISLE_T1) { msg(ai.n + ' — THE ORDER', ai.p1, 3.4); A.secret(); }
   else if (before < AISLE_T2 && after >= AISLE_T2) { msg(ai.n + ' — MASTERED', ai.p2, 4); A.god(); S.flash = 0.7; S.flashCol = ai.col; }
+  /* The third rung is the loudest thing a card can do that is not an off-cut,
+     and it should be: fourteen ranks in one aisle is most of a run's picks
+     spent on one idea. */
+  else if (before < AISLE_T3 && after >= AISLE_T3) {
+    msg(ai.n + ' — ' + ai.t3, ai.p3, 4.6);
+    A.god(); A.roar();
+    S.flash = 1.0; S.flashCol = ai.col;
+    shake(13); punch(0.06);
+    if (S.p) { ring(S.p.x, S.p.y, 130, ai.col, 0.85, 3); float(S.p.x, S.p.y - 32, ai.t3, ai.col, true); }
+  }
   // STOCKED: the max-health card also fills what it just added
   if (c.id === 'roughage' && rd('roughage') && S.p) S.p.hp += o.val;
   afterPick(o.g);
@@ -1252,45 +1476,6 @@ function takeFusion(o) {
 }
 
 /* ============================================================
-   THE COLD ROOM — the signature pick.
-
-   The five groceries used to be dealt into the level-up hand alongside +5%
-   move speed, which is two different kinds of reward wearing the same coat:
-   one is a percentage, the other is a permanent change to the character, and
-   the hand could not price them against each other. They have their own door
-   now. Kill a floor boss, the cold room opens, and you choose one of two.
-   ============================================================ */
-const SIG_ORDER = ['banana', 'melon', 'coolade', 'glock', 'bike'];
-const SIG_MAX = 2;                 // plain, then upgraded
-function sigLevel(k) { return S.items[k] | 0; }
-function sigPool() { return SIG_ORDER.filter(k => sigLevel(k) < SIG_MAX); }
-function openColdRoom() {
-  const pool = sigPool();
-  if (!pool.length) return false;
-  const out = [];
-  const bag = pool.slice();
-  while (out.length < 2 && bag.length) out.push(bag.splice(Math.floor(Math.random() * bag.length), 1)[0]);
-  S.sigOffer = out;
-  S.mode = 'coldroom';
-  if (A.duck) A.duck(0.6, 3.5);
-  A.god(); A.doorOpen();
-  S.flash = 0.7; S.flashCol = GRADE[4].col;
-  return true;
-}
-function takeSig(k) {
-  if (S.mode !== 'coldroom') return;
-  grantItem(k);                                    // the groceries keep their old plumbing
-  S.sigOffer = null; S.mode = 'play';
-  const held = SIG_ORDER.filter(x => sigLevel(x) > 0).length;
-  bumpMax('sigs', held);
-  checkContracts();
-  A.bigpickup(); A.roar();
-  S.flash = 0.9; S.flashCol = ITEMS[k].col;
-  shake(10); punch(0.05);
-  if (S.p) ring(S.p.x, S.p.y, 100, ITEMS[k].col, 0.7, 3);
-}
-
-/* ============================================================
    CONTRACTS — the reason to come back.
 
    Persistent, cross-run objectives. Each one unlocks something the game
@@ -1304,7 +1489,13 @@ const CONTRACTS = [
   { id: 'dozen', name: "BUTCHER'S DOZEN",  goal: 3000,  stat: 'kills',  d: '3000 kills, all runs counted',      u: 'start every run one level up' },
   { id: 'hoard', name: 'HOARDER',          goal: 12000, stat: 'vault',  d: 'bank 12000 coins in the vault',     u: 'start every run holding 60 coins' },
   { id: 'apex',  name: 'APEX PREDATOR',    goal: 1,     stat: 'apex',   d: 'kill an APEX',                      u: 'you are dealt four cards, not three' },
-  { id: 'menu',  name: 'THE FULL MENU',    goal: 5,     stat: 'sigs',   d: 'hold all five signature cards',     u: 'signature cards turn up far more often' }
+  /* THE FULL MENU used to read "hold all five signature cards", counting a
+     stat that only the cold room could advance — so with the groceries gone it
+     became a contract that could never be signed, tracking a system that no
+     longer exists, promising a reward that had already been removed once
+     before. Replaced rather than deleted: the slot is worth keeping, and
+     clearing the building is the achievement the game had no contract for. */
+  { id: 'menu',  name: 'CLOSING TIME',     goal: 1,     stat: 'protocol', d: 'put down THE MEAT PROTOCOL', u: 'every run starts on a hand of four' }
 ];
 /* Counters live in the save under c_*, except two that were already tracked. */
 function cStat(k) {
@@ -1405,7 +1596,20 @@ function buildRoom(idx) {
       const o = S.walls[j];
       if (x < o.x + o.w + g && x + w + g > o.x && y < o.y + o.h + g && y + h + g > o.y) return false;
     }
-    S.walls.push({ x, y, w, h, obs: 1, kind: kind || (rng() < 0.35 ? 'vat' : 'crate') });
+    /* The kind is drawn from the FLOOR's furniture list, not from a global
+       coin-flip between crate and vat. `kind` is still honoured as a hint —
+       the layout code asks for 'vat' on the big slabs and 'crate' on the
+       small ones — but it is mapped onto whatever this floor actually keeps:
+       a hint of 'vat' means "something bulky", not literally a vat. */
+    const kinds = propKinds(idx);
+    /* A 'vat' hint means "this one is bulky", so it biases toward the front of
+       the list where each floor's heaviest furniture lives — but only biases.
+       Restricting it to the first two entries meant the `pillars` layout, which
+       passes the hint for every single column, furnished those floors out of a
+       two-item list and the other kinds never appeared at all. rng()*rng() is
+       a triangular distribution: front-loaded, full range. */
+    const u = kind === 'vat' ? rng() * rng() : rng();
+    S.walls.push({ x, y, w, h, obs: 1, kind: kinds[Math.floor(u * kinds.length)] });
     return true;
   }
   function scatter(count, gap) {
@@ -1417,9 +1621,14 @@ function buildRoom(idx) {
     }
   }
 
+  /* The archetype is the FLOOR's, not the roll's. It used to be picked at
+     random every time you walked through a door, which meant the arena had no
+     identity you could carry between runs — you could not learn that floor 7 is
+     long lanes and floor 2 is columns, because on the next run it wasn't.
+     Rolled positions inside a fixed archetype is the right amount of variety:
+     the shape is the same, the cover is not. */
   const n = 7 + idx * 2;
-  const LAYOUTS = ['scatter', 'pillars', 'corridors', 'bunkers', 'ring'];
-  const layout = LAYOUTS[Math.floor(rng() * LAYOUTS.length)];
+  const layout = R.layout || 'scatter';
   S.layout = layout;
 
   if (layout === 'pillars') {
@@ -1467,8 +1676,44 @@ function buildRoom(idx) {
     scatter(n, 40);
   }
 
-  for (let i = 0; i < 26 + idx * 8; i++)
-    S.deco.push({ x: rnd(T + 10, R.aw - T - 10), y: rnd(T + 10, R.ah - T - 10), k: rng() < 0.5 ? 'hook' : 'stain', s: rnd(0.6, 1.5) });
+  /* ---- guarantee the floor's signature furniture ----
+     Kinds are rolled per obstacle, so a floor with four kinds and fourteen
+     blocks can and does roll zero of one of them — and the one it drops is
+     just as likely to be the brazier that makes THE RED KITCHEN read as a
+     kitchen. Retag a few of the placed blocks so the first two kinds are
+     always present. Retagging rather than placing keeps the LAYOUT untouched:
+     cover, sightlines and spacing are decided by the archetype, and this only
+     changes what the cover is made of. */
+  {
+    const kinds = propKinds(idx);
+    const obs = [];
+    for (let i = 4; i < S.walls.length; i++) obs.push(S.walls[i]);
+    for (let k = 0; k < Math.min(2, kinds.length); k++) {
+      const want = k === 0 ? 2 : 1;
+      let have = 0;
+      for (const o of obs) if (o.kind === kinds[k]) have++;
+      for (let n2 = have; n2 < want && obs.length; n2++) {
+        // retag the block that is furthest from the middle, so a feature prop
+        // never lands where it would crowd the arrival pad
+        let best = null, bd = -1;
+        for (const o of obs) {
+          if (o.kind === kinds[k] || o.tagged) continue;
+          const d = Math.hypot(o.x - R.aw / 2, o.y - R.ah / 2);
+          if (d > bd) { bd = d; best = o; }
+        }
+        if (!best) break;
+        best.kind = kinds[k]; best.tagged = 1;
+      }
+    }
+  }
+
+  /* Decor. Half of it is the shared floor stain; the other half is the FLOOR'S
+     OWN MOTIF, which is the cheapest way to make ten arenas look like ten
+     places rather than ten palettes. Drawn in drawWorld — see `d.k`. */
+  const motif = R.motif || 'hook';
+  for (let i = 0; i < 30 + idx * 6; i++)
+    S.deco.push({ x: rnd(T + 10, R.aw - T - 10), y: rnd(T + 10, R.ah - T - 10),
+                  k: rng() < 0.42 ? 'stain' : motif, s: rnd(0.6, 1.5), ph: rng() * TAU });
 
   S.door = { x: R.aw / 2 - 22, y: 2, w: 44, h: T + 4, open: false, glow: 0 };
   S.secret = idx === 0
@@ -1526,16 +1771,46 @@ function shopStock() {
      holding what a fresh one has to buy — but it does mean a deep enough
      roster can leave him with an empty pallet, and the pedestal loop below is
      written to survive that rather than assume three things exist. */
-  const pool = BUYABLE.filter(id => S.p.owned.indexOf(id) < 0 &&
-                                    (!WEP[id].lock || contractDone(WEP[id].lock)) &&
-                                    S.room >= (WEP[id].floor | 0));
-  // THE FISH goes through the same three gates as everything else now that it
-  // costs coins. It used to be appended unconditionally because cards were its
-  // gate; 500 coins and floor 5 are its gate instead.
-  if (S.p.owned.indexOf('omega') < 0 && S.room >= (WEP.omega.floor | 0)) pool.push('omega');
+  const owned = id => S.p.owned.indexOf(id) >= 0;
+  const unlocked = id => !WEP[id].lock || contractDone(WEP[id].lock);
+  // THE FISH goes through the same gates as everything else now that it costs
+  // coins. It used to be appended unconditionally because cards were its gate.
+  const all = BUYABLE.concat(BUYABLE.indexOf('omega') < 0 ? ['omega'] : []);
+  const pool = all.filter(id => !owned(id) && unlocked(id) && S.room >= (WEP[id].floor | 0));
+  /* If depth has left him short of a full pallet, drop the depth gate — never
+     the contract gate, and never the ownership one. Three pedestals every
+     visit is a promise the room makes just by having three pedestals in it,
+     and a shop with one thing on offer is not a shop, it is a receipt. The
+     rarity weights below then do the gating that `floor` was doing: a floor-1
+     player CAN be shown GOD FINGER this way, at odds of about one visit in
+     thirty, and cannot afford it anyway. */
+  if (pool.length < shopSlots())
+    for (const id of all)
+      if (!owned(id) && unlocked(id) && pool.indexOf(id) < 0) pool.push(id);
+
+  /* ---- weighted by rarity, not uniform ----
+
+     Uniform meant a COMMON and a LEGENDARY were equally likely to be standing
+     on a pedestal, so the crate had no texture: every visit was a coin-flip
+     between two things you could afford and one you could not. These weights
+     are roughly a rarity ladder of their own —
+
+       COMMON 100 · UNCOMMON 52 · RARE 24 · EPIC 9 · LEGENDARY 2.5
+
+     — so a LEGENDARY on a pedestal is about one seat in seventy. Seeing THE
+     FISH at all should be the thing you tell someone about; buying it is a
+     separate problem costing 500 coins. */
+  const SHOP_W = [100, 52, 24, 9, 2.5];
   const offer = [];
   const n = shopSlots();
-  while (offer.length < n && pool.length) offer.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  while (offer.length < n && pool.length) {
+    let total = 0;
+    for (const id of pool) total += SHOP_W[WEP[id].gr | 0];
+    let r = Math.random() * total, idx = pool.length - 1;
+    for (let i = 0; i < pool.length; i++) { r -= SHOP_W[WEP[pool[i]].gr | 0]; if (r <= 0) { idx = i; break; } }
+    // spliced, so a pedestal can never be a duplicate of the one beside it
+    offer.push(pool.splice(idx, 1)[0]);
+  }
   offer.sort((a, b) => WORDER.indexOf(a) - WORDER.indexOf(b));
   return offer;
 }
@@ -1564,7 +1839,8 @@ function enterShop() {
     S.secret = null; S.corner = null; S.tomce = null;
     S.en.length = 0; S.bul.length = 0; S.eb.length = 0; S.cracks.length = 0;
     S.nades.length = 0; S.part.length = 0; S.gibs.length = 0; S.rings.length = 0;
-    S.props.length = 0; S.peels.length = 0; S.pools.length = 0; S.arcs.length = 0;
+    S.props.length = 0; S.pools.length = 0; S.arcs.length = 0;
+    S.haz.length = 0;
     S.boss = null; S.vacuum = 0;
     /* The wave-end vacuum deliberately never pulls in permanent drops — a boss's
        grocery has to be walked to. The shop opens on a timer, not on your say-so,
@@ -1772,7 +2048,7 @@ function makePlayer() {
     spin: 0, charge: 0, beamT: 0,
     nades: 3, nadeCd: 0,
     dash: 0, dashCd: 0, iframe: 0, walkT: 0, stepPhase: 0, flip: false,
-    peelT: 0, hurtFlash: 0, kick: 0,
+    hurtFlash: 0, kick: 0,
     glockT: 0, glockSide: 1, ramHit: [], tempShield: 0
   };
 }
@@ -1780,7 +2056,8 @@ function makePlayer() {
 function spawnEnemy(type, x, y) {
   const d = ETYPE[type], D = diff();
   const waveK = 1 + S.wave * 0.05;
-  const hp = d.hp * D.hp * waveK;
+  // the other half of THE RENDERING's twist — see startWave
+  const hp = d.hp * D.hp * waveK * (isTwist('swarm') ? 0.7 : 1);
   const e = {
     type, x, y, vx: 0, vy: 0, r: d.r, bank: d.bank, spr: d.bank.walk[0],
     // random phase so a spawned batch doesn't march in lockstep
@@ -1800,31 +2077,41 @@ function spawnEnemy(type, x, y) {
   return e;
 }
 
+/* `idx < 0` means the finale. Everything else is a roster index. */
 function spawnBoss(idx, apex) {
-  const B = BOSSES[idx], D = diff();
+  const fin = idx < 0;
+  const B = fin ? BOSS_FINAL : BOSSES[idx], D = diff();
   const am = apex ? 2.6 : 1;
-  const hp = B.hp * D.hp * 1.35 * am;
+  /* Health is the FLOOR's, scaled by the entry's `bulk` nudge — see BOSS_HP.
+     The finale is priced flat because it is not on the ladder: it is the top
+     of it, and floor 10's diff().hp is already 12.25x. */
+  const hp = bossBudget(fin ? FLOORS - 1 : S.room) * D.hp * 1.35 * am;
+  const sp = B.spd * (1 + S.room * 0.06) * (1 + (S.evo | 0) * 0.04) * (apex ? 1.22 : 1);
   const b = {
     type: 'boss', def: B, name: apex ? 'APEX ' + B.name : B.name, x: S.aw / 2, y: 90, vx: 0, vy: 0,
-    r: B.r * (apex ? 1.45 : 1), bank: B.bank, spr: B.bank.walk[0],
-    tint: apex ? 'rgba(176,40,255,0.5)' : B.tint, scale: apex ? 1.5 : 1, apex: !!apex,
+    r: B.r * (apex ? 1.45 : fin ? 1.2 : 1), bank: B.bank, spr: B.bank.walk[0],
+    tint: apex ? 'rgba(176,40,255,0.5)' : B.tint, scale: apex ? 1.5 : fin ? 1.35 : 1, apex: !!apex,
+    final: !!fin,
     anim: 0, poseT: 0,
-    hp, max: hp, spd: B.spd * (1 + S.room * 0.06) * (1 + (S.evo | 0) * 0.04) * (apex ? 1.22 : 1),
-    base: B.spd * (1 + S.room * 0.06) * (1 + (S.evo | 0) * 0.04) * (apex ? 1.22 : 1),
+    hp, max: hp, spd: sp, base: sp,
     mark: 0, slowT: 0, slowAmt: 0,
-    dmg: 26 * D.dmg * (apex ? 1.45 : 1), score: apex ? 1400 : 500,
+    dmg: 26 * D.dmg * (apex ? 1.45 : fin ? 1.25 : 1), score: fin ? 6000 : apex ? 1400 : 500,
     gib: '#8a3540', hit: 0, phase: 'idle', pt: 1.2, wob: 0, bob: 0, sq: 0, orbit: rnd(0, TAU),
     stun: 0, burn: 0, burnT: 0, flip: false, boss: true, dead: false, chargeDir: 0, spawnT: 4,
     twitch: 0, twx: 0, twy: 0, trail: [],
-    ph: 1, phaseT: 0, spitAng: rnd(0, TAU)      // two phases: see enterPhase2()
+    /* `ph` is which phase it is in and `phases` how many it has — two for the
+       roster, three for the finale. See enterPhase(). */
+    ph: 1, phases: B.phases || 2, phaseT: 0, spitAng: rnd(0, TAU),
+    edge: 0, dropT: 0, hookT: rnd(1.4, 2.2), volley: 0
   };
   S.en.push(b); S.boss = b;
   A.roar();
-  if (A.music) { A.music.setBoss(true); A.duck(0.7, 1.4); }
-  S.jump = 0.42; S.jumpSpr = B;
-  shake(apex ? 18 : 11); punch(apex ? 0.09 : 0.05);
+  if (A.music) { A.music.setBoss(true); A.duck(0.7, fin ? 2.4 : 1.4); }
+  S.jump = fin ? 0.75 : 0.42; S.jumpSpr = B;
+  shake(fin ? 24 : apex ? 18 : 11); punch(fin ? 0.11 : apex ? 0.09 : 0.05);
   if (apex) { S.flash = 0.8; S.flashCol = '#b028ff'; }
-  msg(b.name, apex ? 'IT CAME UP WRONG AND IT KEPT GROWING' : B.cry, 3.2);
+  if (fin) { S.flash = 1.0; S.flashCol = '#ff2b2b'; A.setDread(1); }
+  msg(b.name, apex ? 'IT CAME UP WRONG AND IT KEPT GROWING' : B.cry, fin ? 4.2 : 3.2);
   return b;
 }
 
@@ -1842,8 +2129,12 @@ function spawnBoss(idx, apex) {
      levels            +5%  each   — the broadest signal, and the slowest
      cards taken       +3%  each   — deck ranks, the main track
      guns owned        +7%  each   — a new gun is a whole new output curve
-     signature levels  +14% each   — the biggest single power spikes in a run
-     off-cuts built    +18% each   — LEGENDARY by definition
+     aisle rungs      +12%  each   — THE ORDER, MASTERED, and the third rung
+     off-cuts built   +18%  each   — LEGENDARY by definition
+
+   The signature-grocery term went with the groceries. Aisle rungs replace it:
+   they are the same kind of signal — a small number of large, deliberate power
+   spikes — and they read a system that still exists.
 
    Capped at 3.2x. Uncapped, a very long run's elites outgrow its floor boss,
    which inverts the shape of a floor. Deliberately NOT applied to floor
@@ -1855,7 +2146,8 @@ function powerMul() {
   n += Math.max(0, S.level - 1) * 0.05;
   n += (S.cardsTaken | 0) * 0.03;
   n += Math.max(0, (S.p ? S.p.owned.length : 1) - 1) * 0.07;
-  for (const k of SIG_ORDER) n += sigLevel(k) * 0.14;
+  for (const k of AISLE_ORDER)
+    n += ((aisleT1(k) ? 1 : 0) + (aisleT2(k) ? 1 : 0) + (aisleT3(k) ? 1 : 0)) * 0.12;
   for (const f of FUSIONS) if (fz(f.id)) n += 0.18;
   return Math.min(3.2, n);
 }
@@ -1882,7 +2174,11 @@ function spawnMini(idx) {
 
      `flavour` keeps a CYST elite chunkier than a CRAWLER elite — but 1.45x
      chunkier, not 6.5x. */
-  const bossHp = BOSSES[bossIndexFor(S.room)].hp * D.hp * 1.35;
+  /* Reads the FLOOR's boss budget, not the roster entry's — which no longer
+     carries one at all, now that identity and health have been separated (see
+     BOSS_HP). Reading `BOSSES[...].hp` here silently produced NaN and every
+     elite in the game spawned with an undefined health bar. */
+  const bossHp = bossBudget(S.room) * D.hp * 1.35;
   const flavour = 0.85 + 0.5 * (ETYPE[M.key].hp / 170);   // 0.93 crawler .. 1.35 cyst
   e.hp = e.max = bossHp * ELITE_SHARE * flavour * powerMul();
   /* Half the build multiplier on the bite as well. Full would make a strong
@@ -1918,6 +2214,38 @@ function spray(x, y, ang, col, n, spd, life, cone) {
     const a = ang + rnd(-(cone || 0.6), cone || 0.6), s = rnd(spd * 0.35, spd);
     S.part.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, col, life: rnd(life * 0.5, life), max: life, s: 1 });
   }
+}
+/* ---- sparks ----
+   The same emitter, but the particle carries `trail`, so the draw pass strikes
+   it as a short line along its own velocity instead of a square. That single
+   difference is most of what separates "a puff of dots" from an impact: a
+   spark you can see the DIRECTION of tells you where the hit came from, which
+   is information the dot never carried. They also decay much faster, so they
+   read as a flash rather than as smoke. */
+function sparks(x, y, ang, col, n, spd, life, cone) {
+  for (let i = 0; i < n; i++) {
+    const a = ang + rnd(-(cone === undefined ? 0.7 : cone), cone === undefined ? 0.7 : cone);
+    const s = rnd(spd * 0.45, spd);
+    S.part.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, col,
+                  life: rnd(life * 0.4, life), max: life, s: 1, trail: 1, drag: 0.86 });
+  }
+}
+/* ---- the impact ----
+   One call, used by every bullet that lands on something. A white core that
+   sells the moment of contact, a fan of sparks thrown BACK along the shot
+   (which is where debris actually goes), and a thin expanding ring so the hit
+   still registers when the enemy sprite is under a pile of other enemies.
+
+   `heavy` is for crits and big single rounds: same shape, more of it. Scaling
+   one effect rather than adding a second one is what keeps a crit reading as
+   "that hit harder" instead of "that was a different event". */
+function impact(x, y, ang, col, heavy) {
+  const n = heavy ? 11 : 5;
+  sparks(x, y, ang + Math.PI, col, n, heavy ? 260 : 170, heavy ? 0.34 : 0.22, 0.85);
+  sparks(x, y, ang, '#fff6e0', heavy ? 4 : 2, 120, 0.16, 0.5);
+  ring(x, y, heavy ? 17 : 9, heavy ? '#ffffff' : col, heavy ? 0.20 : 0.13, 1);
+  S.part.push({ x, y, vx: 0, vy: 0, col: '#ffffff', life: heavy ? 0.09 : 0.06,
+                max: 0.1, s: heavy ? 4 : 2, glow: 1 });
 }
 function gib(x, y, col, n) {
   for (let i = 0; i < n; i++) {
@@ -1968,18 +2296,62 @@ function shred(x, y, dmg, stage) {
 }
 function ring(x, y, r, col, life, wid) { S.rings.push({ x, y, r0: 2, r1: r, col, life, max: life, wid: wid || 1 }); }
 
+/* Three kinds of particle out of one array. Plain ones are a square, which is
+   right for smoke and meat; sparks are struck as a short line along their own
+   velocity, so the DIRECTION of a hit is visible; `glow` ones go through
+   'lighter' so an impact core or a muzzle actually blows out instead of
+   sitting on the image as a grey square. */
+function drawParticles() {
+  ctx.save();
+  ctx.lineCap = 'round';
+  for (const q of S.part) {
+    const a = clamp(q.life / q.max, 0, 1);
+    if (q.trail) {
+      ctx.globalAlpha = a;
+      ctx.strokeStyle = q.col;
+      ctx.lineWidth = 1 + a * 0.8;
+      ctx.beginPath();
+      ctx.moveTo(q.x, q.y);
+      ctx.lineTo(q.x - q.vx * 0.026, q.y - q.vy * 0.026);
+      ctx.stroke();
+    } else if (q.glow) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = a;
+      ctx.fillStyle = q.col;
+      ctx.beginPath(); ctx.arc(q.x, q.y, q.s * (0.5 + a), 0, TAU); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+    } else {
+      ctx.globalAlpha = a;
+      ctx.fillStyle = q.col;
+      ctx.fillRect(q.x | 0, q.y | 0, q.s, q.s);
+    }
+  }
+  ctx.restore();
+  ctx.globalAlpha = 1;
+}
+
 /* The thing you actually see when something dies: a white pop, a meat cloud,
    a shockwave, sparks and a few rising embers. */
 function deathBurst(e, ang) {
   const big = !!e.boss, n = big ? 3 : 1;
+  /* The white pop is what sells the frame the thing stops existing on: a
+     one-frame additive disc at the body's own size, before any of the debris.
+     Without it a death is a cloud of red squares appearing out of nothing. */
+  S.part.push({ x: e.x, y: e.y, vx: 0, vy: 0, col: '#ffffff',
+                life: big ? 0.14 : 0.07, max: big ? 0.14 : 0.07,
+                s: (e.r || 6) * (big ? 2.4 : 1.5), glow: 1 });
   ring(e.x, e.y, big ? 74 : 22, '#ffffff', 0.16, 2);
   ring(e.x, e.y, big ? 58 : 17, '#c02028', 0.30, 1);
   gib(e.x, e.y, e.gib, big ? 70 : 12);
   blood(e.x, e.y + 4, big ? 26 : 11);
   part(e.x, e.y, e.gib, 14 * n, 165, 0.55, 2);          // meat cloud
   part(e.x, e.y, '#8a1018', 12 * n, 120, 0.65, 2);
-  part(e.x, e.y, '#ffd9a0', 7 * n, 210, 0.32, 1);       // hot sparks
-  if (ang !== undefined) spray(e.x, e.y, ang, e.gib, 18 * n, 210, 0.6, 0.85);
+  // struck sparks rather than dots, so the burst has a shape and a direction
+  sparks(e.x, e.y, rnd(0, TAU), '#ffd9a0', 8 * n, 250, 0.30, Math.PI);
+  if (ang !== undefined) {
+    spray(e.x, e.y, ang, e.gib, 14 * n, 210, 0.6, 0.85);
+    sparks(e.x, e.y, ang, '#ffe3b0', 6 * n, 300, 0.26, 0.6);
+  }
   // embers that drift upward and fade
   for (let i = 0; i < 5 * n; i++) {
     S.part.push({ x: e.x + rnd(-5, 5), y: e.y + rnd(-5, 5), vx: rnd(-16, 16), vy: rnd(-52, -20),
@@ -2109,7 +2481,10 @@ function emit(w) {
         x: mx, y: my, vx: Math.cos(a) * w.spd, vy: Math.sin(a) * w.spd,
         dmg: fdmg, pierce: (w.pierce || 0) + st.pierce, hitIds: [], life: w.life || 1.4,
         col, size: (w.size || 1) + (evo && S.scarLv > 3 ? 1 : 0) + (rd('caliber') ? 1 : 0),
-        knock: w.knock === undefined ? 60 : w.knock, pin: w.pin || 0, burn: (w.burn || 0) + st.burn,
+        // house default 60 -> 38: every gun without its own `knock` was pushing
+        // the room away from the muzzle, which quietly made backpedalling the
+        // correct answer to everything.
+        knock: w.knock === undefined ? 38 : w.knock, pin: w.pin || 0, burn: (w.burn || 0) + st.burn,
         bounce: (w.bounce || 0) + st.bounce, mark: w.mark || 0, chill: w.chill || 0,
         home: homing, lock: rd('guidance') ? null : undefined,
         /* THE FLYKILLER and BLACK FRIDAY. `ghost` is what makes a singularity
@@ -2123,10 +2498,18 @@ function emit(w) {
   if (magLow) part(mx, my, '#ffb03a', 3, 60, 0.25);
   p.recoil = Math.min(1, p.recoil + (w.pellets > 3 ? 0.7 : 0.24));
   p.kick = w.pellets > 3 ? 6 : w.charge ? 7 : 2.6;
-  p.vx -= Math.cos(p.ang) * (w.knock ? w.knock * 0.28 : 12);
-  p.vy -= Math.sin(p.ang) * (w.knock ? w.knock * 0.28 : 12);
-  spray(mx, my, aim, '#ffd07a', w.pellets > 3 ? 14 : 5, 140, 0.18, 0.4);
-  S.muzzle = { x: mx, y: my, t: 0.06, big: w.pellets > 3 || !!w.charge };
+  /* Self-recoil used to be derived from `knock`, which tied how hard the gun
+     shoved YOU to how hard it shoved THEM. Cutting the shotgun's knockback
+     would then have silently deleted its kick as well, and the two are not the
+     same feeling — one is a crowd tool, the other is weight. It is its own
+     number now, and a much smaller one: a shove you notice, not a retreat. */
+  const self = w.pellets > 3 ? 26 : w.charge ? 22 : 10;
+  p.vx -= Math.cos(p.ang) * self;
+  p.vy -= Math.sin(p.ang) * self;
+  // burnt powder, thrown forward and shedding speed fast
+  sparks(mx, my, aim, '#ffd07a', w.pellets > 3 ? 10 : 4, 190, 0.16, 0.42);
+  // the flash carries the barrel's angle and the gun's own colour now
+  S.muzzle = { x: mx, y: my, a: aim, col, t: 0.06, big: w.pellets > 3 || !!w.charge };
   shake(w.pellets > 3 ? 3.4 : w.charge ? 5.5 : S.god ? 1.4 : 1.0);
   if (w.charge) punch(0.05);
   if (S.god) A.godshoot();
@@ -2255,23 +2638,35 @@ function throwNade() {
   float(p.x, p.y - 20, 'FRAG', '#7aa35e');
 }
 
-function explode(x, y, r, dmg, col) {
+/* `quiet` is what a passive gets instead of the full detonation.
+   A frag is an event: you threw it, you were expecting it, and the camera is
+   allowed to react. OVERKILL is not an event — it fires on every kill, and a
+   camera that recoils on every kill is a camera that never stops moving. So a
+   quiet burst keeps the ring, the sparks and the damage, and gives up the
+   shake, the punch, the hitstop, the screen flash and the audio duck. The
+   feedback you need (a ring where it went off) survives; the feedback that
+   fights you for control of the frame does not. */
+function explode(x, y, r, dmg, col, quiet) {
   ring(x, y, r * 1.5, col || '#ffb03a', 0.4, 2);
   ring(x, y, r * 0.8, '#ffffff', 0.22, 3);
-  part(x, y, '#ffd05a', 34, 220, 0.55, 2);
-  part(x, y, '#ff5a1e', 26, 160, 0.7, 2);
-  part(x, y, '#3a2a24', 20, 90, 1.0, 2);
+  part(x, y, '#ffd05a', quiet ? 14 : 34, quiet ? 150 : 220, 0.55, 2);
+  part(x, y, '#ff5a1e', quiet ? 10 : 26, 160, 0.7, 2);
+  if (!quiet) part(x, y, '#3a2a24', 20, 90, 1.0, 2);
   blood(x, y, r * 0.6, 'rgba(24,12,8,0.4)');
-  shake(14); punch(0.075); S.hitstop = Math.max(S.hitstop, 0.07);
-  S.flash = Math.max(S.flash, 0.35); S.flashCol = '#ffcf8a';
-  A.boom(); A.duck(0.35, 0.5);
+  if (quiet) {
+    A.hit();
+  } else {
+    shake(14); punch(0.075); S.hitstop = Math.max(S.hitstop, 0.07);
+    S.flash = Math.max(S.flash, 0.35); S.flashCol = '#ffcf8a';
+    A.boom(); A.duck(0.35, 0.5);
+  }
   for (const e of S.en) {
     if (e.dead) continue;
     const d = Math.hypot(e.x - x, e.y - y);
     if (d > r) continue;
     const f = 1 - d / r;
     const a = Math.atan2(e.y - y, e.x - x);
-    e.vx += Math.cos(a) * 340 * f; e.vy += Math.sin(a) * 340 * f;
+    e.vx += Math.cos(a) * (quiet ? 150 : 340) * f; e.vy += Math.sin(a) * (quiet ? 150 : 340) * f;
     damageEnemy(e, dmg * f, false, a);
   }
   const pd = Math.hypot(S.p.x - x, S.p.y - y);
@@ -2364,7 +2759,10 @@ function killEnemy(e, ang) {
      few at a time, once a frame, so a chain is a chain and not a stack. Every
      death-triggered rider added since goes on the same queue for the same
      reason; none of them may call damageEnemy directly from here. */
-  if (st.overkill > 0) S.fx.push({ k: 'boom', x: e.x, y: e.y, r: 42, d: st.overkill * st.dmgMul, fire: rd('overkill') });
+  // r 42 -> 30. OVERKILL's radius was wider than a crawler pack is deep, so one
+  // death cleared the pack and the pack's neighbours; the chain that made was
+  // the card's whole reputation. It reaches its own kill's neighbours now.
+  if (st.overkill > 0) S.fx.push({ k: 'boom', x: e.x, y: e.y, r: 30, d: st.overkill * st.dmgMul, fire: rd('overkill') });
   /* GORGED: healing past the ceiling is banked as a temporary shield instead
      of being thrown away, which is what makes stacked GRAZING worth having. */
   if (st.graze > 0 && S.p.hp > 0) {
@@ -2430,6 +2828,29 @@ function killEnemy(e, ang) {
     S.slow = 0.9; punch(0.09);
     S.flash = 0.7; S.flashCol = '#ff2b2b';
 
+    /* ---- the end of the game ----
+       Everything it left in the air goes with it. A victory beat you have to
+       dodge through is not a victory beat, and there is nothing left alive to
+       be fighting: the finale spawns alone, so an empty room is the honest
+       state of the world the moment it dies. */
+    if (e.final) {
+      S.eb.length = 0; S.haz.length = 0; S.cracks.length = 0; S.queue.length = 0;
+      for (const o of S.en) if (o !== e) { o.dead = true; o.hp = 0; }
+      S.won = true; S.winT = 3.4;
+      // and nothing is owed a screen any more
+      S.upgPts = 0; S.pendingLuck = 0;
+      S.slow = 2.2; S.hitstop = Math.max(S.hitstop, 0.4);
+      S.flash = 1; S.flashCol = '#ffffff';
+      shake(26); punch(0.14);
+      for (let k = 0; k < 5; k++) ring(e.x, e.y, 60 + k * 70, '#ff2b2b', 0.9 + k * 0.2, 3);
+      part(e.x, e.y, '#ffffff', 70, 260, 1.4, 2);
+      A.roar(); A.god();
+      if (A.music) A.music.stop(2.6);
+      A.setDread(0);
+      bump('protocol');
+      msg('THE MEAT PROTOCOL IS MEAT', 'it is over. you can stop now.', 5);
+    }
+
     /* Elites and floor bosses both pay in a card you get to choose. That is
        the whole reason to fight one now — the groceries live in the deck. */
     const elite = !!e.mini;
@@ -2446,27 +2867,35 @@ function killEnemy(e, ang) {
     dropPickup(e.x - 10, e.y, 'nade');
     if (!elite) dropPickup(e.x + 18, e.y, 'shield');
 
-    /* A guaranteed hand, dealt at better odds the bigger the thing was. */
-    S.upgPts++;
-    S.pendingLuck = elite ? 0.5 : e.apex ? 2.4 : 1.2;
-    S.lvlDelay = 1.1;
+    /* A guaranteed hand, dealt at better odds the bigger the thing was — but
+       not from the finale. There is no next wave to spend a card on, and
+       shoving a level-up screen between the last kill and the ending is the
+       single most reliable way to throw an ending away. */
+    if (!e.final) {
+      S.upgPts++;
+      /* A floor boss used to pay a card AND open the cold room. With the
+         groceries gone it owes the difference in the only currency left, so
+         its hand runs much hotter: 2.0 luck against an elite's 0.5. The apex
+         stays the biggest number in the game. */
+      S.pendingLuck = elite ? 0.5 : e.apex ? 2.4 : 2.0;
+      S.lvlDelay = 1.1;
+    }
 
     S.bossKills++;
-    /* Only a FLOOR boss opens the top of the deck — elites do not count. It
-       also unlocks the cold room, which is where the five signature groceries
-       live now. An elite pays a card; a floor boss pays a card and a name. */
+    // Only a FLOOR boss opens the top of the deck — elites do not count.
     if (!elite) {
       S.floorBosses++;
       if (e.apex) S.apexKills++;
       bump('bosses'); if (e.apex) bump('apex');
-      if (sigPool().length) { S.sigDue = true; float(e.x, e.y - 44, 'THE COLD ROOM IS OPEN', '#c05cff', true); }
-      else float(e.x, e.y - 44, 'THE DECK OPENS', '#ffb03a', true);
+      if (!e.final) float(e.x, e.y - 44, 'THE DECK OPENS', '#ffb03a', true);
     }
     checkContracts();
-    msg(e.name + ' IS MEAT', elite ? 'an elite. the deck opens.'
-        : S.sigDue ? 'the cold room is unlocked. go and take something.'
-        : e.apex ? 'the apex is down. take something obscene.' : 'the floor is yours. pick a card.', 3);
-    A.roar();
+    if (!e.final) {
+      msg(e.name + ' IS MEAT', elite ? 'an elite. the deck opens.'
+          : e.apex ? 'the apex is down. take something obscene.'
+          : 'the floor is yours. pick something good.', 3);
+      A.roar();
+    }
   } else {
     /* Med kits used to be a 6% drop on top of two guaranteed ones every wave,
        which meant health was never actually a resource. */
@@ -2484,22 +2913,36 @@ function killEnemy(e, ang) {
   if (S.kills % 25 === 0) { bump('kills', 25); checkContracts(); }
 }
 
-/* Shared by the NOVA pickup and the FLASHPOINT card. */
+/* Shared by the NOVA pickup and the FLASHPOINT card.
+
+   The old one was 26 homing rounds at 90 damage with two pierce each and a
+   2.6s life — which is 78 potential bodies from one press, and they *steered*,
+   so it did not miss. It cleared any wave it was fired into, which is why
+   FLASHPOINT could feed itself. Cut on four axes at once, because no single
+   one of them was the problem:
+
+     rounds    26 -> 20     it is a ring, not a wall
+     damage    90 -> 55     kills a CRAWLER, wounds a BLOATER
+     pierce     2 ->  1     two bodies a round, not three
+     homing   5.5 -> 1.6    it now has to be aimed by standing somewhere
+
+   Still the loudest single button in the game, and still worth picking the
+   pickup up for. It just no longer ends the wave on its own. */
 function fireNova(x, y) {
-  const st = ST(), N = 26;
+  const st = ST(), N = 20;
   for (let k = 0; k < N; k++) {
     const a = k / N * TAU + Math.random() * 0.1;
     S.bul.push({
       x, y, vx: Math.cos(a) * 340, vy: Math.sin(a) * 340,
-      dmg: 90 * st.dmgMul, pierce: 2 + st.pierce, hitIds: [], life: 2.6,
-      col: '#ffb03a', size: 3, knock: 180, pin: 0, burn: 12 + st.burn, bounce: st.bounce,
-      mark: 0, chill: 0, god: S.god, home: 5.5, spd: 340
+      dmg: 55 * st.dmgMul, pierce: 1 + st.pierce, hitIds: [], life: 1.9,
+      col: '#ffb03a', size: 3, knock: 80, pin: 0, burn: 12 + st.burn, bounce: st.bounce,
+      mark: 0, chill: 0, god: S.god, home: 1.6, spd: 340
     });
   }
   float(x, y - 18, 'NOVA', '#ffb03a', true);
   ring(x, y, 64, '#ffb03a', 0.4, 2);
-  part(x, y, '#fff0a8', 40, 200, 0.7, 2);
-  shake(9); punch(0.05); S.flash = Math.max(S.flash, 0.45); S.flashCol = '#ffcf8a';
+  part(x, y, '#fff0a8', 30, 200, 0.7, 2);
+  shake(5); punch(0.03); S.flash = Math.max(S.flash, 0.28); S.flashCol = '#ffcf8a';
   A.boom();
   // FALLOUT leaves the ground going; FLASH FLOOD puts the room on ice with it
   if (rd('flashpoint')) S.pools.push({ x, y, r: 40, life: 5, max: 5, d: 16, fire: 1 });
@@ -2558,9 +3001,21 @@ function updatePools(dt, st) {
     const q = S.pools[i];
     q.life -= dt;
     if (q.life <= 0) { S.pools.splice(i, 1); continue; }
+    /* `warm` is a burner that has lit but not yet caught: it draws its ring and
+       does nothing at all. Your own pools never set it — only the floor does,
+       because only the floor's pools can hurt you and only a hazard that can
+       hurt you owes you a warning. */
+    if (q.warm > 0) {
+      q.warm -= dt;
+      if (Math.random() < dt * 18) part(q.x + rnd(-q.r, q.r) * 0.6, q.y + rnd(-q.r, q.r) * 0.4, '#ff8a2b', 1, 26, 0.4);
+      if (q.warm <= 0) { ring(q.x, q.y, q.r, '#ff8a2b', 0.35, 2); A.burn(); }
+      continue;
+    }
     if (Math.random() < dt * 6)
       part(q.x + rnd(-q.r, q.r) * 0.7, q.y + rnd(-q.r, q.r) * 0.5, q.fire ? '#ff8a2b' : '#8fdc5a', 1, 12, 0.5);
     if (!tick) continue;
+    // THE RED KITCHEN's burners are the only pools that read Damjan as fuel.
+    if (q.hot && Math.hypot(p.x - q.x, p.y - q.y) < q.r) hurtPlayer(q.d * 0.5, q.x, q.y);
     for (const e of S.en) {
       if (e.dead) continue;
       const d = Math.hypot(e.x - q.x, e.y - q.y);
@@ -2573,6 +3028,240 @@ function updatePools(dt, st) {
       p.hp = Math.min(st.maxhp, p.hp + 1);
   }
   if (S.pools.length > 40) S.pools.splice(0, S.pools.length - 40);
+}
+
+/* ============================================================
+   BOSS HAZARDS
+
+   A boss whose entire vocabulary is "spawn a ring of projectiles" asks the
+   player exactly one question, over and over: which way is out. Ten of those
+   in a row is one boss with ten health bars. These are the other questions.
+
+     mark   a shell lands HERE, in `t` seconds. the circle is the contract:
+            it is drawn before it is dangerous and it does not move, so the
+            answer is always "be elsewhere" and never "be lucky".
+     mine   sits, arms, and goes off when you touch it. it turns the arena
+            into terrain you have to spend, which is the only way to make a
+            big empty room a place with corners in it.
+     beam   a line, anchored to the boss, that sweeps. it does not care where
+            you are; it cares where you WILL be, and it cannot be outrun in a
+            straight line — only crossed.
+
+   Every one has a wind-up you can see and a shape you can learn. That is the
+   whole design rule for this file: no damage without a tell.
+   ============================================================ */
+function updateHaz(dt) {
+  const p = S.p;
+  for (let i = S.haz.length - 1; i >= 0; i--) {
+    const h = S.haz[i];
+    h.t -= dt;
+
+    if (h.k === 'mark') {
+      if (h.t <= 0) {
+        /* `spawn` makes it an EGG rather than a shell — MOTHER OF MELONS seeds
+           the room instead of shelling it. Same telegraph, same circle, and
+           what comes out of it is the surprise. It goes through the crack
+           system so it hatches on the ordinary spawn animation, and it obeys
+           the room cap: a boss that can seed past the cap is bug #A with a
+           different name on it. */
+        if (h.spawn) {
+          const addCap = Math.min(30, 14 + S.room * 4 + (S.evo | 0) * 2);
+          if (S.en.length + S.cracks.length < addCap)
+            S.cracks.push({ x: h.x, y: h.y, t: 0.4, type: h.spawn });
+          ring(h.x, h.y, h.r, h.col, 0.35, 2);
+          part(h.x, h.y, h.col, 14, 120, 0.5);
+          A.screech(true);
+        } else {
+          // the shell lands: one loud ring, damage falling off to the rim
+          ring(h.x, h.y, h.r, h.col, 0.45, 3);
+          ring(h.x, h.y, h.r * 0.5, '#ffffff', 0.22, 2);
+          part(h.x, h.y, h.col, 24, 190, 0.6, 2);
+          shake(7); punch(0.03); A.boom();
+          const d = Math.hypot(p.x - h.x, p.y - h.y);
+          if (d < h.r) hurtPlayer(h.dmg * (1 - 0.45 * (d / h.r)), h.x, h.y);
+        }
+        S.haz.splice(i, 1);
+      }
+
+    } else if (h.k === 'mine') {
+      /* Armed after 0.7s, then live for the rest of its life. `hit` stops one
+         mine paying out twice inside a single dash. */
+      if (h.t <= 0) { S.haz.splice(i, 1); continue; }
+      if (h.life - h.t < 0.7) continue;
+      if (!h.hit && Math.hypot(p.x - h.x, p.y - h.y) < h.r) {
+        h.hit = 1;
+        ring(h.x, h.y, h.r * 1.6, h.col, 0.4, 2);
+        part(h.x, h.y, h.col, 20, 170, 0.5, 2);
+        shake(6); A.boom();
+        hurtPlayer(h.dmg, h.x, h.y);
+        S.haz.splice(i, 1);
+      }
+
+    } else if (h.k === 'beam') {
+      /* Anchored to its boss and swept by it. Dies with the boss — a beam
+         hanging in the air after the thing holding it is gone reads as a bug
+         no matter how good it looks. */
+      if (h.t <= 0 || !h.b || h.b.dead) { S.haz.splice(i, 1); continue; }
+      h.x = h.b.x; h.y = h.b.y;
+      h.ang += h.spin * dt;
+      if (h.warm > 0) { h.warm -= dt; continue; }
+      // point-to-line distance along the beam's own axis
+      const dx = p.x - h.x, dy = p.y - h.y;
+      const along = dx * Math.cos(h.ang) + dy * Math.sin(h.ang);
+      const off = Math.abs(-dx * Math.sin(h.ang) + dy * Math.cos(h.ang));
+      if (along > 0 && along < h.len && off < h.w + p.r) {
+        hurtPlayer(h.dmg * dt, h.x, h.y);
+        part(p.x, p.y, h.col, 1, 40, 0.3);
+      }
+    }
+  }
+  if (S.haz.length > 48) S.haz.splice(0, S.haz.length - 48);
+}
+
+/* Called twice a frame. Marks and mines are FLOOR — they have to sit under
+   everything that walks on them or they read as objects in the air. A sweeping
+   beam is not floor; it goes over the top with the muzzle flashes. */
+function drawHaz(air) {
+  for (const h of S.haz) {
+    if (!!air !== (h.k === 'beam')) continue;
+    if (h.k === 'mark') {
+      /* The circle fills as the shell falls. Full ring = now. Nothing about
+         this is subtle on purpose; a telegraph you have to squint at is not a
+         telegraph. */
+      const u = clamp(1 - h.t / h.max, 0, 1);
+      ctx.globalAlpha = 0.22 + u * 0.22;
+      ctx.fillStyle = h.col;
+      ctx.beginPath(); ctx.ellipse(h.x, h.y, h.r * u, h.r * u * 0.6, 0, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 0.5 + Math.abs(Math.sin(S.t * (5 + u * 14))) * 0.4;
+      ctx.strokeStyle = h.col; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(h.x, h.y, h.r, h.r * 0.6, 0, 0, TAU); ctx.stroke();
+      ctx.globalAlpha = 1;
+
+    } else if (h.k === 'mine') {
+      const armed = h.life - h.t >= 0.7;
+      ctx.globalAlpha = armed ? 0.55 + Math.sin(S.t * 7 + h.x) * 0.3 : 0.3;
+      ctx.fillStyle = h.col;
+      ctx.fillRect((h.x - 2) | 0, (h.y - 2) | 0, 4, 4);
+      if (armed) {
+        ctx.globalAlpha = 0.16 + Math.sin(S.t * 7 + h.x) * 0.10;
+        ctx.beginPath(); ctx.arc(h.x, h.y, h.r, 0, TAU); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+    } else if (h.k === 'beam') {
+      const ex = h.x + Math.cos(h.ang) * h.len, ey = h.y + Math.sin(h.ang) * h.len;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+      if (h.warm > 0) {
+        // the sighting line: where it is about to be, at a width that cannot hurt
+        ctx.globalAlpha = 0.35 + Math.sin(S.t * 20) * 0.2;
+        ctx.strokeStyle = h.col; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.lineTo(ex, ey); ctx.stroke();
+      } else {
+        ctx.globalAlpha = 0.30; ctx.strokeStyle = h.col; ctx.lineWidth = h.w * 2.4;
+        ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.globalAlpha = 0.75; ctx.lineWidth = h.w * 1.1;
+        ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.lineTo(ex, ey); ctx.stroke();
+        ctx.globalAlpha = 1; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1.4;
+        ctx.beginPath(); ctx.moveTo(h.x, h.y); ctx.lineTo(ex, ey); ctx.stroke();
+      }
+      ctx.restore(); ctx.globalAlpha = 1;
+    }
+  }
+}
+
+/* One shell, landing where it is drawn, `t` seconds from now. */
+function mortarAt(x, y, r, dmg, t, col) {
+  S.haz.push({ k: 'mark', x, y, r, dmg, t, max: t, col: col || '#ff8a2b' });
+}
+
+/* ============================================================
+   THE FLOOR TWISTS
+
+   One rule per floor, and each one has to be a rule you can PLAY AGAINST
+   rather than a number you absorb. That is the whole test: a twist that just
+   subtracts (−10% damage, say) is difficulty; a twist you can read, time and
+   step around is design. So every one of these either has a tell, a rhythm, or
+   a trade attached.
+
+     dark      floor 2 · the lamp is smaller. nothing else changes.
+     slick     floor 3 · you keep your momentum. so do your mistakes.
+     heat      floor 4 · burners open on a beat and you can see them coming
+     frost     floor 5 · the room freezes over; you are slow for four seconds
+     swarm     floor 6 · half again as many, at 70% health each
+     blackout  floor 7 · the lights cut out and it counts you down first
+     frail     floor 8 · everything hits 25% harder. no tell. that IS floor 8.
+     hunt      floor 9 · a third elite, on a wave that never had one
+     final     floor 10 · see BOSS_FINAL
+
+   `heat`, `frost` and `blackout` run on the shared timer below. The rest are
+   read where they land — search isTwist().
+   ============================================================ */
+function updateTwist(dt) {
+  const t = twist();
+  if (!t) return;
+  const p = S.p;
+
+  if (t === 'heat') {
+    /* Burners. A vent lights, and for 1.1s it is only a warning ring — long
+       enough to walk out of, short enough that standing still is a decision.
+       Two of them at a time, never within 90px of you when they light, because
+       a hazard that spawns under you is not a hazard, it is a tax. */
+    S.twistT -= dt;
+    if (S.twistT <= 0) {
+      S.twistT = rnd(2.6, 4.0);
+      for (let k = 0; k < 2; k++) {
+        const q = freeSpot(120);
+        if (Math.hypot(q.x - p.x, q.y - p.y) < 90) continue;
+        S.pools.push({ x: q.x, y: q.y, r: 34, life: 4.6, max: 4.6, d: 22, fire: 1, hot: 1, warm: 1.1 });
+      }
+      A.burn();
+    }
+
+  } else if (t === 'frost') {
+    /* The cold comes in waves, and the wave is announced. Four seconds of
+       wind-up, then four seconds where you move at 55% — everything else in
+       the room is slowed with you, so it is a change of tempo rather than a
+       handicap. The freezer is the one floor where standing and shooting is
+       correct. */
+    S.twistT -= dt;
+    if (S.twistOn > 0) {
+      S.twistOn -= dt;
+      if (Math.random() < dt * 30) part(rnd(0, S.aw), rnd(0, S.ah), '#dff4ff', 1, 8, 1.2);
+      if (S.twistOn <= 0) msg('', 'it is letting go of you.', 1.6);
+    } else if (S.twistT <= 0) {
+      S.twistT = rnd(13, 18); S.twistOn = 4.0; S.twistN++;
+      msg('THE COLD', 'everything slows down. including them.', 2.2);
+      S.flash = Math.max(S.flash, 0.35); S.flashCol = '#bfefff';
+      ring(p.x, p.y, 200, '#bfefff', 0.6, 3);
+      A.hit(); shake(5);
+      for (const e of S.en) { e.slowT = Math.max(e.slowT, 4.2); e.slowAmt = Math.max(e.slowAmt, 0.45); }
+    } else if (S.twistT < 1.4 && Math.random() < dt * 26) {
+      part(rnd(0, S.aw), rnd(0, S.ah), '#bfefff', 1, 20, 0.8);
+    }
+
+  } else if (t === 'blackout') {
+    /* The lights go, and they tell you first: three seconds of the room dimming
+       before it drops to nothing for two and a half. In the dark you keep the
+       muzzle flash, the enemy bullets (which light their own way — see
+       drawLight) and the crosshair, and that is the fight. It is the only twist
+       that takes something away without giving you a way to counter it, which
+       is why it is on a metronome you can count. */
+    S.twistT -= dt;
+    if (S.twistOn > 0) {
+      S.twistOn -= dt;
+      if (S.twistOn <= 0) { A.doorOpen(); msg('', 'the lights come back. count them.', 1.8); }
+    } else if (S.twistT <= 0) {
+      S.twistT = rnd(15, 21); S.twistOn = 2.5;
+      msg('THE LIGHTS', '', 1.4); A.denied(); shake(4);
+    }
+  }
+}
+
+/* How dark it is right now, 0..1 on top of the room's own `dark`. */
+function blackoutK() {
+  if (!isTwist('blackout')) return 0;
+  if (S.twistOn > 0) return 1;                          // out
+  return clamp((3 - S.twistT) / 3, 0, 1) * 0.55;        // dimming, as a warning
 }
 
 /* One shared shove. DEFLECTION, SPRUNG, SLAM FIRE and the HARDWARE mastery
@@ -2629,6 +3318,8 @@ function hurtPlayer(dmg, sx, sy) {
     return;
   }
   dmg *= stp.resist;
+  // THE SALT LINE. No tell and no counter — the whole floor is the tell.
+  if (isTwist('frail')) dmg *= 1.25;
   if (p.shield > 0) {
     p.shield--; p.shieldT = ST().shieldCd; p.iframe = 0.45;
     part(p.x, p.y, '#63b04a', 16, 130, 0.5);
@@ -2683,21 +3374,9 @@ function hurtPlayer(dmg, sx, sy) {
    PICKUPS
    ============================================================ */
 function dropPickup(x, y, kind, key) {
-  const perm = kind === 'item' || kind === 'god';
+  // THE EYE is the only drop the floor will hold onto forever now
+  const perm = kind === 'god';
   S.drops.push({ x, y, kind, key, t: 0, life: perm ? 1e9 : 34, bob: rnd(0, TAU), vx: rnd(-40, 40), vy: rnd(-40, 40) });
-}
-
-function grantItem(key) {
-  const lv = (S.items[key] | 0) + 1;
-  S.items[key] = lv;
-  S.banner = { key, lv, t: 4.2 };
-  A.bigpickup();
-  S.flash = 0.5; S.flashCol = ITEMS[key].col;
-  shake(7); punch(0.05);
-  if (key === 'melon') S.p.hp += 55;
-  const st = ST();
-  S.p.hp = Math.min(st.maxhp, S.p.hp);
-  S.p.shield = st.shieldMax;
 }
 
 function grantGod() {
@@ -2732,13 +3411,21 @@ function startWave(n) {
   S.queue = [];
   S.spawnT = 0.5;
   if (n === BOSS_WAVE) {
-    const apex = isApexFloor(S.room);
-    spawnBoss(bossIndexFor(S.room), apex);
-    const filler = S.room >= 1 ? ['crawler', 'crawler', 'shrieker', 'husk'] : ['crawler', 'crawler', 'shrieker'];
-    for (let i = 0; i < Math.round(4 + n * 0.9 + S.room * 3.5); i++) S.queue.push(pick(filler));
-    msg('WAVE ' + n, apex ? 'APEX' : 'FLOOR BOSS', 2.4);
-  } else if (MINI_WAVES.indexOf(n) >= 0) {
-    spawnMini(S.room * MINI_WAVES.length + MINI_WAVES.indexOf(n));
+    /* The last wave of the last floor is THE MEAT PROTOCOL, and it arrives
+       alone. Every other boss wave queues a floor's worth of filler on top;
+       this one does not, because the finale's own three phases are the content
+       and a crowd underneath them would only make the beams unreadable. */
+    const last = isLastFloor(S.room);
+    const apex = !last && isApexFloor(S.room);
+    spawnBoss(last ? -1 : bossIndexFor(S.room), apex);
+    if (!last) {
+      const filler = S.room >= 1 ? ['crawler', 'crawler', 'shrieker', 'husk'] : ['crawler', 'crawler', 'shrieker'];
+      for (let i = 0; i < Math.round(4 + n * 0.9 + S.room * 3.5); i++) S.queue.push(pick(filler));
+    }
+    msg('WAVE ' + n, last ? 'THE LAST ONE' : apex ? 'APEX' : 'FLOOR BOSS', 2.4);
+  } else if (miniWaves().indexOf(n) >= 0) {
+    const mw = miniWaves();
+    spawnMini(S.room * mw.length + mw.indexOf(n));
     const filler = S.room >= 1 ? ['crawler', 'crawler', 'shrieker', 'stalker', 'husk'] : ['crawler', 'crawler', 'shrieker', 'stalker'];
     for (let i = 0; i < Math.round(6 + n * 1.4 + S.room * 3); i++) S.queue.push(pick(filler));
     msg('WAVE ' + n, 'ELITE', 2.4);
@@ -2750,8 +3437,12 @@ function startWave(n) {
     const armed = 1 + Math.max(0, S.p.owned.length - 1) * 0.10;
     const levelled = 1 + Math.max(0, S.level - 1) * 0.06;   // the stronger you get, the more come
     // gentler inside a floor, much steeper between them
+    // THE RENDERING sends half again as many and takes 30% off each of them —
+    // the same total meat arriving in more pieces, which is a different fight
+    // rather than a harder one. See spawnEnemy for the health side of it.
     const count = Math.round((7 + n * 2.6 + n * n * 0.26) * (1 + S.room * 0.72)
-                             * (1 + (S.evo | 0) * 0.15) * armed * levelled * ST().swarm);
+                             * (1 + (S.evo | 0) * 0.15) * armed * levelled * ST().swarm
+                             * (isTwist('swarm') ? 1.5 : 1));
     // Weights shift toward the nastier things as the wave and floor climb.
     const pool = [['crawler', 10]];
     if (n >= 2 || S.room > 0) pool.push(['shrieker', 3 + n * 0.4 + S.room]);
@@ -2815,7 +3506,9 @@ function updateWaves(dt) {
       persist();
       // PACI keeps to the fives now — see SHOP_WAVES.
       if (shopDueAfter(S.wave)) S.shopDue = true;
-      if (S.wave >= 10) {
+      if (S.wave >= 10 && isLastFloor(S.room)) {
+        // there is no eleventh floor and therefore no door. see the win path.
+      } else if (S.wave >= 10) {
         S.door.open = true;
         msg('THE DOOR IS OPEN', 'go north. it is worse down there.', 4);
         A.doorOpen();
@@ -2896,6 +3589,8 @@ function update(rdt) {
   }
 
   if (S.mode === 'dead') { S.deadT += rdt; updateParticles(dt); updateCam(rdt); return; }
+  // the win screen keeps the wreckage moving behind it, same as the death one
+  if (S.mode === 'win') { updateParticles(dt); updateCam(rdt); return; }
   if (S.mode !== 'play') { updateCam(rdt); return; }
 
   const p = S.p, st = ST(), w = curW();
@@ -2908,21 +3603,42 @@ function update(rdt) {
     S.introT -= rdt;
     if (S.introT <= 0 && S.wave === 0) startWave(1);
   }
+  /* The ending. A few seconds of standing in the wreckage before the screen
+     comes up, because cutting straight from the last hit to a stats page is
+     how you make a finale feel like a menu transition. */
+  if (S.won) {
+    S.winT -= rdt;
+    if (S.winT <= 0) {
+      persist();
+      bumpMax('deep', FLOORS);
+      S.mode = 'win'; S.deadT = 0;
+      if (A.music) A.music.stop(0.8);
+    }
+  }
+
   if (S.introMsgT > 0) {
     S.introMsgT -= rdt;
-    if (S.introMsgT <= 0) msg('', 'something breathes inside the north wall.', 4);
+    if (S.introMsgT <= 0) {
+      /* The floor's rule, announced on the way in. A twist you have to work out
+         from the damage numbers is a bug as far as the player is concerned. */
+      const R2 = roomDef(S.room);
+      if (R2.tw) { msg(R2.tw, '', 3.2); A.denied(); }
+      else msg('', 'something breathes inside the north wall.', 4);
+    }
   }
 
   /* The hand is dealt from here rather than from gainXP, so a boss can add its
      guaranteed pick and its luck bonus before the cards are turned over. The
      cold room jumps the queue when a floor boss has just opened it — the
      signature is the bigger moment and it should not arrive third. */
-  if (S.sigDue || S.upgPts > 0) {
+  /* `!S.won` is load-bearing. The finale's own kill still runs gainXP, which
+     can push you over a level on the very hit that ends the game — and a
+     level-up screen opening during the victory beat both buries the ending
+     and stalls it, because the win countdown below only ticks in play. There
+     is nothing to spend a card on after the last boss anyway. */
+  if (!S.won && S.upgPts > 0) {
     S.lvlDelay -= rdt;
-    if (S.lvlDelay <= 0 && !S.fadeDir) {
-      if (S.sigDue) { S.sigDue = false; if (openColdRoom()) S.lvlDelay = 0.4; }
-      else { openLevelUp(S.pendingLuck); S.pendingLuck = 0; }
-    }
+    if (S.lvlDelay <= 0 && !S.fadeDir) { openLevelUp(S.pendingLuck); S.pendingLuck = 0; }
   }
 
   /* ---- the deck's per-frame verbs ----
@@ -2954,6 +3670,8 @@ function update(rdt) {
     if (S.frostT >= st.frostEvery) { S.frostT = 0; frostPulse(p.x, p.y, rd('frost')); }
   }
 
+  updateTwist(rdt);              // the floor's own weather, before the pools it makes
+  updateHaz(rdt);
   updateOrbs(rdt, st);
   updatePools(rdt, st);
 
@@ -3058,9 +3776,18 @@ function update(rdt) {
   }
 
   const slowMul = w.spin ? 1 - w.slow * p.spin : 1;
-  const spd = st.speed * slowMul * (p.dash > 0 ? 3.4 : 1);
-  p.vx = lerp(p.vx, ix * spd, 1 - Math.pow(0.0009, dt));
-  p.vy = lerp(p.vy, iy * spd, 1 - Math.pow(0.0009, dt));
+  // THE FREEZER's cold snap slows the room, you included. See updateTwist.
+  const cold = (isTwist('frost') && S.twistOn > 0) ? 0.55 : 1;
+  const spd = st.speed * slowMul * cold * (p.dash > 0 ? 3.4 : 1);
+  /* THE MEAT LOOP is greased. `grip` is the per-frame share of the gap between
+     where you are going and where you asked to go — 0.0009 is "instant", and
+     0.30 is a floor that keeps your momentum for you whether or not you wanted
+     it kept. It does not slow you down; it makes stopping a thing you have to
+     plan, which turns every corridor into a commitment. The dash is unaffected
+     on purpose: it is the one move that still does exactly what you told it. */
+  const grip = (isTwist('slick') && p.dash <= 0) ? 0.30 : 0.0009;
+  p.vx = lerp(p.vx, ix * spd, 1 - Math.pow(grip, dt));
+  p.vy = lerp(p.vy, iy * spd, 1 - Math.pow(grip, dt));
   p.x += p.vx * dt; p.y += p.vy * dt;
   collideWalls(p);
   p.x = clamp(p.x, 8, S.aw - 8); p.y = clamp(p.y, 8, S.ah - 8);
@@ -3075,11 +3802,6 @@ function update(rdt) {
       part(p.x + rnd(-3, 3), p.y + 9, 'rgba(180,160,140,0.5)', 3, 26, 0.35);
     }
   } else p.walkT = 0;
-
-  if (st.peel) {
-    p.peelT -= dt;
-    if (p.peelT <= 0 && (ix || iy)) { p.peelT = 0.55; S.peels.push({ x: p.x, y: p.y + 4, life: 9 }); }
-  }
 
   // aim
   const sw = screenToWorld(mouse.x, mouse.y);
@@ -3241,7 +3963,13 @@ function update(rdt) {
           continue;
         }
         if (b.sing) singularityPop(b);      // it lands on the wall it reached
-        else spray(b.x, b.y, Math.atan2(-b.vy, -b.vx), '#d8c8b0', 6, 110, 0.28, 0.7);
+        else {
+          // a round into a crate throws chips back at you, not a grey puff
+          const back = Math.atan2(-b.vy, -b.vx);
+          sparks(b.x, b.y, back, '#e8dcc0', 5, 150, 0.24, 0.75);
+          sparks(b.x, b.y, back, b.col, 2, 90, 0.16, 0.9);
+          S.part.push({ x: b.x, y: b.y, vx: 0, vy: 0, col: '#fff6e0', life: 0.05, max: 0.08, s: 2, glow: 1 });
+        }
         S.bul.splice(i, 1); removed = true; break;
       }
       /* PACI is not an enemy and has no health bar. He is a very large man
@@ -3271,8 +3999,16 @@ function update(rdt) {
              read counters the bullet was already keeping. */
           let hd = b.dmg;
           if (rd('carve')) hd *= 1 + 0.25 * b.hitIds.length;
-          if (rd('ricochet') && b.bounced) hd *= 1 + 0.30 * b.bounced;
+          // 0.30 -> 0.20 a bounce. With CROSS-CUT's two extra the old figure
+          // reached +150% on the last hop of a round you did not have to aim.
+          if (rd('ricochet') && b.bounced) hd *= 1 + 0.20 * b.bounced;
           damageEnemy(e, hd, true, a, false, b.crit);
+          /* The hit itself. A bullet used to land with nothing but a damage
+             number: no spark, no flash, no direction — the enemy flickered and
+             a figure appeared. `impact` gives it a physical event scaled to
+             how hard it landed, so a shotgun into a crowd reads as nine
+             separate hits and a GOD FINGER slug reads as one enormous one. */
+          impact(b.x, b.y, a, b.col, hd > 55 || b.crit);
           float(b.x, b.y - 6, Math.round(hd), b.god ? '#ff5cf0' : hd > 60 ? '#ff8a3a' : '#ffe8b0', hd > 60);
           // THE FLYKILLER: the round stops here, the current does not
           if (b.chain) chainZap(e, hd, b.chain, b.chainR, b.col);
@@ -3315,7 +4051,12 @@ function update(rdt) {
     }
     if (Math.random() < dt * 22) part(g.x, g.y - g.z, '#8a8a8a', 1, 16, 0.4);
     if (g.fuse <= 0) {
-      explode(g.x, g.y, 58, 130 * ST().dmgMul, '#ffb03a');
+      /* Quiet, like everything else that goes off. The camera shake on a frag
+         was a full 14 units with a punch and a hitstop, which is a lot of the
+         frame taken away from you at exactly the moment you want to see what
+         your frag did. The blast keeps its rings, its sparks, its light and
+         its sound — see explode(). */
+      explode(g.x, g.y, 58, 130 * ST().dmgMul, '#ffb03a', true);
       if (rd('munitions')) S.pools.push({ x: g.x, y: g.y, r: 44, life: 5, max: 5, d: 18, fire: 1 });  // INCENDIARY
       S.nades.splice(i, 1);
     }
@@ -3377,15 +4118,6 @@ function update(rdt) {
       e.atkT -= dt;
       if (e.atkT <= 0) { e.atkT = CONTACT_CD; hurtPlayer(e.dmg, e.x, e.y); }
     }
-    for (const pl of S.peels) {
-      if (pl.life > 0 && Math.hypot(e.x - pl.x, e.y - pl.y) < e.r + 6) {
-        pl.life = 0;
-        e.stun = 1.6; e.vx *= -0.6; e.vy *= -0.6;
-        float(e.x, e.y - 10, 'SLIP!', '#f7dc55');
-        part(e.x, e.y, '#f7dc55', 12, 90, 0.5);
-        if (ST().peelBoom) explode(e.x, e.y, 40, 70 * ST().dmgMul, '#f7dc55');
-      }
-    }
   }
 
   /* ---- enemy projectiles ---- */
@@ -3397,6 +4129,20 @@ function update(rdt) {
     if (Math.hypot(b.x - p.x, b.y - p.y) < b.r + p.r) {
       hurtPlayer(b.dmg, b.x, b.y);
       part(b.x, b.y, b.col, 12, 100, 0.4);
+      /* THE BUTCHER's hook. It does very little damage and then puts you where
+         it wants you: one hard shove toward whatever threw it. Applied as
+         velocity rather than as a teleport so the walls, the crates and your
+         own dash all still get a say — it is a tug, not a grab, and a dash
+         fired on the same frame beats it. Landing it is how the fight resets
+         to its own preferred range. */
+      if (b.hook && b.owner && !b.owner.dead) {
+        const a = Math.atan2(b.owner.y - p.y, b.owner.x - p.x);
+        p.vx += Math.cos(a) * 460; p.vy += Math.sin(a) * 460;
+        float(p.x, p.y - 16, 'HOOKED', '#e8dcc8', true);
+        for (let k = 0; k < 5; k++)
+          S.arcs.push({ x1: b.owner.x, y1: b.owner.y, x2: p.x, y2: p.y, life: 0.24, col: '#e8dcc8' });
+        A.ram(); shake(6);
+      }
       S.eb.splice(i, 1);
     }
   }
@@ -3408,7 +4154,7 @@ function update(rdt) {
     if (d.vx) { d.x += d.vx * dt; d.y += d.vy * dt; d.vx *= 0.88; d.vy *= 0.88; }
     if (d.life <= 0) { S.drops.splice(i, 1); continue; }
     const dd = Math.hypot(d.x - p.x, d.y - p.y);
-    const perm = d.kind === 'item' || d.kind === 'god';
+    const perm = d.kind === 'god';
     // End of a wave: the floor gives up everything it was holding.
     if (S.vacuum > 0 && !perm) {
       d.life = Math.max(d.life, 2);
@@ -3418,8 +4164,18 @@ function update(rdt) {
       d.vx = d.vy = 0;
       if (Math.random() < dt * 12) part(d.x, d.y, '#ffe9a8', 1, 20, 0.3);
     }
-    // WINDFALL: the reach stops being a radius and becomes the whole floor
-    else if (!perm && (rd('ripe') || dd < 40 * ST().magnet)) { d.x += (p.x - d.x) * dt * 6; d.y += (p.y - d.y) * dt * 6; }
+    /* WINDFALL widens the reach enormously — but it IS a reach. Unconditional
+       collection made loot placement, the wave-end vacuum and walking anywhere
+       all pointless in one rider. */
+    else if (!perm) {
+      const stp = ST();
+      const reach = Math.max(40 * stp.magnet, stp.reach);
+      if (dd < reach) {
+        const pull = dd < 40 * stp.magnet ? 6 : 2.6;   // gentler at the far edge
+        d.x += (p.x - d.x) * dt * pull; d.y += (p.y - d.y) * dt * pull;
+        if (stp.reach && dd > 60 && Math.random() < dt * 4) part(d.x, d.y, '#9fe08a', 1, 16, 0.3);
+      }
+    }
     if (dd < 12) {
       if (d.kind === 'ammo') { p.mags[curW().id] = magCap(curW()); p.reT = 0; float(p.x, p.y - 16, 'AMMO', '#f2d14a'); A.pickup(); }
       else if (d.kind === 'med') { p.hp = Math.min(ST().maxhp, p.hp + 26); float(p.x, p.y - 16, '+26 HP', '#ff6b6b'); A.pickup(); }
@@ -3443,7 +4199,6 @@ function update(rdt) {
         float(p.x, p.y - 18, 'CARD ' + S.cards, '#c0202a', true);
         A.card(); S.flash = 0.3; S.flashCol = '#e8dfc8'; shake(4);
       }
-      else if (d.kind === 'item') grantItem(d.key);
       else if (d.kind === 'god') { grantGod(); if (S.secret) S.secret.taken = true; }
       S.drops.splice(i, 1);
     }
@@ -3483,7 +4238,6 @@ function update(rdt) {
     }
   }
 
-  for (let i = S.peels.length - 1; i >= 0; i--) { const q = S.peels[i]; q.life -= dt; if (q.life <= 0) S.peels.splice(i, 1); }
 
   /* ---- secrets ---- */
   if (S.secret && !S.secret.taken) {
@@ -3514,7 +4268,9 @@ function update(rdt) {
     for (const f of batch) {
       if (f.k === 'nova') fireNova(f.x, f.y);
       else {
-        explode(f.x, f.y, f.r, f.d, f.col || '#ff6a72');
+        // everything on this queue was triggered BY a kill, so all of it is
+        // quiet — see explode().
+        explode(f.x, f.y, f.r, f.d, f.col || '#ff6a72', true);
         // RENDERED: OVERKILL's burst leaves the floor alight where it went off
         if (f.fire) S.pools.push({ x: f.x, y: f.y, r: 26, life: 4, max: 4, d: 14, fire: 1 });
       }
@@ -3633,28 +4389,39 @@ function updateEnemy(e, dt) {
 
    The bar does not refill. Two phases over one bar is structure; two phases
    over two bars is just twice the health. */
-function enterPhase2(b) {
-  b.ph = 2;
-  b.phaseT = 1.05;                        // the rear-up
+function enterPhase(b) {
+  b.ph++;
+  const last = b.ph >= b.phases;
+  b.phaseT = last ? 1.35 : 1.05;          // the rear-up, longer for a final form
   b.phase = 'idle'; b.pt = 0.4;
-  b.spd *= 1.28; b.base *= 1.28;
-  b.dmg *= 1.18;
+  b.spd *= 1.24; b.base *= 1.24;
+  b.dmg *= 1.16;
   b.spawnT = Math.min(b.spawnT, 1.2);
-  b.poseT = 1.05;
-  knockRoom(b.x, b.y, 220, 300, '#ff2b2b');
+  b.poseT = b.phaseT;
+  /* Everything the boss has already put in the air goes with the break. Two
+     reasons, and the second is the real one: a phase change that leaves the
+     last pattern's bullets on screen reads as the two patterns overlapping
+     rather than one replacing the other, and on a three-phase fight that
+     compounds into noise nobody can parse. The rear-up is also the player's
+     window — handing it to them with the room still full is not a window. */
+  knockRoom(b.x, b.y, 240, 300, '#ff2b2b');
+  S.eb.length = 0;
+  for (let i = S.haz.length - 1; i >= 0; i--) if (S.haz[i].b === b) S.haz.splice(i, 1);
   b.vx = b.vy = 0;                        // knockRoom shoves everything, itself included
+  b.beam = null; b.hooked = 0;
   ring(b.x, b.y, 120, '#ff2b2b', 0.7, 3);
   ring(b.x, b.y, 70, '#ffffff', 0.45, 2);
   part(b.x, b.y, '#ff5a48', 46, 190, 0.8, 2);
   blood(b.x, b.y + 8, 26, 'rgba(90,10,16,0.4)');
-  S.flash = Math.max(S.flash, 0.7); S.flashCol = '#ff2b2b';
-  shake(b.apex ? 22 : 15); punch(0.08);
-  S.hitstop = Math.max(S.hitstop, 0.1);
+  S.flash = Math.max(S.flash, last ? 0.9 : 0.7); S.flashCol = '#ff2b2b';
+  shake(b.apex || last ? 22 : 15); punch(0.08);
+  S.hitstop = Math.max(S.hitstop, last ? 0.16 : 0.1);
   A.roar(); A.screech(true);
   if (A.music) A.music.setIntensity(1);
   A.setDread(1);
-  msg(b.name, b.def.cry2 || 'IT IS NOT FINISHED', 2.6);
-  float(b.x, b.y - 46, 'SECOND PHASE', '#ff2b2b', true);
+  const cry = b.ph === 3 ? (b.def.cry3 || b.def.cry2) : b.def.cry2;
+  msg(b.name, cry || 'IT IS NOT FINISHED', 2.6);
+  float(b.x, b.y - 46, b.ph === 3 ? 'FINAL PHASE' : 'SECOND PHASE', '#ff2b2b', true);
 }
 
 function updateBoss(b, dt) {
@@ -3662,7 +4429,11 @@ function updateBoss(b, dt) {
   const dx = p.x - b.x, dy = p.y - b.y, d = Math.hypot(dx, dy) || 1;
   b.pt -= dt; b.flip = dx < 0;
 
-  if (b.ph === 1 && b.hp <= b.max * 0.5) enterPhase2(b);
+  /* The bar is divided into `phases` equal bands and it breaks on every
+     boundary — halves for the roster, thirds for the finale. The bar never
+     refills: N phases over one bar is structure, N phases over N bars is just
+     N times the health. */
+  if (b.ph < b.phases && b.hp <= b.max * (1 - b.ph / b.phases)) enterPhase(b);
   /* The break itself: it holds still, everything else keeps running. Nothing
      below this point executes until the rear-up is over. */
   if (b.phaseT > 0) {
@@ -3674,14 +4445,18 @@ function updateBoss(b, dt) {
     if (Math.random() < dt * 40) part(b.x, b.y, '#ff2b2b', 2, 70, 0.4);
     return;
   }
-  const pat = b.ph === 2 ? (b.def.pat2 || b.def.pat) : b.def.pat;
+  const pat = b.ph === 3 ? (b.def.pat3 || b.def.pat2 || b.def.pat)
+            : b.ph === 2 ? (b.def.pat2 || b.def.pat) : b.def.pat;
 
   // Every boss summons, but only up to a ceiling that scales with the floor —
   // so it stays a fight rather than an avalanche.
   const D2 = b.def;
   const addCap = Math.min(30, 14 + S.room * 4 + (S.evo | 0) * 2);
   b.spawnT -= dt;
-  if (b.spawnT <= 0 && S.en.length < addCap) {
+  // p3 does not call for help. A bullet-hell finale with adds walking through
+  // it is not harder, it is unreadable — and unreadable is where a good fight
+  // stops being a fight and starts being a dice roll.
+  if (pat !== 'p3' && b.spawnT <= 0 && S.en.length < addCap) {
     b.spawnT = D2.addT * rnd(0.85, 1.15) * (b.ph === 2 ? 0.7 : 1);
     b.poseT = 0.6;                          // bossB splits open to let them out
     const cnt = Math.min(D2.addN + Math.floor(S.room * 0.5), addCap - S.en.length);
@@ -3854,6 +4629,322 @@ function updateBoss(b, dt) {
       ring(b.x, b.y, 40, '#ff6a3a', 0.28, 2);
       A.ram();
     }
+
+  /* ==========================================================
+     THE SIX NEW VERBS
+
+     Every pattern above this line resolves to "get near the player and emit
+     projectiles". These do not. Each one changes what the ARENA is worth:
+     hook says distance is not yours to keep, mortar says the ground is
+     temporary, curtain says the room has one door at a time, sweep says
+     standing anywhere is a decision, mines says the floor you already crossed
+     is spent, brood says you have to choose between the boss and the room.
+     ========================================================== */
+
+  } else if (pat === 'hook') {
+    /* THE BUTCHER. It works at a butcher's distance — about a hook's length —
+       and if you back off further than that it throws the hook and DRAGS you
+       back in. You cannot solve this one by kiting, which is exactly the point
+       of putting it on the first boss you meet: the game teaches you to kite
+       for nine waves and then introduces something that has read the manual.
+
+       The hook is an ordinary enemy bullet carrying `hook`, so it collides,
+       lights the room and can be walked around like anything else. What it
+       does on contact is in the S.eb loop. */
+    const want = 96;
+    const push = clamp((d - want) / 90, -0.7, 1);
+    b.vx = lerp(b.vx, dx / d * b.spd * push, 1 - Math.pow(0.1, dt));
+    b.vy = lerp(b.vy, dy / d * b.spd * push, 1 - Math.pow(0.1, dt));
+    b.hookT -= dt;
+    if (b.hookT <= 0 && d > 70) {
+      b.hookT = rnd(2.6, 3.6);
+      b.poseT = 0.45;
+      const a = Math.atan2(dy, dx);
+      S.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 210, vy: Math.sin(a) * 210, r: 5,
+                  bob: rnd(0, TAU), dmg: b.dmg * 0.35, life: 1.5, col: '#e8dcc8',
+                  hook: 1, owner: b });
+      A.ram();
+    }
+    // and a short swing whenever you are actually inside its reach
+    if (b.pt <= 0) {
+      b.pt = rnd(1.5, 2.2);
+      if (d < 74) {
+        b.poseT = 0.35;
+        const a = Math.atan2(dy, dx);
+        for (let k = -2; k <= 2; k++)
+          S.eb.push({ x: b.x + Math.cos(a) * 16, y: b.y + Math.sin(a) * 16,
+                      vx: Math.cos(a + k * 0.22) * 165, vy: Math.sin(a + k * 0.22) * 165,
+                      r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.4, life: 0.55, col: '#ff5a48' });
+        ring(b.x + Math.cos(a) * 20, b.y + Math.sin(a) * 20, 34, '#ff5a48', 0.25, 2);
+        A.roar(); shake(4);
+      }
+    }
+
+  } else if (pat === 'brood') {
+    /* MOTHER OF MELONS. She will not fight you: she backs away and seeds the
+       room, and every seed hatches into something that will. The fight is a
+       question about priorities — kill her slowly while the room fills, or
+       clear the room and let her seed it again — and the answer is different
+       depending on what gun you bought. That is a boss.
+
+       Eggs are mortar marks that hatch instead of detonating (`spawn`), so
+       they land where they were drawn and you can see the room's next shape
+       two seconds before it arrives. */
+    const want = 170;
+    const push = clamp((d - want) / 120, -1, 0.6);
+    b.vx = lerp(b.vx, dx / d * b.spd * push, 1 - Math.pow(0.1, dt));
+    b.vy = lerp(b.vy, dy / d * b.spd * push, 1 - Math.pow(0.1, dt));
+    if (Math.random() < dt * 6) part(b.x, b.y + 6, '#8fdd4a', 1, 24, 0.5);
+    if (b.pt <= 0) {
+      b.pt = rnd(2.8, 3.8);
+      b.poseT = 0.6;
+      const n = 2 + Math.min(2, Math.floor(S.room / 4));
+      for (let k = 0; k < n; k++) {
+        const a = Math.random() * TAU, rr = rnd(40, 110);
+        const ex = clamp(p.x + Math.cos(a) * rr, 40, S.aw - 40);
+        const ey = clamp(p.y + Math.sin(a) * rr, 40, S.ah - 40);
+        if (pointInWall(ex, ey)) continue;
+        S.haz.push({ k: 'mark', x: ex, y: ey, r: 22, dmg: b.dmg * 0.25, t: 1.9, max: 1.9,
+                     col: '#8fdd4a', spawn: pick(b.def.adds) });
+      }
+      A.screech(true);
+    }
+
+  } else if (pat === 'mortar') {
+    /* THE HOGFATHER. Sits at range, strafes, and walks a three-shell volley
+       across wherever you are going — the shells LEAD you, so running in a
+       straight line puts you under the third one. The counter is to change
+       direction between shells, which is the only pattern in the game that
+       punishes committing to a heading. */
+    const want = 165;
+    const push = clamp((d - want) / 110, -1, 1);
+    const perp = Math.atan2(dy, dx) + Math.PI / 2;
+    b.vx = lerp(b.vx, dx / d * b.spd * push + Math.cos(perp) * b.spd * 0.7, 1 - Math.pow(0.14, dt));
+    b.vy = lerp(b.vy, dy / d * b.spd * push + Math.sin(perp) * b.spd * 0.7, 1 - Math.pow(0.14, dt));
+    if (b.pt <= 0) {
+      if (b.volley > 0) {
+        b.volley--;
+        b.pt = 0.42;                       // the walk between shells
+        b.poseT = 0.3;
+        // lead grows with each shell of the volley: it is learning your speed
+        const lead = 0.35 + (2 - b.volley) * 0.22;
+        const ex = clamp(p.x + p.vx * lead, 36, S.aw - 36);
+        const ey = clamp(p.y + p.vy * lead, 36, S.ah - 36);
+        mortarAt(ex, ey, 40, b.dmg * 0.85, 1.35, '#ff8a2b');
+        A.magOut();
+      } else {
+        b.volley = 3; b.pt = rnd(2.6, 3.4);
+      }
+    }
+
+  } else if (pat === 'curtain') {
+    /* A wall of shot with exactly one hole in it, walked across the arena.
+       It picks an edge, slides along it, and sweeps — so the room stops being
+       a space and becomes a corridor with a moving door. The gap wanders, and
+       it wanders slowly enough to run to and fast enough that you cannot camp
+       it.
+
+       It does not chase at all while it is doing this. That is the trade: the
+       safest place to stand is right next to it. */
+    if (!b.edge) { b.edge = 1 + Math.floor(Math.random() * 4); b.gap = Math.random(); }
+    const vert = b.edge <= 2;
+    const tx = b.edge === 1 ? 56 : b.edge === 2 ? S.aw - 56 : S.aw / 2;
+    const ty = b.edge === 3 ? 56 : b.edge === 4 ? S.ah - 56 : S.ah / 2;
+    b.vx = lerp(b.vx, (tx - b.x) * 1.6, 1 - Math.pow(0.05, dt));
+    b.vy = lerp(b.vy, (ty - b.y) * 1.6, 1 - Math.pow(0.05, dt));
+    b.gap = (b.gap + dt * 0.09) % 1;
+    if (b.pt <= 0) {
+      b.pt = 0.5;
+      b.poseT = 0.3;
+      /* Fired along the wall it is standing on, aimed across the room. `slots`
+         positions, one of which is empty and moving. */
+      const slots = 11, hole = Math.floor(b.gap * slots);
+      const span = vert ? S.ah - 80 : S.aw - 80;
+      const dir = b.edge === 1 ? 0 : b.edge === 2 ? Math.PI : b.edge === 3 ? Math.PI / 2 : -Math.PI / 2;
+      for (let i = 0; i < slots; i++) {
+        if (i === hole || i === hole + 1) continue;      // a two-wide door
+        const u = 40 + span * (i / (slots - 1));
+        S.eb.push({
+          x: vert ? b.x : u, y: vert ? u : b.y,
+          vx: Math.cos(dir) * 108, vy: Math.sin(dir) * 108,
+          r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.36, life: 4.2, col: '#7fd0ff'
+        });
+      }
+      A.screech();
+      // and it moves house every few sweeps, so the door is never in the same wall
+      if (Math.random() < 0.16) { b.edge = 1 + Math.floor(Math.random() * 4); b.pt = 1.4; }
+    }
+
+  } else if (pat === 'sweep') {
+    /* THE FISHWIFE plants herself and turns a beam. The beam does not track
+       you, it does not stop, and it cannot be blocked — you cross it or you
+       leave. It also winds up as a sighting line first, so the geometry is
+       readable a full second before it is lethal.
+
+       `spin` flips sign between casts so the safe side of the room alternates.
+       A beam that always turns the same way is one you solve once. */
+    b.vx = lerp(b.vx, dx / d * b.spd * 0.18, 1 - Math.pow(0.2, dt));
+    b.vy = lerp(b.vy, dy / d * b.spd * 0.18, 1 - Math.pow(0.2, dt));
+    if (!b.beam || b.beam.t <= 0 || S.haz.indexOf(b.beam) < 0) {
+      if (b.pt <= 0) {
+        b.pt = rnd(3.0, 4.0);
+        b.poseT = 0.9;
+        b.spinFlip = -(b.spinFlip || -1);
+        b.beam = {
+          k: 'beam', b, x: b.x, y: b.y, ang: Math.atan2(dy, dx),
+          spin: b.spinFlip * (0.62 + Math.min(0.5, S.room * 0.05)),
+          len: Math.max(S.aw, S.ah), w: 5, dmg: b.dmg * 1.9,
+          t: 3.4, warm: 0.9, col: '#4fd6e8'
+        };
+        S.haz.push(b.beam);
+        A.beam();
+      }
+    }
+
+  } else if (pat === 'mines') {
+    /* THE NIGHT SHELF restocks. It orbits at speed and leaves armed mines
+       behind it, so the floor it has already crossed is floor you cannot use —
+       the arena shrinks over the fight instead of the boss getting bigger. The
+       mines outlive it by design; killing it does not clean up after it.
+
+       Capped at 14 live. Uncapped, a long fight tiles the room and the fight
+       stops being about the boss at all. */
+    b.orbit += dt * 1.15;
+    const R2 = 128;
+    const tx2 = p.x + Math.cos(b.orbit) * R2, ty2 = p.y + Math.sin(b.orbit) * R2;
+    b.vx = lerp(b.vx, (tx2 - b.x) * 3.0, 1 - Math.pow(0.03, dt));
+    b.vy = lerp(b.vy, (ty2 - b.y) * 3.0, 1 - Math.pow(0.03, dt));
+    b.dropT -= dt;
+    let live = 0;
+    for (const h of S.haz) if (h.k === 'mine') live++;
+    if (b.dropT <= 0 && live < 14) {
+      b.dropT = rnd(0.75, 1.1);
+      S.haz.push({ k: 'mine', x: b.x, y: b.y, r: 26, dmg: b.dmg * 0.8,
+                   t: 15, life: 15, col: '#8a6aff' });
+      part(b.x, b.y, '#8a6aff', 4, 30, 0.3);
+    }
+    if (b.pt <= 0) {
+      // a spread aimed where it is going, not where it is
+      b.pt = rnd(1.8, 2.6);
+      const aa = Math.atan2(dy, dx);
+      for (let k = -1; k <= 1; k++)
+        S.eb.push({ x: b.x, y: b.y, vx: Math.cos(aa + k * 0.20) * 150, vy: Math.sin(aa + k * 0.20) * 150,
+                    r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.4, life: 2.2, col: '#8a6aff' });
+      A.nailgun();
+    }
+
+  /* ==========================================================
+     THE MEAT PROTOCOL — three phases, three different fights.
+
+     Each phase is built to invalidate the answer that got you through the
+     last one, which is the only thing that makes a three-phase fight better
+     than a two-phase fight with more health:
+
+       p1  it holds the middle and denies the ring — you play at range
+       p2  it hunts, fast, and mortars where you are running to — range stops
+           working, you have to keep crossing it
+       p3  it stops moving and turns two beams while the room floods — there
+           is no safe distance left, only safe timing
+
+     It never summons in p3. Adds during a bullet-hell phase is how you make a
+     finale unreadable rather than hard.
+     ========================================================== */
+  } else if (pat === 'p1') {
+    /* It sits on the centre of the arena and will not be moved off it. Rings
+       go out on a slow beat with an alternating offset, and between them it
+       spits a lead shot at you — so the room has a rhythm and you have to hold
+       a distance inside it. */
+    const cx = S.aw / 2, cy = S.ah / 2;
+    b.vx = lerp(b.vx, (cx - b.x) * 1.1, 1 - Math.pow(0.06, dt));
+    b.vy = lerp(b.vy, (cy - b.y) * 1.1, 1 - Math.pow(0.06, dt));
+    b.spitT = (b.spitT || 0) - dt;
+    if (b.spitT <= 0) {
+      b.spitT = 0.62;
+      const a = Math.atan2(p.y + p.vy * 0.3 - b.y, p.x + p.vx * 0.3 - b.x);
+      for (let k = -1; k <= 1; k++)
+        S.eb.push({ x: b.x, y: b.y, vx: Math.cos(a + k * 0.13) * 178, vy: Math.sin(a + k * 0.13) * 178,
+                    r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.34, life: 2.4, col: '#ff2b2b' });
+    }
+    if (b.pt <= 0.6 && b.pt > 0 && Math.random() < dt * 60) { b.poseT = 0.5; part(b.x, b.y, '#ff2b2b', 2, 100, 0.5); }
+    if (b.pt <= 0) {
+      b.pt = rnd(2.4, 3.0);
+      b.novaN = (b.novaN | 0) + 1;
+      const n = 26, off = (b.novaN & 1) ? Math.PI / n : 0;
+      for (let i = 0; i < n; i++) {
+        const a = off + i / n * TAU;
+        S.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 124, vy: Math.sin(a) * 124,
+                    r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.42, life: 3.4, col: '#ff6a3a' });
+      }
+      ring(b.x, b.y, 96, '#ff2b2b', 0.5, 3);
+      part(b.x, b.y, '#ff8a48', 34, 190, 0.6, 2);
+      A.boom(); shake(8); punch(0.035);
+    }
+
+  } else if (pat === 'p2') {
+    /* It comes off the middle and hunts. Fast, lazy steering — it overcommits
+       and has to correct, so it can be juked — and it drops a pair of shells
+       on where you are RUNNING TO every couple of seconds, which means juking
+       into open floor is exactly the wrong instinct. */
+    const sp = Math.min(b.spd * 1.9, 118);
+    b.vx = lerp(b.vx, dx / d * sp, 1 - Math.pow(0.32, dt));
+    b.vy = lerp(b.vy, dy / d * sp, 1 - Math.pow(0.32, dt));
+    if (Math.random() < dt * 30) part(b.x, b.y + 8, '#ff2b2b', 1, 44, 0.5);
+    blood(b.x, b.y + 8, 2, 'rgba(90,8,14,0.18)');
+    b.spitT = (b.spitT || 0) - dt;
+    if (b.spitT <= 0) {
+      b.spitT = 1.9;
+      for (let k = 0; k < 2; k++) {
+        const lead = 0.5 + k * 0.45;
+        mortarAt(clamp(p.x + p.vx * lead, 36, S.aw - 36),
+                 clamp(p.y + p.vy * lead, 36, S.ah - 36),
+                 44, b.dmg * 0.8, 1.25, '#ff2b2b');
+      }
+      A.magOut();
+    }
+    if (b.pt <= 0) {
+      b.pt = rnd(2.2, 3.0);
+      const aa = Math.atan2(b.vy, b.vx);
+      for (let k = -4; k <= 4; k++)
+        S.eb.push({ x: b.x, y: b.y, vx: Math.cos(aa + k * 0.24) * 146, vy: Math.sin(aa + k * 0.24) * 146,
+                    r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.36, life: 2.6, col: '#ff8a2b' });
+      ring(b.x, b.y, 46, '#ff8a2b', 0.3, 2);
+      A.ram();
+    }
+
+  } else if (pat === 'p3') {
+    /* It plants in the middle for the last time and opens two beams on
+       opposite sides, turning slowly, while a thin spiral fills in behind
+       them. Two beams 180 degrees apart means there is always exactly one
+       safe wedge and it is always moving — the fight becomes a single
+       continuous circular run, and the spiral is what stops you from simply
+       matching the beam's speed and standing in the gap forever.
+
+       It is the only pattern in the game with no rest beat in it. It is also
+       the last thirty seconds of the game. */
+    const cx = S.aw / 2, cy = S.ah / 2;
+    b.vx = lerp(b.vx, (cx - b.x) * 0.9, 1 - Math.pow(0.05, dt));
+    b.vy = lerp(b.vy, (cy - b.y) * 0.9, 1 - Math.pow(0.05, dt));
+    let beams = 0;
+    for (const h of S.haz) if (h.k === 'beam' && h.b === b) beams++;
+    if (!beams) {
+      const a0 = Math.atan2(dy, dx);
+      for (let k = 0; k < 2; k++)
+        S.haz.push({ k: 'beam', b, x: b.x, y: b.y, ang: a0 + k * Math.PI,
+                     spin: 0.5, len: Math.max(S.aw, S.ah), w: 5.5,
+                     dmg: b.dmg * 2.0, t: 999, warm: 1.2, col: '#ff2b2b' });
+      A.beam(); shake(6);
+    }
+    b.spitAng = (b.spitAng || 0) + dt * 1.5;
+    b.spitT = (b.spitT || 0) - dt;
+    if (b.spitT <= 0) {
+      b.spitT = 0.19;
+      for (let k = 0; k < 2; k++) {
+        const a = b.spitAng + k * Math.PI + Math.PI / 2;
+        S.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 96, vy: Math.sin(a) * 96,
+                    r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.30, life: 3.2, col: '#c05cff' });
+      }
+    }
+    if (Math.random() < dt * 20) part(b.x, b.y, '#ff2b2b', 1, 60, 0.6);
   }
 
   b.x += b.vx * dt; b.y += b.vy * dt;
@@ -3865,7 +4956,9 @@ function updateParticles(dt) {
   for (let i = S.part.length - 1; i >= 0; i--) {
     const q = S.part[i];
     q.x += q.vx * dt; q.y += q.vy * dt;
-    q.vx *= 0.92; q.vy *= 0.92;
+    // sparks shed speed harder than smoke does, which is what makes them snap
+    const k = q.drag || 0.92;
+    q.vx *= k; q.vy *= k;
     q.life -= dt; if (q.life <= 0) S.part.splice(i, 1);
   }
   for (let i = S.gibs.length - 1; i >= 0; i--) {
@@ -3888,6 +4981,20 @@ function updateParticles(dt) {
     q.life -= dt; if (q.life <= 0) S.props.splice(i, 1);
   }
   for (let i = S.rings.length - 1; i >= 0; i--) { const r = S.rings[i]; r.life -= dt; if (r.life <= 0) S.rings.splice(i, 1); }
+  /* ---- soft caps ----
+     Nothing in here was bounded, and the effects pass just got a lot more
+     generous: every bullet impact now emits sparks and a glow core, and every
+     death emits a pop on top of the debris it already had. A chain of
+     OVERKILL bursts through a packed floor-10 wave measured over five
+     thousand live particles, and the draw loop is linear in all of them.
+
+     Oldest-first, because the oldest are the most faded and the least
+     informative — dropping the tail of a burst costs nothing you were
+     reading. The numbers are set well above anything normal play reaches
+     (a busy wave sits around 300), so this only ever fires on a chain. */
+  if (S.part.length > 900) S.part.splice(0, S.part.length - 900);
+  if (S.gibs.length > 420) S.gibs.splice(0, S.gibs.length - 420);
+  if (S.rings.length > 80) S.rings.splice(0, S.rings.length - 80);
   for (let i = S.floats.length - 1; i >= 0; i--) {
     const f = S.floats[i]; f.y += f.vy * dt; f.vy *= 0.92; f.life -= dt;
     if (f.life <= 0) S.floats.splice(i, 1);
@@ -3993,6 +5100,7 @@ function startRun() {
   applyEvoLoadout();                 // the permanent roster, before anything reads it
   S.p.hp = ST().maxhp;               // a starting ROUGHAGE should be health you have, not a ceiling
   S.cam.cx = S.p.x; S.cam.cy = S.p.y;
+  rollRoster();                      // a new order of bosses for a new run
   recalcLuck();
   /* Signed contracts pay out here, at the top of the run. */
   if (contractDone('dozen')) { S.level = 2; S.upgPts = 1; S.lvlDelay = 2.6; }
@@ -4028,9 +5136,10 @@ function nextRoom() {
     const R = roomDef(nr);
     buildRoom(nr);
     S.en.length = 0; S.bul.length = 0; S.eb.length = 0; S.drops.length = 0;
-    S.peels.length = 0; S.gibs.length = 0; S.part.length = 0; S.cracks.length = 0;
+    S.gibs.length = 0; S.part.length = 0; S.cracks.length = 0;
     S.nades.length = 0; S.props.length = 0; S.rings.length = 0;
-    S.pools.length = 0; S.arcs.length = 0; S.waveKills = 0; S.waveHit = false;
+    S.pools.length = 0; S.arcs.length = 0; S.haz.length = 0;
+    S.waveKills = 0; S.waveHit = false;
     S.boss = null; S.wave = 0; S.waveState = 'idle';
     S.p.x = S.aw / 2; S.p.y = S.ah - 60; S.p.vx = S.p.vy = 0;
     S.p.hp = Math.min(ST().maxhp, S.p.hp + 30);
@@ -4049,7 +5158,11 @@ function nextRoom() {
     if (A.music) { A.music.setFloor(nr); A.music.setBoss(false); A.music.setIntensity(0.2 + nr * 0.16); }
     persist();
     S.introT = 2.6;              // game time — see startRun()
-    S.introMsgT = 0;
+    // the new floor's rule lands after its name has finished being read
+    S.introMsgT = R.tw ? 4.4 : 0;
+    // the weather is the floor's, so it starts over with the floor
+    S.twistT = R.twist === 'heat' ? 3.0 : rnd(9, 13);
+    S.twistOn = 0; S.twistN = 0;
   };
 }
 
@@ -4070,9 +5183,57 @@ function drawWorld() {
   blit(ctx, floorCan, 0, 0);
   blit(ctx, decalCan, 0, 0);
 
+  /* ---- floor decor ----
+     One shared stain plus a per-floor motif. All of it is two or three
+     fillRects at a handful of pixels; the point is not detail, it is that the
+     eye can tell floor 5 from floor 8 with the HUD covered up. Everything here
+     draws UNDER the walls and the actors, so none of it can hide a threat. */
   for (const d of S.deco) {
     if (d.x < vl || d.x > vr || d.y < vt || d.y > vb) continue;
-    if (d.k === 'stain') { ctx.fillStyle = 'rgba(20,8,10,0.35)'; ctx.fillRect(d.x | 0, d.y | 0, (6 * d.s) | 0, (4 * d.s) | 0); }
+    const x = d.x | 0, y = d.y | 0, s = d.s;
+    switch (d.k) {
+      case 'stain':
+        ctx.fillStyle = 'rgba(20,8,10,0.35)'; ctx.fillRect(x, y, (6 * s) | 0, (4 * s) | 0); break;
+      case 'hook':      // a chain and the hook on the end of it, hanging
+        ctx.fillStyle = 'rgba(150,140,124,0.30)'; ctx.fillRect(x, y - (7 * s | 0), 1, (7 * s) | 0);
+        ctx.fillStyle = 'rgba(186,176,158,0.42)'; ctx.fillRect(x, y, 1, 2); ctx.fillRect(x + 1, y + 2, 2, 1);
+        break;
+      case 'drip':      // condensation running down nothing
+        ctx.fillStyle = 'rgba(150,200,220,0.22)'; ctx.fillRect(x, y, 1, (5 * s) | 0);
+        ctx.fillStyle = 'rgba(190,225,240,0.30)'; ctx.fillRect(x, y + (5 * s | 0), 1, 1);
+        break;
+      case 'rust':      // a bloom of corrosion, dithered outward
+        ctx.fillStyle = 'rgba(122,58,26,0.30)'; ctx.fillRect(x, y, (5 * s) | 0, (3 * s) | 0);
+        ctx.fillStyle = 'rgba(160,84,36,0.22)'; ctx.fillRect(x - 2, y + 1, 2, 1); ctx.fillRect(x + (5 * s | 0), y, 2, 1);
+        break;
+      case 'ember':     // a coal that has not gone out, breathing
+        ctx.fillStyle = 'rgba(60,20,10,0.40)'; ctx.fillRect(x, y, (4 * s) | 0, (3 * s) | 0);
+        ctx.globalAlpha = 0.30 + Math.sin(S.t * 2.2 + d.ph) * 0.22;
+        ctx.fillStyle = '#ff7a2a'; ctx.fillRect(x + 1, y + 1, 1, 1);
+        ctx.globalAlpha = 1; break;
+      case 'frost':     // rime, brighter at the centre
+        ctx.fillStyle = 'rgba(196,236,255,0.16)'; ctx.fillRect(x - 1, y, (7 * s) | 0, (4 * s) | 0);
+        ctx.fillStyle = 'rgba(230,248,255,0.26)'; ctx.fillRect(x + 1, y + 1, (3 * s) | 0, 1);
+        break;
+      case 'sludge':    // something that dripped and then set
+        ctx.fillStyle = 'rgba(52,72,18,0.42)'; ctx.fillRect(x, y, (6 * s) | 0, (3 * s) | 0);
+        ctx.fillStyle = 'rgba(122,158,42,0.26)'; ctx.fillRect(x + 1, y - 1, (3 * s) | 0, 1);
+        break;
+      case 'candle':    // a stub with a flame on it, guttering
+        ctx.fillStyle = 'rgba(214,200,170,0.42)'; ctx.fillRect(x, y - 3, 2, 4);
+        ctx.globalAlpha = 0.45 + Math.sin(S.t * 5 + d.ph) * 0.3;
+        ctx.fillStyle = '#ffc24a'; ctx.fillRect(x, y - 5, 1, 2);
+        ctx.globalAlpha = 1; break;
+      case 'salt':      // crust, bone-pale, in loose drifts
+        ctx.fillStyle = 'rgba(232,226,208,0.20)'; ctx.fillRect(x, y, (5 * s) | 0, 2);
+        ctx.fillStyle = 'rgba(248,244,232,0.28)'; ctx.fillRect(x + 2, y - 1, 2, 1);
+        break;
+      case 'eye':       // it is watching, and it blinks
+        ctx.globalAlpha = 0.10 + Math.max(0, Math.sin(S.t * 0.6 + d.ph)) * 0.32;
+        ctx.fillStyle = '#c05cff'; ctx.fillRect(x, y, 3, 2);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 1, y, 1, 1);
+        ctx.globalAlpha = 1; break;
+    }
   }
 
   drawCornerSigil();
@@ -4081,6 +5242,19 @@ function drawWorld() {
      Drawn as two stacked ellipses so they read as depth rather than as a
      flat disc, and they shrink as they dry up. */
   for (const q of S.pools) {
+    /* A burner that has not caught yet is drawn as an outline that pulses
+       faster the closer it is to lighting — the ring IS the timer, so you can
+       read how long you have without a number on the screen. */
+    if (q.warm > 0) {
+      const u = 1 - clamp(q.warm / 1.1, 0, 1);
+      ctx.globalAlpha = 0.35 + Math.abs(Math.sin(S.t * (6 + u * 16))) * 0.45;
+      ctx.strokeStyle = '#ff8a2b'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.ellipse(q.x, q.y + 3, q.r, q.r * 0.55, 0, 0, TAU); ctx.stroke();
+      ctx.globalAlpha = 0.14 * u; ctx.fillStyle = '#ff5a1e';
+      ctx.beginPath(); ctx.ellipse(q.x, q.y + 3, q.r * u, q.r * 0.55 * u, 0, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 1;
+      continue;
+    }
     const k = clamp(q.life / q.max, 0, 1), r = q.r * (0.7 + k * 0.3);
     const hot = q.fire;
     ctx.globalAlpha = k * 0.5;
@@ -4092,35 +5266,91 @@ function drawWorld() {
     ctx.globalAlpha = 1;
   }
 
-  for (const q of S.peels) drawSpr(ctx, SPR.banana, q.x, q.y, 0.6, false, clamp(q.life / 2, 0, 1));
 
-  // rings (shockwaves)
+  drawHaz(0);          // mortar circles and mines, on the floor with the pools
+
+  /* ---- shockwaves ----
+     Rings are the single most reused effect in the game — explosions, novas,
+     phase breaks, pickups, aisle rungs, every knockRoom. They used to expand
+     LINEARLY and fade linearly, which is why they all read as the same soft
+     grey pulse: a real shockwave leaves fast and stops, it does not travel at
+     a constant speed.
+
+     Cubic ease-out on the radius, a squared fade on the alpha, and a second
+     hot inner edge trailing the leading one — three lines, and every one of
+     the two dozen call sites gets sharper for free. The width also thins as
+     it goes, so it dissipates instead of just disappearing. */
+  ctx.save();
   for (const r of S.rings) {
-    const k = 1 - r.life / r.max;
-    ctx.globalAlpha = clamp(r.life / r.max, 0, 1) * 0.8;
-    ctx.strokeStyle = r.col; ctx.lineWidth = r.wid;
-    ctx.beginPath(); ctx.arc(r.x, r.y, lerp(r.r0, r.r1, k), 0, TAU); ctx.stroke();
-    ctx.globalAlpha = 1;
+    const u = clamp(1 - r.life / r.max, 0, 1);
+    const ease = 1 - Math.pow(1 - u, 3);
+    const rad = lerp(r.r0, r.r1, ease);
+    const a = (1 - u) * (1 - u);
+    ctx.globalAlpha = a * 0.85;
+    ctx.strokeStyle = r.col;
+    ctx.lineWidth = Math.max(0.6, r.wid * (1 - u * 0.65));
+    ctx.beginPath(); ctx.arc(r.x, r.y, rad, 0, TAU); ctx.stroke();
+    // the leading edge, hotter and thinner, just inside the front
+    if (u < 0.55) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = (1 - u / 0.55) * 0.5;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(r.x, r.y, rad * 0.94, 0, TAU); ctx.stroke();
+      ctx.globalCompositeOperation = 'source-over';
+    }
   }
+  ctx.restore();
+  ctx.globalAlpha = 1;
 
   drawPaci();
   drawTomce();
   drawShops();
 
+  /* ---- pickups ----
+     Was: one flat translucent disc and the sprite. Now every drop is lit from
+     under itself and sits in a small piece of staging — a cast shadow that
+     tells you where the FLOOR is (a bobbing sprite with no shadow reads as
+     stuck to the camera), an additive pool, and for anything above ammo a slow
+     halo ring and a rising mote. The rare things earn a second ring turning
+     the other way, so RARE reads as rare from across the room without a label
+     on it. */
   for (const d of S.drops) {
     const by = Math.sin(d.bob) * 2;
     const spr = d.kind === 'ammo' ? SPR.ammo : d.kind === 'med' ? SPR.medkit : d.kind === 'god' ? SPR.eye
       : d.kind === 'coin' ? SPR.coin : d.kind === 'card' ? SPR.card : d.kind === 'nade' ? SPR.grenade
-      : d.kind === 'shield' ? SPR.shield : d.kind === 'nova' ? SPR.nova : ITEMS[d.key].spr;
-    const sc = (d.kind === 'item' || d.kind === 'god') ? 1.6 : d.kind === 'card' ? 1.1 : 1;
-    const col = d.kind === 'god' ? '#ff2b2b' : d.kind === 'item' ? ITEMS[d.key].col
+      : d.kind === 'shield' ? SPR.shield : SPR.nova;
+    const sc = d.kind === 'god' ? 1.6 : d.kind === 'card' ? 1.1 : 1;
+    const col = d.kind === 'god' ? '#ff2b2b'
       : d.kind === 'coin' ? '#f5c518' : d.kind === 'card' ? '#c0202a'
-      : d.kind === 'shield' ? '#7fd0ff' : d.kind === 'nova' ? '#ffb03a' : '#ffffff';
-    ctx.globalAlpha = 0.16 + Math.sin(S.t * 5 + d.bob) * 0.07;
+      : d.kind === 'shield' ? '#7fd0ff' : d.kind === 'nova' ? '#ffb03a'
+      : d.kind === 'med' ? '#ff6b6b' : d.kind === 'nade' ? '#7aa35e' : '#f2d14a';
+    const rare = d.kind === 'god' || d.kind === 'card' || d.kind === 'nova' || d.kind === 'shield';
+    const fade = d.life < 4 && Math.sin(S.t * 18) > 0 ? 0.35 : 1;
+
+    // the shadow shrinks as it rises, which is the whole reason it is there
+    ctx.globalAlpha = fade * (0.30 - by * 0.03);
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(d.x, d.y + 7, 5.5 * sc - by * 0.4, 2.2 * sc, 0, 0, TAU); ctx.fill();
+
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = fade * (0.13 + Math.sin(S.t * 4 + d.bob) * 0.05);
     ctx.fillStyle = col;
-    ctx.beginPath(); ctx.arc(d.x, d.y + 6, 12 * sc, 0, TAU); ctx.fill();
-    ctx.globalAlpha = 1;
-    drawSpr(ctx, spr, d.x, d.y + by, sc, false, d.life < 4 && Math.sin(S.t * 18) > 0 ? 0.35 : 1);
+    ctx.beginPath(); ctx.arc(d.x, d.y + 4, 13 * sc, 0, TAU); ctx.fill();
+    if (rare) {
+      // two counter-rotating hairline rings — cheap, and it reads instantly
+      for (let k = 0; k < 2; k++) {
+        const a0 = S.t * (k ? -1.3 : 1.9) + d.bob;
+        ctx.globalAlpha = fade * (0.5 - k * 0.2);
+        ctx.strokeStyle = col; ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.ellipse(d.x, d.y + 4, 9 * sc + k * 3, (3 + k) * sc, a0, 0, TAU);
+        ctx.stroke();
+      }
+      if (Math.random() < 0.25) part(d.x + rnd(-6, 6), d.y + 4, col, 1, 16, 0.6);
+    }
+    ctx.restore(); ctx.globalAlpha = 1;
+    drawSpr(ctx, spr, d.x, d.y + by, sc, false, fade);
   }
 
   for (const c2 of S.cracks) {
@@ -4199,6 +5429,8 @@ function drawWorld() {
     ctx.beginPath(); ctx.moveTo(o.x, o.y - 4); ctx.lineTo(o.x, o.y + 1);
     ctx.arc(o.x + 2, o.y + 1, 2.4, Math.PI, TAU * 0.75, true); ctx.stroke();
   }
+  drawHaz(1);          // sweeping beams, over the top of whatever they are crossing
+
   // BUTCHER'S BILL's arcs, and anything else that wants a line between two throats
   if (S.arcs.length) {
     ctx.save();
@@ -4253,6 +5485,16 @@ function drawWorld() {
   ctx.lineCap = 'butt';
   ctx.restore();
   for (const b of S.eb) {
+    /* A hook in flight is drawn as the chain it is on, back to the fist that
+       threw it. Without the line it is one more enemy round and there is no
+       reason to read it differently from the twenty others in the air — with
+       it, you can see the thing that is about to happen to you. */
+    if (b.hook && b.owner && !b.owner.dead) {
+      ctx.strokeStyle = 'rgba(30,22,18,0.8)'; ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.moveTo(b.owner.x, b.owner.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.strokeStyle = 'rgba(196,186,166,0.85)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(b.owner.x, b.owner.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
     const pu = 1 + Math.sin(S.t * 15 + b.bob) * 0.13;
     ctx.fillStyle = 'rgba(4,0,2,0.62)';
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r * pu + 1.7, 0, TAU); ctx.fill();
@@ -4262,8 +5504,7 @@ function drawWorld() {
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 0.5, 0, TAU); ctx.fill();
   }
 
-  for (const q of S.part) { ctx.globalAlpha = clamp(q.life / q.max, 0, 1); ctx.fillStyle = q.col; ctx.fillRect(q.x | 0, q.y | 0, q.s, q.s); }
-  ctx.globalAlpha = 1;
+  drawParticles();
 
   drawWalls(R, vl, vt, vr, vb);
   drawDoor();
@@ -4376,21 +5617,422 @@ function drawCornerSigil() {
   if (c.pulse > 0.4 && Math.random() < 0.25) part(c.x + rnd(-6, 6), c.y + rnd(-6, 6), '#b028ff', 1, 14, 0.5);
 }
 
+/* ============================================================
+   THE PROP LIBRARY
+
+   Every obstacle in the arena used to be the same object: a brick-textured
+   rectangle, with a red rectangle inside it if it happened to be a "vat". Ten
+   floors of that is ten floors of the same room in ten palettes — the level
+   design was already doing its job (each floor has a fixed layout archetype),
+   but nothing you could SEE told you which building you were in.
+
+   So obstacles now have a KIND, drawn by one of the entries below, and each
+   floor draws its kinds from its own short list (FLOOR_PROPS). The rules every
+   prop obeys, because they are gameplay objects before they are decoration:
+
+     · it FILLS its rect. The collision box is the rect; a prop that draws
+       smaller than its box is a lie you walk into.
+     · it has a dark base edge and a lit top edge, always in the same
+       direction, so a room of mixed props still reads as one lit space.
+     · it is legible at 1px. No detail smaller than a pixel, no detail that
+       only resolves when you stand on it.
+     · nothing animates fast enough to be mistaken for a threat. Flame
+       flickers, liquid ripples, lamps pulse — all slow.
+
+   `lit` marks the props that put light into the room; drawLight reads it. */
+const PROPS = {
+
+  /* ---- containers ---- */
+  crate(w, R) {                             // slatted wood, iron banding
+    box(w, '#5a4028', '#7a5a38', '#2c1d10');
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    for (let y = w.y + 4; y < w.y + w.h - 3; y += 5) ctx.fillRect(w.x + 1, y, w.w - 2, 1);
+    ctx.fillStyle = 'rgba(230,210,170,0.10)';
+    for (let y = w.y + 5; y < w.y + w.h - 3; y += 5) ctx.fillRect(w.x + 1, y, w.w - 2, 1);
+    // corner brackets
+    ctx.fillStyle = '#3a3038';
+    ctx.fillRect(w.x + 1, w.y + 1, 3, 3); ctx.fillRect(w.x + w.w - 4, w.y + 1, 3, 3);
+    ctx.fillRect(w.x + 1, w.y + w.h - 5, 3, 3); ctx.fillRect(w.x + w.w - 4, w.y + w.h - 5, 3, 3);
+  },
+
+  barrel(w, R) {                            // a drum, ribbed, lid on top
+    box(w, '#3f4a3a', '#5c6a52', '#1c231a');
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    ctx.fillRect(w.x + 1, w.y + Math.round(w.h * 0.32), w.w - 2, 2);
+    ctx.fillRect(w.x + 1, w.y + Math.round(w.h * 0.66), w.w - 2, 2);
+    ctx.fillStyle = 'rgba(220,230,210,0.13)';
+    ctx.fillRect(w.x + 1, w.y + Math.round(w.h * 0.32) + 2, w.w - 2, 1);
+    // rust running down from the top rib
+    ctx.fillStyle = 'rgba(140,68,26,0.35)';
+    ctx.fillRect(w.x + 3, w.y + Math.round(w.h * 0.34), 1, Math.round(w.h * 0.3));
+    ctx.fillRect(w.x + w.w - 6, w.y + Math.round(w.h * 0.34), 1, Math.round(w.h * 0.2));
+    // lid
+    ctx.fillStyle = '#6e7d64'; ctx.fillRect(w.x + 2, w.y + 1, w.w - 4, 3);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(w.x + 2, w.y + 4, w.w - 4, 1);
+  },
+
+  vat(w, R) {                               // open tank, floor-coloured contents
+    box(w, '#3a3640', '#585062', '#191622');
+    const c = R.vat || '#78121a';
+    const iy = w.y + 4, ih = w.h - 8;
+    ctx.globalAlpha = 0.62; ctx.fillStyle = c;
+    ctx.fillRect(w.x + 3, iy, w.w - 6, ih);
+    // two crossing ripples, slow, so it reads as liquid and not as a pattern
+    ctx.globalAlpha = 0.22; ctx.fillStyle = '#ffffff';
+    ctx.fillRect(w.x + 3, iy + 2 + Math.sin(S.t * 1.4 + w.x * 0.1) * (ih * 0.2), w.w - 6, 1);
+    ctx.fillRect(w.x + 3, iy + ih * 0.6 + Math.sin(S.t * 1.1 + w.y * 0.1) * (ih * 0.15), w.w - 6, 1);
+    ctx.globalAlpha = 1;
+    // rim
+    ctx.fillStyle = '#6a6478'; ctx.fillRect(w.x + 1, w.y + 2, w.w - 2, 2);
+  },
+
+  sacks(w, R) {                             // stacked sacks on a pallet
+    box(w, '#4a4030', '#655840', '#241e14');
+    ctx.fillStyle = '#7a6a4e';
+    for (let y = w.y + 3; y < w.y + w.h - 6; y += 7)
+      for (let x = w.x + 3; x < w.x + w.w - 5; x += 9) {
+        ctx.fillRect(x, y, 7, 5);
+        ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(x, y + 4, 7, 1);
+        ctx.fillStyle = 'rgba(240,224,190,0.14)'; ctx.fillRect(x, y, 7, 1);
+        ctx.fillStyle = '#7a6a4e';
+      }
+    ctx.fillStyle = '#3a3020';                 // the pallet under it
+    ctx.fillRect(w.x, w.y + w.h - 5, w.w, 5);
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    for (let x = w.x + 2; x < w.x + w.w; x += 6) ctx.fillRect(x, w.y + w.h - 5, 1, 5);
+  },
+
+  /* ---- cold ---- */
+  freezer(w, R) {                           // chest freezer, frosted lid, lit
+    box(w, '#4a5860', '#6e828c', '#1e2830');
+    ctx.fillStyle = 'rgba(190,236,255,0.20)';
+    ctx.fillRect(w.x + 3, w.y + 3, w.w - 6, Math.max(4, w.h - 12));
+    ctx.fillStyle = 'rgba(230,248,255,0.30)';
+    ctx.fillRect(w.x + 4, w.y + 4, w.w - 8, 1);
+    // the cold coming off it, breathing
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.10 + Math.sin(S.t * 1.3 + w.x) * 0.05;
+    ctx.fillStyle = '#bfefff';
+    ctx.fillRect(w.x - 3, w.y - 2, w.w + 6, w.h + 4);
+    ctx.restore();
+    ctx.fillStyle = '#8aa8b8'; ctx.fillRect(w.x + 4, w.y + w.h - 7, w.w - 8, 2);   // handle
+  },
+
+  icewall(w, R) {                           // a block of it, cracked through
+    ctx.fillStyle = '#5d7f8e'; ctx.fillRect(w.x, w.y, w.w, w.h);
+    ctx.fillStyle = 'rgba(200,240,255,0.30)'; ctx.fillRect(w.x, w.y, w.w, w.h - 3);
+    ctx.fillStyle = 'rgba(255,255,255,0.40)'; ctx.fillRect(w.x, w.y, w.w, 1);
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)'; ctx.lineWidth = 1;
+    for (let k = 0; k < 3; k++) {                 // frozen-in fractures
+      ctx.beginPath();
+      let cx = w.x + ((k * 37 + w.x) % Math.max(1, w.w)), cy = w.y + 2;
+      ctx.moveTo(cx, cy);
+      for (let s = 0; s < 3; s++) { cx += ((k + s) % 2 ? 4 : -3); cy += w.h / 3; ctx.lineTo(cx, cy); }
+      ctx.stroke();
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(w.x, w.y + w.h - 3, w.w, 3);
+  },
+
+  /* ---- heat ---- */
+  brazier(w, R) {                           // a fire drum. the brightest thing in a room.
+    box(w, '#3a2a22', '#523a2c', '#1a1010');
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(w.x + 1, w.y + Math.round(w.h * 0.55), w.w - 2, 2);
+    // coals
+    ctx.fillStyle = '#8a2a08'; ctx.fillRect(w.x + 3, w.y + 3, w.w - 6, 4);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (let k = 0; k < 3; k++) {
+      const ph = S.t * (3.4 + k) + w.x * 0.3 + k;
+      const fh = 5 + Math.abs(Math.sin(ph)) * 7;
+      ctx.globalAlpha = 0.30 + Math.sin(ph * 1.7) * 0.12;
+      ctx.fillStyle = k === 0 ? '#ff4a10' : k === 1 ? '#ff9a2a' : '#ffe08a';
+      const fw = (w.w - 8) * (1 - k * 0.24);
+      ctx.fillRect(w.x + 4 + ((w.w - 8) - fw) / 2, w.y + 4 - fh, fw, fh);
+    }
+    ctx.globalAlpha = 0.13 + Math.sin(S.t * 2.6 + w.x) * 0.05;
+    ctx.fillStyle = '#ff8a2a';
+    ctx.fillRect(w.x - 10, w.y - 12, w.w + 20, w.h + 22);
+    ctx.restore(); ctx.globalAlpha = 1;
+    if (Math.random() < 0.30) part(w.x + rnd(4, w.w - 4), w.y + 2, pick(['#ff9a2a', '#ffd05a']), 1, 24, 1.1);
+  },
+
+  candles(w, R) {                           // a table of them, guttering
+    box(w, '#40301c', '#5c4628', '#1e1610');
+    ctx.fillStyle = 'rgba(240,220,180,0.10)'; ctx.fillRect(w.x + 1, w.y + 1, w.w - 2, 1);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (let x = w.x + 5; x < w.x + w.w - 3; x += 8) {
+      const ph = S.t * 4.5 + x;
+      ctx.globalAlpha = 0.9; ctx.fillStyle = '#e8dcc0';
+      ctx.fillRect(x, w.y - 4, 2, 6);
+      ctx.globalAlpha = 0.55 + Math.sin(ph) * 0.25;
+      ctx.fillStyle = '#ffc24a'; ctx.fillRect(x, w.y - 7 + (Math.sin(ph) > 0 ? 0 : 1), 2, 3);
+      ctx.globalAlpha = 0.10; ctx.fillStyle = '#ffb03a';
+      ctx.fillRect(x - 9, w.y - 15, 20, 24);
+    }
+    ctx.restore(); ctx.globalAlpha = 1;
+  },
+
+  /* ---- machinery ---- */
+  machine(w, R) {                           // an industrial unit with a status lamp
+    box(w, '#3c4048', '#565c68', '#171a20');
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(w.x + 3, w.y + 4, w.w - 6, Math.max(3, w.h * 0.4));
+    ctx.fillStyle = 'rgba(190,205,225,0.10)'; ctx.fillRect(w.x + 3, w.y + 4, w.w - 6, 1);
+    // vents
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    for (let x = w.x + 5; x < w.x + w.w - 5; x += 3) ctx.fillRect(x, w.y + w.h - 9, 1, 4);
+    // the lamp, slow, never fast enough to look like a threat
+    const on = (Math.sin(S.t * 1.6 + w.x * 0.2) + 1) / 2;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.35 + on * 0.5; ctx.fillStyle = '#4fd6e8';
+    ctx.fillRect(w.x + w.w - 6, w.y + 3, 3, 3);
+    ctx.globalAlpha = 0.06 + on * 0.07;
+    ctx.fillRect(w.x + w.w - 14, w.y - 5, 19, 18);
+    ctx.restore(); ctx.globalAlpha = 1;
+  },
+
+  pipes(w, R) {                             // a bank of them, with valve wheels
+    ctx.fillStyle = '#232a30'; ctx.fillRect(w.x, w.y, w.w, w.h);
+    for (let x = w.x + 2; x < w.x + w.w - 2; x += 7) {
+      ctx.fillStyle = '#4a565e'; ctx.fillRect(x, w.y, 5, w.h);
+      ctx.fillStyle = 'rgba(190,215,230,0.20)'; ctx.fillRect(x, w.y, 1, w.h);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x + 4, w.y, 1, w.h);
+      // a coupling band partway down
+      ctx.fillStyle = '#65727c';
+      ctx.fillRect(x - 1, w.y + Math.round(w.h * 0.45), 7, 3);
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(w.x, w.y + w.h - 2, w.w, 2);
+    // one dripping joint, in slow time
+    if (Math.random() < 0.02) part(w.x + w.w / 2, w.y + w.h, 'rgba(150,200,220,0.7)', 1, 8, 1.4);
+  },
+
+  cage(w, R) {                              // wire mesh, empty. probably.
+    ctx.fillStyle = 'rgba(10,8,12,0.72)'; ctx.fillRect(w.x, w.y, w.w, w.h);
+    ctx.fillStyle = '#5a6068';
+    ctx.fillRect(w.x, w.y, w.w, 2); ctx.fillRect(w.x, w.y + w.h - 2, w.w, 2);
+    ctx.fillRect(w.x, w.y, 2, w.h); ctx.fillRect(w.x + w.w - 2, w.y, 2, w.h);
+    ctx.fillStyle = 'rgba(140,150,160,0.30)';
+    for (let x = w.x + 4; x < w.x + w.w - 2; x += 5) ctx.fillRect(x, w.y + 2, 1, w.h - 4);
+    for (let y = w.y + 4; y < w.y + w.h - 2; y += 5) ctx.fillRect(w.x + 2, y, w.w - 4, 1);
+    ctx.fillStyle = 'rgba(220,230,240,0.16)'; ctx.fillRect(w.x, w.y, w.w, 1);
+  },
+
+  shelf(w, R) {                             // wire shelving with stock still on it
+    ctx.fillStyle = '#2a2630'; ctx.fillRect(w.x, w.y, w.w, w.h);
+    const rows = Math.max(2, Math.floor(w.h / 11));
+    for (let r = 0; r < rows; r++) {
+      const y = w.y + 3 + r * ((w.h - 5) / rows);
+      // the goods, then the shelf they sit on
+      ctx.fillStyle = ['#7a5a38', '#4a6a52', '#6a4a5a', '#5a5a70'][r % 4];
+      for (let x = w.x + 3; x < w.x + w.w - 5; x += 8) {
+        if (((x + r * 13) | 0) % 3 === 0) continue;      // gaps, so it is not a wall
+        ctx.fillRect(x, y - 5, 6, 5);
+        ctx.fillStyle = 'rgba(255,240,220,0.12)'; ctx.fillRect(x, y - 5, 6, 1);
+        ctx.fillStyle = ['#7a5a38', '#4a6a52', '#6a4a5a', '#5a5a70'][r % 4];
+      }
+      ctx.fillStyle = '#6a6e78'; ctx.fillRect(w.x + 1, y, w.w - 2, 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.fillRect(w.x + 1, y + 2, w.w - 2, 1);
+    }
+    ctx.fillStyle = '#454a54';                                // uprights
+    ctx.fillRect(w.x, w.y, 2, w.h); ctx.fillRect(w.x + w.w - 2, w.y, 2, w.h);
+  },
+
+  till(w, R) {                              // a checkout unit, screen still lit
+    box(w, '#3a3a44', '#54545e', '#18181e');
+    ctx.fillStyle = '#1a2a22'; ctx.fillRect(w.x + 3, w.y + 3, Math.max(6, w.w - 10), Math.max(4, w.h * 0.4));
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = 0.30 + Math.sin(S.t * 0.8 + w.x) * 0.10;
+    ctx.fillStyle = '#6ede7a';
+    ctx.fillRect(w.x + 4, w.y + 4, Math.max(4, w.w - 12), 1);
+    ctx.fillRect(w.x + 4, w.y + 7, Math.max(3, (w.w - 14) * 0.6), 1);
+    ctx.globalAlpha = 0.07; ctx.fillRect(w.x - 6, w.y - 5, w.w + 12, w.h + 12);
+    ctx.restore(); ctx.globalAlpha = 1;
+    ctx.fillStyle = '#6a6a76'; ctx.fillRect(w.x + 2, w.y + w.h - 6, w.w - 4, 3);   // the belt
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    for (let x = w.x + 3; x < w.x + w.w - 3; x += 4) ctx.fillRect(x, w.y + w.h - 6, 1, 3);
+  },
+
+  /* ---- the abattoir's own ---- */
+  carcass(w, R) {                           // something hung on a rail, still dripping
+    ctx.fillStyle = '#3a3238'; ctx.fillRect(w.x, w.y, w.w, 3);          // the rail
+    ctx.fillStyle = 'rgba(220,225,235,0.20)'; ctx.fillRect(w.x, w.y, w.w, 1);
+    const bx = w.x + 2, bw = w.w - 4, by = w.y + 5, bh = w.h - 6;
+    ctx.fillStyle = '#5e2830'; ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = '#7d3640'; ctx.fillRect(bx, by, bw, Math.max(2, bh - 5));
+    ctx.fillStyle = 'rgba(240,190,190,0.16)'; ctx.fillRect(bx, by, bw, 1);
+    // ribs
+    ctx.fillStyle = 'rgba(225,215,200,0.30)';
+    for (let y = by + 3; y < by + bh - 2; y += 5) ctx.fillRect(bx + 2, y, bw - 4, 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(bx, by + bh - 3, bw, 3);
+    // hooks holding it up
+    ctx.fillStyle = '#8a8fa0';
+    ctx.fillRect(bx + 3, w.y + 2, 1, 4); ctx.fillRect(bx + bw - 4, w.y + 2, 1, 4);
+    if (Math.random() < 0.012) part(bx + rnd(2, bw - 2), by + bh, 'rgba(120,16,22,0.8)', 1, 6, 1.6);
+  },
+
+  slab(w, R) {                              // poured concrete. the honest one.
+    box(w, '#4a4a4e', '#63636a', '#1e1e22');
+    ctx.fillStyle = 'rgba(0,0,0,0.20)';
+    for (let k = 0; k < 3; k++) {
+      const x = w.x + 3 + ((k * 29 + w.x) % Math.max(1, w.w - 6));
+      ctx.fillRect(x, w.y + 3 + (k % 2) * 4, 1, Math.max(3, w.h - 10));
+    }
+    ctx.fillStyle = 'rgba(255,250,240,0.06)';
+    ctx.fillRect(w.x + 2, w.y + 2, w.w - 4, 1);
+  },
+
+  table(w, R) {                             // a working table, cloth over the end
+    box(w, '#4c3a26', '#6c5236', '#20180e');
+    ctx.fillStyle = 'rgba(250,240,220,0.12)'; ctx.fillRect(w.x + 1, w.y + 1, w.w - 2, 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.30)';
+    for (let x = w.x + 4; x < w.x + w.w - 2; x += 6) ctx.fillRect(x, w.y + 2, 1, w.h - 6);
+    // the cloth
+    ctx.fillStyle = '#9a8a72';
+    ctx.fillRect(w.x + 2, w.y + Math.round(w.h * 0.5), Math.round(w.w * 0.45), Math.round(w.h * 0.4));
+    ctx.fillStyle = 'rgba(120,20,26,0.35)';
+    ctx.fillRect(w.x + 4, w.y + Math.round(w.h * 0.6), Math.round(w.w * 0.25), 3);
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(w.x, w.y + w.h - 3, w.w, 3);
+  },
+
+  bones(w, R) {                             // a heap. not stacked — heaped.
+    ctx.fillStyle = 'rgba(20,16,14,0.55)'; ctx.fillRect(w.x, w.y + 2, w.w, w.h - 2);
+    for (let k = 0; k < Math.max(4, (w.w * w.h) / 170); k++) {
+      const x = w.x + ((k * 41 + w.x * 7) % Math.max(1, w.w - 6));
+      const y = w.y + 2 + ((k * 27 + w.y * 5) % Math.max(1, w.h - 5));
+      const horiz = (k + w.x) % 2;
+      ctx.fillStyle = k % 3 ? '#c8bfa8' : '#a89b84';
+      if (horiz) { ctx.fillRect(x, y, 6, 2); ctx.fillRect(x - 1, y - 1, 2, 4); ctx.fillRect(x + 5, y - 1, 2, 4); }
+      else { ctx.fillRect(x, y, 2, 6); ctx.fillRect(x - 1, y - 1, 4, 2); ctx.fillRect(x - 1, y + 5, 4, 2); }
+    }
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(w.x, w.y + w.h - 2, w.w, 2);
+  },
+
+  saltpile(w, R) {                          // crust, drifted up against itself
+    ctx.fillStyle = '#6a6558'; ctx.fillRect(w.x, w.y, w.w, w.h);
+    ctx.fillStyle = '#cfc9b4'; ctx.fillRect(w.x, w.y, w.w, Math.max(2, w.h - 5));
+    ctx.fillStyle = '#eae5d2';
+    for (let x = w.x; x < w.x + w.w; x += 3)
+      ctx.fillRect(x, w.y + 1 + (((x * 13) % 5) | 0), 2, 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.30)'; ctx.fillRect(w.x, w.y, w.w, 1);
+    ctx.fillStyle = 'rgba(0,0,0,0.40)'; ctx.fillRect(w.x, w.y + w.h - 4, w.w, 4);
+  },
+
+  sludge(w, R) {                            // a tank of something that is still working
+    box(w, '#2e3a20', '#44562e', '#141a0e');
+    const c = R.vat || '#4a6a12';
+    ctx.globalAlpha = 0.55; ctx.fillStyle = c;
+    ctx.fillRect(w.x + 3, w.y + 4, w.w - 6, w.h - 9);
+    ctx.globalAlpha = 0.30 + Math.sin(S.t * 1.1 + w.x) * 0.08;
+    ctx.fillStyle = '#a8dc4a';
+    // bubbles, rising on their own clocks
+    for (let k = 0; k < 3; k++) {
+      const ph = (S.t * (0.4 + k * 0.12) + k * 0.4 + w.x * 0.03) % 1;
+      const bx = w.x + 5 + ((k * 17 + w.x) % Math.max(1, w.w - 10));
+      ctx.fillRect(bx, w.y + w.h - 5 - ph * (w.h - 10), 2, 2);
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = '#5a6a3a'; ctx.fillRect(w.x + 1, w.y + 2, w.w - 2, 2);
+  }
+};
+
+/* Every prop shares this: a body, a lit top edge, a dark base. Doing it once
+   is what keeps twenty props looking like one art pass instead of twenty. */
+function box(w, body, top, base) {
+  ctx.fillStyle = body; ctx.fillRect(w.x, w.y, w.w, w.h);
+  ctx.fillStyle = top; ctx.fillRect(w.x, w.y, w.w, 1);
+  ctx.fillStyle = 'rgba(255,255,255,0.05)'; ctx.fillRect(w.x, w.y, 1, w.h);
+  ctx.fillStyle = base; ctx.fillRect(w.x, w.y + w.h - 3, w.w, 3);
+  ctx.fillStyle = 'rgba(0,0,0,0.30)'; ctx.fillRect(w.x + w.w - 1, w.y, 1, w.h);
+}
+
+/* Which props each floor is furnished with. Three or four kinds each, chosen
+   so the floor's NAME is legible from its contents: you should be able to tell
+   THE FREEZER from THE LONG TABLE with the HUD covered. */
+const FLOOR_PROPS = [
+  ['crate', 'barrel', 'carcass', 'slab', 'vat'],     //  1 THE ABATTOIR
+  ['pipes', 'slab', 'cage', 'crate'],                //  2 THE HOLLOW
+  ['machine', 'barrel', 'pipes', 'crate', 'vat'],    //  3 THE MEAT LOOP
+  ['brazier', 'table', 'machine', 'crate'],          //  4 THE RED KITCHEN
+  ['freezer', 'icewall', 'shelf', 'crate'],          //  5 THE FREEZER
+  ['vat', 'sludge', 'barrel', 'machine'],            //  6 THE RENDERING
+  ['table', 'candles', 'shelf', 'crate'],            //  7 THE LONG TABLE
+  ['saltpile', 'bones', 'slab', 'shelf'],            //  8 THE SALT LINE
+  ['shelf', 'till', 'cage', 'sacks'],                //  9 THE LAST AISLE
+  ['carcass', 'slab', 'brazier', 'machine']          // 10 THE KILLING FLOOR
+];
+function propKinds(floor) { return FLOOR_PROPS[clamp(floor | 0, 0, FLOOR_PROPS.length - 1)]; }
+/* The props that put light into the room. drawLight reads this — a brazier
+   that glows but does not lift the darkness around it looks painted on. */
+const LIT_PROPS = { brazier: 34, candles: 26, freezer: 22, machine: 18, till: 18, sludge: 14 };
+
+/* ---- the walls the room is made of ----
+   Five treatments rather than one brick. The border wall is the biggest single
+   surface on screen and it was the same brick on all ten floors, which quietly
+   undid every palette change: you can repaint brick and it is still brick. */
+const WALL_STYLE = ['brick', 'panel', 'brick', 'tile', 'panel',
+                    'concrete', 'panel', 'tile', 'rack', 'brick'];
+function wallStyle(floor) { return WALL_STYLE[clamp(floor | 0, 0, WALL_STYLE.length - 1)]; }
+
 function drawWalls(R, vl, vt, vr, vb) {
+  const style = S.inShop ? 'brick' : wallStyle(S.room);
   for (const w of S.walls) {
     if (w.x > vr || w.x + w.w < vl || w.y > vb || w.y + w.h < vt) continue;
+
+    /* An obstacle is a PROP; only the four border walls are wall. Guarded on
+       the kind existing so a stale save or an unknown kind falls back to a
+       crate rather than throwing inside the draw loop. */
+    if (w.obs) { (PROPS[w.kind] || PROPS.crate)(w, R); continue; }
+
     ctx.fillStyle = R.wall[1]; ctx.fillRect(w.x, w.y, w.w, w.h);
     ctx.fillStyle = R.wall[0]; ctx.fillRect(w.x, w.y, w.w, Math.max(2, w.h - 4));
-    ctx.fillStyle = 'rgba(0,0,0,0.25)';
-    for (let y = w.y; y < w.y + w.h; y += 6) ctx.fillRect(w.x, y, w.w, 1);
-    for (let y = w.y, k = 0; y < w.y + w.h; y += 6, k++)
-      for (let x = w.x + (k % 2 ? 0 : 6); x < w.x + w.w; x += 12) ctx.fillRect(x, y, 1, 6);
+
+    if (style === 'brick') {
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      for (let y = w.y; y < w.y + w.h; y += 6) ctx.fillRect(w.x, y, w.w, 1);
+      for (let y = w.y, k = 0; y < w.y + w.h; y += 6, k++)
+        for (let x = w.x + (k % 2 ? 0 : 6); x < w.x + w.w; x += 12) ctx.fillRect(x, y, 1, 6);
+
+    } else if (style === 'tile') {
+      // glazed square tile with a bright grout lip — a kitchen, a mortuary
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      for (let y = w.y; y < w.y + w.h; y += 8) ctx.fillRect(w.x, y, w.w, 1);
+      for (let x = w.x; x < w.x + w.w; x += 8) ctx.fillRect(x, w.y, 1, w.h);
+      ctx.fillStyle = 'rgba(255,255,255,0.07)';
+      for (let y = w.y + 1; y < w.y + w.h; y += 8) ctx.fillRect(w.x, y, w.w, 1);
+      for (let x = w.x + 1; x < w.x + w.w; x += 8) ctx.fillRect(x, w.y, 1, w.h);
+
+    } else if (style === 'panel') {
+      // riveted steel plate: wide panels, seams, a rivet line down each seam
+      ctx.fillStyle = 'rgba(0,0,0,0.30)';
+      for (let x = w.x; x < w.x + w.w; x += 22) ctx.fillRect(x, w.y, 2, w.h);
+      for (let y = w.y; y < w.y + w.h; y += 22) ctx.fillRect(w.x, y, w.w, 2);
+      ctx.fillStyle = 'rgba(230,240,255,0.10)';
+      for (let x = w.x + 2; x < w.x + w.w; x += 22) ctx.fillRect(x, w.y, 1, w.h);
+      ctx.fillStyle = 'rgba(200,215,235,0.18)';
+      for (let x = w.x + 5; x < w.x + w.w; x += 22)
+        for (let y = w.y + 5; y < w.y + w.h; y += 7) ctx.fillRect(x, y, 1, 1);
+
+    } else if (style === 'concrete') {
+      // poured, with form-tie holes and staining down from them
+      ctx.fillStyle = 'rgba(0,0,0,0.16)';
+      for (let y = w.y; y < w.y + w.h; y += 14) ctx.fillRect(w.x, y, w.w, 1);
+      ctx.fillStyle = 'rgba(0,0,0,0.40)';
+      for (let x = w.x + 9; x < w.x + w.w; x += 26)
+        for (let y = w.y + 7; y < w.y + w.h; y += 14) {
+          ctx.fillRect(x, y, 2, 2);
+          ctx.globalAlpha = 0.35; ctx.fillRect(x, y + 2, 1, 5); ctx.globalAlpha = 1;
+        }
+
+    } else {                                    // 'rack' — shelving, back-of-house
+      ctx.fillStyle = 'rgba(0,0,0,0.34)';
+      for (let y = w.y + 3; y < w.y + w.h; y += 9) ctx.fillRect(w.x, y, w.w, 2);
+      ctx.fillStyle = 'rgba(210,200,230,0.10)';
+      for (let y = w.y + 3; y < w.y + w.h; y += 9) ctx.fillRect(w.x, y - 1, w.w, 1);
+      ctx.fillStyle = 'rgba(0,0,0,0.28)';
+      for (let x = w.x + 6; x < w.x + w.w; x += 18) ctx.fillRect(x, w.y, 2, w.h);
+    }
+
     ctx.fillStyle = R.wall[2]; ctx.fillRect(w.x, w.y, w.w, 1);
     ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(w.x, w.y + w.h - 3, w.w, 3);
-    if (w.kind === 'vat') {
-      ctx.fillStyle = 'rgba(120,14,20,0.55)'; ctx.fillRect(w.x + 3, w.y + 3, w.w - 6, w.h - 8);
-      ctx.fillStyle = 'rgba(190,30,40,0.25)'; ctx.fillRect(w.x + 3, w.y + 3 + Math.sin(S.t * 2 + w.x), w.w - 6, 2);
-    }
   }
 }
 
@@ -4607,11 +6249,37 @@ function drawPlayer(p) {
     ctx.restore();
   }
 
+  /* ---- muzzle flash ----
+     Was a single additive disc, which is a light source and not a flash: it
+     had no direction, so every gun in the game bloomed identically and none of
+     them looked like they were pointing anywhere.
+
+     A flash is now a four-point star oriented along the barrel — a long lobe
+     forward, a short one back, two short ones across — with a hot core and a
+     couple of burnt-powder specks. It is aimed, so the shotgun's fat one and
+     the pistol's thin one read as different guns from the same call. Two
+     frames of it; anything longer starts to look like a light you are
+     carrying rather than a thing that just happened. */
   if (S.muzzle && S.muzzle.t > 0) {
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = 'rgba(255,214,140,0.9)';
-    ctx.beginPath(); ctx.arc(S.muzzle.x, S.muzzle.y, S.muzzle.big ? 9 : 5, 0, TAU); ctx.fill();
+    const m = S.muzzle, k = clamp(m.t / 0.06, 0, 1);
+    const L = (m.big ? 21 : 12) * (0.7 + k * 0.3), Wd = (m.big ? 8 : 4.5) * k;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.translate(m.x, m.y); ctx.rotate(m.a || 0);
+    ctx.globalAlpha = 0.55 * k;
+    ctx.fillStyle = m.col || '#ffd68c';
+    ctx.beginPath();                        // the star
+    ctx.moveTo(L, 0); ctx.lineTo(0, -Wd);
+    ctx.lineTo(-L * 0.32, 0); ctx.lineTo(0, Wd);
+    ctx.closePath(); ctx.fill();
+    ctx.globalAlpha = 0.9 * k;              // hot core
+    ctx.fillStyle = '#fffaf0';
+    ctx.beginPath();
+    ctx.moveTo(L * 0.55, 0); ctx.lineTo(0, -Wd * 0.42);
+    ctx.lineTo(-L * 0.16, 0); ctx.lineTo(0, Wd * 0.42);
+    ctx.closePath(); ctx.fill();
     ctx.restore();
+    ctx.globalAlpha = 1;
   }
 
   if (p.shield > 0) {
@@ -4792,15 +6460,23 @@ function drawEnemy(e) {
 /* ---------- lighting ---------- */
 function drawLight() {
   const R = curRoom();
+  /* THE LONG TABLE's blackout rides on top of whatever the room was already
+     doing, up to near-total. Capped short of 1 so the silhouettes never fully
+     go — a room you cannot see AT ALL is not tense, it is a loading screen. */
+  const bo = blackoutK();
+  const dark = S.god ? 0.55 : Math.min(0.97, R.dark + bo * 0.14);
   lctx.globalCompositeOperation = 'source-over';
-  lctx.fillStyle = 'rgba(4,2,6,' + (S.god ? 0.55 : R.dark) + ')';
+  lctx.fillStyle = 'rgba(4,2,6,' + dark + ')';
   lctx.fillRect(0, 0, W, H);
   lctx.globalCompositeOperation = 'destination-out';
 
   const z = S.cam.z;
   const ps = worldToScreen(S.p.x, S.p.y);
 
-  const sight = ST().sight;                 // CATARACT and SLEEPLESS close this in
+  /* CATARACT and SLEEPLESS close this in, and so does the floor: THE HOLLOW
+     runs the lamp at 68% permanently, and a blackout squeezes it to a quarter
+     for the two and a half seconds it lasts. */
+  const sight = ST().sight * (isTwist('dark') ? 0.68 : 1) * (1 - bo * 0.75);
   const lamp = 104 * sight;
   let g = lctx.createRadialGradient(ps.x, ps.y, 4, ps.x, ps.y, lamp * z);
   g.addColorStop(0, 'rgba(0,0,0,1)');
@@ -4840,6 +6516,19 @@ function drawLight() {
   if (S.tomce) blob(S.tomce.x, S.tomce.y, 34 + S.tomce.near * 40, 0.35 + S.tomce.near * 0.5);
   if (S.corner && (S.corner.found || S.corner.pulse > 0.15)) blob(S.corner.x, S.corner.y, 40, S.corner.found ? 0.8 : S.corner.pulse * 0.7);
   if (S.door.open) blob(S.door.x + S.door.w / 2, S.door.y + S.door.h, 70, 0.9);
+  /* Props that make light, make light. A brazier drawn as a fire inside a
+     lightmap that does not know it is there reads as a picture of a fire —
+     this is the line between set dressing and a lit room, and it is also
+     genuinely useful: on the dark floors the furniture is what you navigate
+     by. Only obstacles, so the cost is a dozen blobs at worst. */
+  for (const w of S.walls) {
+    if (!w.obs) continue;
+    const r = LIT_PROPS[w.kind];
+    if (!r) continue;
+    const flick = w.kind === 'brazier' || w.kind === 'candles'
+      ? 1 + Math.sin(S.t * 6 + w.x) * 0.09 : 1;
+    blob(w.x + w.w / 2, w.y + w.h / 2, r * flick, 0.55);
+  }
   for (const e of S.en) blob(e.x, e.y, e.boss ? 40 : 15, 0.42);
   // incoming fire lights its own way in, so a dark room can't hide it
   for (const b of S.eb) blob(b.x, b.y, 26, 0.75);
@@ -4913,28 +6602,19 @@ function post() {
     ctx.globalAlpha = 1;
   }
 
-  /* GLUSEC — three seconds of the base rifle being reforged. The text cycles
-     hue continuously and each line lags the other so they never match.
-     It sits low: a new floor also fires msg() and the item banner, and all
-     three used to stack on the middle of the screen. */
+  /* The sidearm still gains a mark on every floor — see scarMul — but it no
+     longer announces itself with a full-width hue-cycling banner across the
+     bottom of the screen. That sign fired on top of the floor name, the floor
+     twist and whatever else a floor entry throws up, three seconds of the
+     brightest thing on screen for a passive +20%.
+
+     What is left is a short mark on the weapon readout itself, which is where
+     you would look to check anyway. */
   if (S.glusec > 0) {
     const a = clamp(S.glusec / 0.6, 0, 1);
-    const h1 = (S.t * 210) % 360, h2 = (h1 + 140) % 360;
-    const c1 = 'hsl(' + h1 + ',95%,66%)', c2 = 'hsl(' + h2 + ',95%,70%)';
-    /* 197..227 is the only clear strip down here: the pickup banner ends at
-       H/2+61 and the grocery shelf starts around H-42. */
-    const gy0 = 197;
-    ctx.fillStyle = 'rgba(6,3,10,' + (a * 0.6) + ')';
-    ctx.fillRect(0, gy0, W, 30);
-    ctx.fillStyle = c1; ctx.globalAlpha = a * 0.8;
-    ctx.fillRect(0, gy0, W, 1); ctx.fillRect(0, gy0 + 29, W, 1);
-    ctx.globalAlpha = 1;
-    htxt('THE POWER OF GLUSEC COMPELS YOU', W / 2, gy0 + 13, c1, 'center', 13.5,
-         { weight: '700', alpha: a, glow: c2, glowSize: 30, track: 0.14 });
-    htxt('YOUR BASE GUN IS UPGRADED', W / 2, gy0 + 24, c2, 'center', 8.5,
-         { weight: '700', alpha: a, glow: c1, glowSize: 20, track: 0.24 });
     htxt(scarName() + '  +' + Math.round((ST().scarMul - 1) * 100) + '%',
-         W - 8, gy0 + 24, scarCol(), 'right', 7.5, { alpha: a, track: 0.10 });
+         W / 2, H - 30, scarCol(), 'center', 8,
+         { alpha: a * 0.9, track: 0.14, glow: scarCol(), glowSize: 10 });
   }
 
   /* GOROMANIA — two seconds, as fast as the screen will go */
@@ -5057,14 +6737,16 @@ function drawHUD() {
   const isEvo = !!w.evolve;
   txt(isEvo ? scarName() : w.name, W / 2, H - 20, isEvo ? scarCol() : w.col, 'center', 7);
 
-  /* wave / room */
-  txt(R.name, W / 2, 12, '#8e7a68', 'center');
+  /* wave / room. The descent has a bottom now, so the HUD says how far down it
+     is — "FLOOR 7" means nothing without the 10 next to it. */
+  txt(S.inShop ? R.name : R.name + '  ·  FLOOR ' + (S.room + 1) + '/' + FLOORS,
+      W / 2, 12, isLastFloor(S.room) && !S.inShop ? '#c0555c' : '#8e7a68', 'center');
   if (S.inShop) {
     txt('SPEND SOMETHING', W / 2, 22, '#c8a8e0', 'center');
     txt('leave through the door at the bottom', W / 2, 32, 'rgba(160,130,190,0.75)', 'center', 7);
   } else {
     txt(S.waveState === 'idle' ? 'PREPARING' : 'WAVE ' + S.wave + '/10', W / 2, 22,
-        S.wave === BOSS_WAVE ? '#ff3b46' : MINI_WAVES.indexOf(S.wave) >= 0 ? '#ff8a3a' : '#c0ac96', 'center');
+        S.wave === BOSS_WAVE ? '#ff3b46' : miniWaves().indexOf(S.wave) >= 0 ? '#ff8a3a' : '#c0ac96', 'center');
     for (let i = 1; i <= 10; i++) {
       ctx.fillStyle = i < S.wave ? '#8a2a2e' : i === S.wave ? '#ff3b46' : 'rgba(255,255,255,0.12)';
       ctx.fillRect(W / 2 - 30 + (i - 1) * 6, 26, 4, 2);
@@ -5077,16 +6759,31 @@ function drawHUD() {
   drawMinimap();
   if (S.vacuum > 0) htxt('COLLECTING', W / 2, 68, 'rgba(245,197,24,' + clamp(S.vacuum, 0, 1) + ')', 'center', 8, { track: 0.3 });
 
-  const ks = ['banana', 'melon', 'coolade', 'glock', 'bike'];
-  let ix = W - 12;
-  for (let i = ks.length - 1; i >= 0; i--) {
-    const k = ks[i], lv = S.items[k] | 0;
-    if (!lv) continue;
-    drawSpr(ctx, ITEMS[k].spr, ix, H - 36, 0.9);
-    for (let j = 0; j < lv; j++) { ctx.fillStyle = ITEMS[k].col; ctx.fillRect(ix - 4 + j * 4, H - 27, 3, 2); }
-    ix -= 16;
+  /* The grocery strip lived here. What is worth showing in that corner now is
+     the aisle you are actually building — three pips per aisle, filling as you
+     clear THE ORDER, MASTERED and the third rung, and only for aisles you have
+     put something into. It is the same information the strip gave (what am I
+     becoming) read off the system that still exists. */
+  {
+    let ix = W - 14;
+    for (let i = AISLE_ORDER.length - 1; i >= 0; i--) {
+      const k = AISLE_ORDER[i], n = ais(k);
+      if (!n) continue;
+      const ai = AISLES[k];
+      const rungs = (aisleT1(k) ? 1 : 0) + (aisleT2(k) ? 1 : 0) + (aisleT3(k) ? 1 : 0);
+      htxt(ai.n, ix, H - 34, rungs ? ai.col : 'rgba(150,132,118,0.55)', 'right', 6.5,
+           { track: 0.10, noShadow: true });
+      for (let j = 0; j < 3; j++) {
+        const on = j < rungs;
+        ctx.globalAlpha = on ? 0.95 : 0.22;
+        ctx.fillStyle = ai.col;
+        ctx.fillRect(ix - 2 - j * 4, H - 29, 3, 3);
+      }
+      ctx.globalAlpha = 1;
+      ix -= Math.max(30, htxtWidth(ai.n, 6.5, 0.10) + 8);
+    }
+    if (S.god) drawSpr(ctx, SPR.eye, ix - 6, H - 32, 0.9);
   }
-  if (S.god) drawSpr(ctx, SPR.eye, ix, H - 36, 0.9);
 
   if (S.boss) {
     const bw = 200;
@@ -5108,13 +6805,13 @@ function drawHUD() {
     const a = clamp(b.t / 1.2, 0, 1);
     ctx.globalAlpha = a;
     ctx.fillStyle = 'rgba(8,4,8,0.86)'; ctx.fillRect(0, H / 2 + 18, W, 44);
-    const col = b.scar ? scarCol() : b.wep ? WEP[b.wep].col : b.key === 'god' ? '#ff2b2b' : ITEMS[b.key].col;
+    const col = b.scar ? scarCol() : b.wep ? WEP[b.wep].col : '#ff2b2b';
     ctx.fillStyle = col; ctx.fillRect(0, H / 2 + 18, W, 1); ctx.fillRect(0, H / 2 + 61, W, 1);
-    const spr = b.scar ? SPR.pistol : b.wep ? WEP[b.wep].spr : b.key === 'god' ? SPR.eye : ITEMS[b.key].spr;
+    const spr = b.scar ? SPR.pistol : b.wep ? WEP[b.wep].spr : SPR.eye;
     drawSpr(ctx, spr, W / 2 - 84, H / 2 + 40, b.wep || b.scar ? 2 : 1.8, false, 1, b.scar ? col : null);
-    const nm = b.scar ? scarName() : b.wep ? WEP[b.wep].name : b.key === 'god' ? 'THE THIRD EYE OF DAMJAN' : ITEMS[b.key].n[Math.min(b.lv - 1, 1)];
+    const nm = b.scar ? scarName() : b.wep ? WEP[b.wep].name : 'THE THIRD EYE OF DAMJAN';
     const de = b.scar ? ('the sidearm reforged — +' + Math.round((ST().scarMul - 1) * 100) + '% damage')
-             : b.wep ? WEP[b.wep].tag : b.key === 'god' ? 'you are no longer bound by meat.' : ITEMS[b.key].d[Math.min(b.lv - 1, 1)];
+             : b.wep ? WEP[b.wep].tag : 'you are no longer bound by meat.';
     ctx.globalAlpha = 1;
     htxt(nm, W / 2 - 58, H / 2 + 36, col, 'left', 12, { weight: '700', alpha: a, glow: col, glowSize: 12, track: 0.10 });
     htxt(de, W / 2 - 58, H / 2 + 50, '#b09a84', 'left', 8, { alpha: a, track: 0.05 });
@@ -5167,12 +6864,12 @@ function drawMinimap() {
   // loose loot (secrets are not on here)
   for (const d of S.drops) {
     if (d.kind === 'god') continue;
-    const c = d.kind === 'item' ? ITEMS[d.key].col
-      : d.kind === 'coin' ? '#f5c518' : d.kind === 'card' ? '#e04a54'
+    const c = d.kind === 'coin' ? '#f5c518' : d.kind === 'card' ? '#e04a54'
       : d.kind === 'med' ? '#ff6b6b' : d.kind === 'ammo' ? '#f2d14a'
       : d.kind === 'nade' ? '#7aa35e' : d.kind === 'shield' ? '#7fd0ff'
       : d.kind === 'nova' ? '#ffb03a' : '#ffffff';
-    const big = d.kind === 'item';
+    // the rare ones pulse, so a card on the far side of the arena gets noticed
+    const big = d.kind === 'card' || d.kind === 'nova' || d.kind === 'shield';
     ctx.fillStyle = c;
     if (big) {
       ctx.globalAlpha = 0.5 + Math.sin(S.t * 6) * 0.3;
@@ -5358,8 +7055,7 @@ function drawTitle() {
   drawSprRot(ctx, SPR.pistol, W / 2 + 4, 112, 0.15, 2, 2, 3, false);
   if (cosDef(equippedCos()).fx === 'fire' && Math.random() < 0.8)
     part(W / 2 + rnd(-10, 10), 88, pick(['#ff8a20', '#ffd05a']), 1, 30, 0.5);
-  for (const q of S.part) { ctx.globalAlpha = clamp(q.life / q.max, 0, 1); ctx.fillStyle = q.col; ctx.fillRect(q.x | 0, q.y | 0, q.s, q.s); }
-  ctx.globalAlpha = 1;
+  drawParticles();
   updateParticles(1 / 60);
 
   /* Three buttons, one centred row, all the same size.
@@ -5454,7 +7150,7 @@ function drawDead() {
   ctx.fillRect(0, 0, W, H);
   if (S.deadT > 0.4) {
     htxt('YOU ARE MEAT', W / 2, 62, '#e02630', 'center', 28, { weight: '700', glow: '#8c0a14', glowSize: 24, track: 0.14 });
-    htxt('FLOOR ' + (S.room + 1) + '  ·  WAVE ' + S.wave, W / 2, 78, '#96826f', 'center', 8.5, { track: 0.22 });
+    htxt('FLOOR ' + (S.room + 1) + '/' + FLOORS + '  ·  WAVE ' + S.wave, W / 2, 78, '#96826f', 'center', 8.5, { track: 0.22 });
     htxt(String(S.score), W / 2, 102, '#e8d2a4', 'center', 22, { weight: '700', track: 0.06 });
     htxt('SCORE', W / 2, 112, '#6b5a4e', 'center', 7, { track: 0.34 });
 
@@ -5493,6 +7189,69 @@ function drawDead() {
       db.forEach((b, i) => uiBtn(W / 2 - drow / 2 + i * (dbw + dgap), 160, dbw, 22, b[0], b[1], b[2]));
       htxt('R retry · C cosmetics', W / 2, 208, 'rgba(120,106,94,0.6)', 'center', 7, { track: 0.10, noShadow: true });
     }
+  }
+  crosshair();
+}
+
+/* ---------- THE END ----------
+   The other terminal screen. Deliberately built as the inverse of drawDead:
+   that one is red on black and says you stopped; this one is warm, the wash
+   drifts upward instead of pooling, and every number on it is a total rather
+   than a where-you-got-to. There is no RETRY here — the verb is PLAY AGAIN,
+   because you are not recovering from anything. */
+function drawWin() {
+  S.ui = []; uiWipe();
+  S.deadT += 1 / 60;
+  const t = S.deadT;
+  ctx.fillStyle = 'rgba(6,4,3,0.94)'; ctx.fillRect(0, 0, W, H);
+  const g = ctx.createRadialGradient(W / 2, H * 0.42, 8, W / 2, H * 0.42, 260);
+  g.addColorStop(0, 'rgba(255,176,58,0.16)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  // embers going up, not motes coming down
+  for (let i = 0; i < 22; i++) {
+    const y = H - ((S.t * 26 + i * 37) % (H + 40));
+    ctx.globalAlpha = 0.10 + (i % 4) * 0.05;
+    ctx.fillStyle = i % 3 ? '#ffb03a' : '#ff6a3a';
+    ctx.fillRect((i * 61 + Math.sin(S.t * 0.5 + i) * 30) % W | 0, y | 0, 2, 2);
+  }
+  ctx.globalAlpha = 1;
+
+  htxt('THE PROTOCOL IS MEAT', W / 2, 54, '#ffb03a', 'center', 26,
+       { weight: '700', glow: '#a04a08', glowSize: 26, track: 0.12 });
+  htxt('ten floors. all of them behind you.', W / 2, 72, '#9d8a7a', 'center', 8,
+       { track: 0.16 });
+
+  if (t > 0.5) {
+    htxt(String(S.score), W / 2, 100, '#e8d2a4', 'center', 22, { weight: '700', track: 0.06 });
+    htxt('FINAL SCORE', W / 2, 110, '#6b5a4e', 'center', 7, { track: 0.34 });
+    statRow([
+      { spr: SPR.coin, v: String(S.coins), col: '#f5c518' },
+      { v: 'KILLS ' + S.kills, col: '#9d8a7a' },
+      { v: 'CARDS ' + S.cardsTaken, col: '#9d8a7a' },
+      { v: 'LEVEL ' + S.level, col: '#9d8a7a' }
+    ], 126);
+    const sv = loadSave();
+    htxt('guns ' + S.p.owned.length + '/' + WORDER.length +
+         '  ·  clears ' + Math.max(1, cStat('protocol')) +
+         '  ·  best ' + Math.max(sv.best || 0, S.score) +
+         '  ·  EVO ' + (S.evo | 0) + '/' + EVO_MAX,
+         W / 2, 140, '#5f5044', 'center', 7, { track: 0.10 });
+    /* The one line that says the run is not the whole game: an evolved roster
+       makes the next ten floors a different ten floors. */
+    htxt((S.evo | 0) >= EVO_MAX
+           ? 'there is nothing left to evolve. do it faster.'
+           : 'EVOLVE and come back holding something. it gets worse, and so do you.',
+         W / 2, 152, '#a8905c', 'center', 7, { track: 0.06 });
+  }
+
+  if (t > 1.2) {
+    const db = [['PLAY AGAIN', '#e8b25a', () => startRun()],
+                ['COSMETICS', '#b558ff', () => { S.cosReturn = 'win'; S.mode = 'cos'; }],
+                ['TITLE', '#8b7a68', () => { S.mode = 'title'; }]];
+    const dbw = 96, dgap = 8, drow = db.length * dbw + (db.length - 1) * dgap;
+    db.forEach((b, i) => uiBtn(W / 2 - drow / 2 + i * (dbw + dgap), 166, dbw, 22, b[0], b[1], b[2]));
+    htxt('R again · C cosmetics', W / 2, 208, 'rgba(120,106,94,0.6)', 'center', 7,
+         { track: 0.10, noShadow: true });
   }
   crosshair();
 }
@@ -5767,69 +7526,6 @@ function drawLevelUp() {
   crosshair();
 }
 
-/* ---------- THE COLD ROOM ----------
-   Two signatures, one door. Deliberately the widest, slowest screen in the
-   game: it happens five times a run at most and it should feel like it. */
-function drawColdRoom() {
-  S.ui = []; uiWipe();
-  ctx.fillStyle = 'rgba(3,4,8,0.94)'; ctx.fillRect(0, 0, W, H);
-  const bg = ctx.createRadialGradient(W / 2, H / 2, 8, W / 2, H / 2, 230);
-  bg.addColorStop(0, 'rgba(150,60,190,0.18)'); bg.addColorStop(1, 'rgba(150,60,190,0)');
-  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-  // hanging rails, because it is a cold room
-  ctx.fillStyle = 'rgba(120,140,150,0.10)';
-  for (let i = 0; i < 9; i++) ctx.fillRect(24 + i * 52, 0, 1, 46);
-
-  htxt('THE COLD ROOM', W / 2, 24, '#e8d2a4', 'center', 22,
-       { weight: '700', mid: 1, glow: '#7a2ea0', glowSize: 22, track: 0.20 });
-  htxt('the floor is yours. one of these leaves with you.', W / 2, 40, '#8d7f92', 'center', 7.5,
-       { track: 0.10, mid: 1 });
-
-  const offer = S.sigOffer || [];
-  const CW = 176, gap = 16, CH = 136, cy = 56;
-  const x0 = W / 2 - (CW * offer.length + gap * (offer.length - 1)) / 2;
-  offer.forEach((k, i) => {
-    const it = ITEMS[k], lv = sigLevel(k);
-    const x = x0 + i * (CW + gap);
-    const hot = mouse.x > x && mouse.x < x + CW && mouse.y > cy - 6 && mouse.y < cy + CH;
-    const key = 'sig' + k;
-    hoverT[key] = clamp((hoverT[key] || 0) + (hot ? 0.20 : -0.16), 0, 1);
-    const t = hoverT[key], y = cy - t * 4;
-
-    frameBox(x, y, CW, CH, it.col, t, 26);
-    ctx.fillStyle = it.col; ctx.globalAlpha = 0.14 + t * 0.12;
-    ctx.fillRect(x + 2, y + 3, CW - 3, 12);
-    ctx.globalAlpha = 1;
-    htxt(lv ? 'UPGRADE' : 'SIGNATURE', x + CW / 2, y + 9, it.col, 'center', 6.5,
-         { track: 0.28, mid: 1, glow: it.col, glowSize: 10 });
-
-    // the grocery itself, floating, with its own light under it
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = 0.10 + t * 0.10 + Math.sin(S.t * 2.4) * 0.03;
-    ctx.fillStyle = it.col;
-    ctx.beginPath(); ctx.arc(x + CW / 2, y + 42, 26, 0, TAU); ctx.fill();
-    ctx.restore();
-    drawSpr(ctx, it.spr, x + CW / 2, y + 42 + Math.sin(S.t * 2 + i) * 1.5, 2.6);
-
-    htxt(it.n[Math.min(lv, 1)], x + CW / 2, y + 74, t > 0.4 ? '#ffffff' : '#e8dcc8', 'center', 12,
-         { weight: '700', mid: 1, glow: it.col, glowSize: 10 + 14 * t, track: 0.05 });
-    wrapped(it.d[Math.min(lv, 1)], x + CW / 2, y + 88, CW - 22, '#c8bba8', 7.5);
-
-    if (lv) {
-      ctx.fillStyle = it.col; ctx.globalAlpha = 0.10;
-      ctx.fillRect(x + 6, y + CH - 22, CW - 12, 16);
-      ctx.globalAlpha = 1;
-      htxt('replaces  ' + it.n[0], x + CW / 2, y + CH - 14, 'rgba(170,152,136,0.85)', 'center', 6.5,
-           { track: 0.04, mid: 1, noShadow: true });
-    }
-    S.ui.push({ x, y: cy - 6, w: CW, h: CH + 6, fn: () => takeSig(k) });
-  });
-
-  htxt('there is no walking out of here empty-handed.', W / 2, H - 10, 'rgba(126,114,124,0.6)', 'center', 7,
-       { track: 0.10, mid: 1, noShadow: true });
-  crosshair();
-}
-
 /* ---------- THE EVOLUTION PICK ----------
    What a rung actually pays for. Either the guns of the rarity it opened, or
    — once the roster covers every rarity — three cards at LEGENDARY to open
@@ -5962,8 +7658,18 @@ function drawDeck() {
      rather than stray words. They wrap; five signatures plus off-cuts is
      wider than the screen. */
   let y = 27;
-  const sigs = SIG_ORDER.filter(k => sigLevel(k) > 0);
-  if (sigs.length || S.fusedOrder.length) {
+  /* The signature chips are gone with the groceries. What sits on this row now
+     is every aisle rung you have earned — the named states, which are exactly
+     the same shape of possession an off-cut is: a thing you have, not a number
+     you accumulated. Off-cuts follow on the same row. */
+  const rungs = [];
+  for (const k of AISLE_ORDER) {
+    const ai = AISLES[k];
+    if (aisleT3(k)) rungs.push({ n: ai.t3, col: ai.col, big: 1 });
+    else if (aisleT2(k)) rungs.push({ n: ai.n + ' MASTERED', col: ai.col });
+    else if (aisleT1(k)) rungs.push({ n: ai.n + ' ORDER', col: ai.col });
+  }
+  if (rungs.length || S.fusedOrder.length) {
     let x = 14;
     const chip = (w, draw) => {
       if (x + w > W - 14) { x = 14; y += 15; }
@@ -5975,11 +7681,10 @@ function drawDeck() {
       draw(x);
       x += w + 5;
     };
-    for (const k of sigs) {
-      const it = ITEMS[k], nm = it.n[Math.min(sigLevel(k) - 1, 1)];
-      chip(16 + htxtWidth(nm, 6.5, 0.04) + 7, cx => {
-        drawSpr(ctx, it.spr, cx + 8, y + 6, 0.85);
-        htxt(nm, cx + 16, y + 6.5, it.col, 'left', 6.5, { track: 0.04, mid: 1 });
+    for (const r of rungs) {
+      chip(htxtWidth(r.n, 6.5, 0.04) + 12, cx => {
+        htxt(r.n, cx + 6, y + 6.5, r.col, 'left', 6.5,
+             { track: 0.04, mid: 1, glow: r.big ? r.col : null, glowSize: 8 });
       });
     }
     for (const fid of S.fusedOrder) {
@@ -6044,7 +7749,8 @@ function drawDeck() {
     }
     colY[col] = py + h + 7;
   }
-  if (!S.cardsTaken && !sigs.length)
+  // `sigs` was the signature-grocery list; the empty case is now just the deck
+  if (!S.cardsTaken)
     htxt('nothing yet. go and level up.', W / 2, 120, '#5f5044', 'center', 8, { mid: 1 });
 
   uiBtn(W / 2 - 48, H - 20, 96, 16, 'BACK', '#e8b25a', () => { S.mode = 'pause'; });
@@ -6200,21 +7906,31 @@ function drawPause() {
        W / 2, 66, canEvolve() ? 'rgba(255,120,124,0.85)' : 'rgba(130,112,104,0.75)', 'center', 7,
        { track: 0.08, noShadow: true });
 
+  /* THE ORDER, in place of the old signature list. Every aisle you have put a
+     rank into, how far along it is, and what the next rung costs — the one
+     progress bar in the game that a player can actually steer toward. */
   let y = 84;
-  sectionRule('SIGNATURE CARDS', y);
+  sectionRule('THE ORDER', y);
   y += 12;
   let any = false;
-  for (const k of ['banana', 'melon', 'coolade', 'glock', 'bike']) {
-    const lv = S.items[k] | 0; if (!lv) continue; any = true;
-    const nm = ITEMS[k].n[Math.min(lv - 1, 1)];
-    drawSpr(ctx, ITEMS[k].spr, 38, y - 2, 0.9);
-    htxt(nm, 50, y + 1, ITEMS[k].col, 'left', 8, { track: 0.06 });
-    htxt(ITEMS[k].d[Math.min(lv - 1, 1)], 50 + htxtWidth(nm, 8, 0.06) + 6, y + 1,
-         'rgba(140,120,106,0.85)', 'left', 7, { track: 0.03, noShadow: true });
+  for (const k of AISLE_ORDER) {
+    const n = ais(k); if (!n) continue; any = true;
+    const ai = AISLES[k];
+    const rung = aisleT3(k) ? 3 : aisleT2(k) ? 2 : aisleT1(k) ? 1 : 0;
+    const next = rung === 0 ? AISLE_T1 : rung === 1 ? AISLE_T2 : rung === 2 ? AISLE_T3 : 0;
+    // rank tick, then the aisle, then where it stands
+    ctx.fillStyle = ai.col; ctx.globalAlpha = 0.6;
+    ctx.fillRect(32, y - 4, 2, 7); ctx.globalAlpha = 1;
+    htxt(ai.n, 38, y + 1, ai.col, 'left', 8, { track: 0.06 });
+    const lbl = rung === 3 ? ai.t3 : rung === 2 ? 'MASTERED' : rung === 1 ? 'THE ORDER' : '—';
+    htxt(lbl, 84, y + 1, rung ? ai.col : 'rgba(120,104,94,0.7)', 'left', 7,
+         { track: 0.06, noShadow: true, glow: rung === 3 ? ai.col : null, glowSize: 8 });
+    htxt(next ? n + '/' + next + ' ranks' : n + ' ranks  ·  maxed',
+         W - 38, y + 1, 'rgba(140,120,106,0.85)', 'right', 7, { track: 0.03, noShadow: true });
     y += 10;
   }
   if (S.god) { drawSpr(ctx, SPR.eye, 38, y - 2, 0.8); htxt('THE THIRD EYE — you cannot die', 50, y + 1, '#ff5b5b', 'left', 8); y += 10; any = true; }
-  if (!any) { htxt('none yet. put down a floor boss and the cold room opens.', 38, y + 1, '#5f5044', 'left', 7.5); y += 10; }
+  if (!any) { htxt('nothing committed to yet. four ranks in one aisle buys the first rung.', 38, y + 1, '#5f5044', 'left', 7.5); y += 10; }
 
   /* Arsenal, divided by rarity — one row per rung, guns laid along it.
 
@@ -6310,10 +8026,10 @@ function frame(now) {
     if (S.mode === 'pause') drawPause();
     if (S.mode === 'deck') drawDeck();
     if (S.mode === 'levelup') drawLevelUp();
-    if (S.mode === 'coldroom') drawColdRoom();
     if (S.mode === 'evolve') drawEvoPick();
     if (S.mode === 'augment') drawAugments();
     if (S.mode === 'dead') drawDead();
+    if (S.mode === 'win') drawWin();
   }
 
   if (S.fade > 0) { ctx.fillStyle = 'rgba(0,0,0,' + clamp(S.fade, 0, 1) + ')'; ctx.fillRect(0, 0, W, H); }
@@ -6364,22 +8080,25 @@ S.p = makePlayer();
 requestAnimationFrame(frame);
 
 // dev hook
-window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantItem, grantGod, breakSecret,
+window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantGod, breakSecret,
                 giveWeapon, explode, triggerModagaz, triggerGoromania,
                 evolve, resetEvolution, canEvolve, EVO_COST, EVO_MAX, EVO_TIER,
                 evoGuns, evoCards, evoGunPool, evoCardPool, evoReward, evoFullSet,
                 openEvoPick, takeEvoGun, takeEvoCard, applyEvoLoadout,
                 OMEGA_COINS, COIN_RATE, powerMul,
                 gainXP, openLevelUp, takeCard, dealCards, rerollHand, scarName, scarCol, ST,
-                ITEMS, BOSSES, WEP, WORDER, COSMETICS, frame, nextRoom,
+                BOSSES, WEP, WORDER, COSMETICS, frame, nextRoom,
                 enterShop, exitShop, shopStock, shopSlots, roomDef, curRoom, buildRoom,
                 CARDS, CARD_BY_ID, AISLES, AISLE_ORDER, GRADE, rollGrade, cardVal, dk, dkr, dkc,
-                riderOn, recalcLuck, recalcAisles, ais, aisleT1, aisleT2, AISLE_T1, AISLE_T2,
+                riderOn, recalcLuck, recalcAisles, ais, aisleT1, aisleT2, aisleT3,
+                AISLE_T1, AISLE_T2, AISLE_T3,
                 FUSIONS, FUSION_BY_ID, fz, fusionReady, fusionHint, availableFusions, takeFusion,
-                SIG_ORDER, sigPool, sigLevel, openColdRoom, takeSig, frostPulse, knockRoom,
+                frostPulse, knockRoom, PROPS, propKinds,
                 CONTRACTS, cStat, bump, bumpMax, contractDone, checkContracts,
                 AUGMENTS, ag, dealAugments, openAugments, takeAugment, refuseAugments,
-                spawnMini, MINIS, BOSS_WAVE, MINI_WAVES, isApexFloor, bossIndexFor,
+                spawnMini, MINIS, BOSS_WAVE, MINI_WAVES, miniWaves, isApexFloor, bossIndexFor,
+                ROOMS, FLOORS, isLastFloor, twist, isTwist, rollRoster, updateTwist,
+                BOSS_FINAL, BOSS_HP, FINAL_HP, bossBudget, enterPhase, mortarAt, updateHaz, drawWin,
                 magCap, fireNova, SHOP_WAVES, diff, killEnemy, damageEnemy,
                 angerPaci, hurtStage, bodySprite, legSprite, shred, hurtPlayer, RS, quitToTitle };
 
