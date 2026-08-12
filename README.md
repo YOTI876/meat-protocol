@@ -4,7 +4,11 @@ Top-down pixel-art horror wave shooter. You are Damjan. You have a headband, a
 pistol that was in the drawer, and a shopping problem.
 
 Ten waves a floor, two elites and a two-phase boss on the way through, PACI at
-half time and again at the end, and no bottom to it.
+half time and again at the end.
+
+**Ten floors, and then it ends.** Every one has its own look, its own props and
+its own rule, the boss roster is shuffled every run, and the tenth floor has
+something on it with three phases.
 
 ## Run it
 
@@ -35,30 +39,63 @@ no dependencies — but fonts in `fonts/` won't load that way.
 ## How a run goes
 
 Ten waves per floor. **Elites** on waves 4 and 8, the **floor boss** on wave
-10 — and every fifth floor that boss comes up as an **APEX** instead, at 2.6×
-health and 1.45× damage.
+10. On floor 5 that boss comes up as an **APEX** instead, at 2.6× health and
+1.45× damage — there's exactly one a run.
 
 **Every floor boss has two phases.** At half health it breaks: rears up, throws
 the room off itself, and comes back faster, angrier, and doing something else
 entirely — a boss that does one thing for its whole bar is a health sponge.
-There are **ten** of them now, one per floor, cycling every ten.
 
-All three boss-class kills hand you a card. Only the floor boss opens THE COLD
-ROOM.
+**Every boss has its own kit.** THE BUTCHER throws a hook and drags you back in
+if you try to kite. MOTHER OF MELONS won't fight you at all — she backs off and
+seeds the room, and the seeds hatch. THE HOGFATHER walks a three-shell volley
+across where you're *going*. THE PITCHER fires a wall of shot with one moving
+hole in it. THE FISHWIFE turns a beam. THE NIGHT SHELF mines the floor behind
+itself so the room shrinks as the fight goes on.
+
+**Which boss lands on which floor is rolled per run.** Nine of the ten, shuffled
+— so the one you never meet is different every time too.
+
+Every boss-class kill hands you a card. Only the floor boss opens the top of
+the deck.
 
 **PACI turns up twice a floor** — after wave 5 and again after wave 10. Clear
 wave 10, spend what's left, and the north door opens. The next floor has
 stronger enemies but you keep everything.
 
-**There is no last floor.** Past the four hand-built ones the game keeps
-generating them — new names, new palettes, wider arenas, darker rooms — and
-the difficulty keeps climbing with no ceiling. Floor 201 is `THE SALT LINE
-XXV`. Every floor also rolls one of five arena layouts, so you're not always
-fighting in the same shape of room.
+## The ten floors
+
+| | | its rule |
+| --- | --- | --- |
+| 1 | THE ABATTOIR | — you have enough to learn already |
+| 2 | THE HOLLOW | the light does not reach |
+| 3 | THE MEAT LOOP | the floor is greased — dash to stop |
+| 4 | THE RED KITCHEN | the burners are still on |
+| 5 | THE FREEZER | the cold comes in waves, and it slows them too |
+| 6 | THE RENDERING | more of them. less of each. |
+| 7 | THE LONG TABLE | the lights go out on a count |
+| 8 | THE SALT LINE | everything cuts deeper — including you |
+| 9 | THE LAST AISLE | three elites instead of two |
+| 10 | THE KILLING FLOOR | it has been waiting the whole time |
+
+Each floor has its own palette, its own arena, one of five layouts, one of five
+wall treatments, and its own set of props — braziers and long tables on floor
+7, salt piles and bones on floor 8, tills and shelving on floor 9.
+
+## The last floor
+
+Floor 10, wave 10: **THE MEAT PROTOCOL**, and it has three phases that are
+three different fights. It holds the centre and denies the ring, so you play at
+range. Then it comes off the middle and *hunts*, mortaring where you're running
+to — so range stops working. Then it plants and opens two beams turning in
+opposite arcs with a spiral filling in behind them, and there's exactly one
+safe wedge, and it's moving.
+
+Put it down and you've won. There's a screen for it.
 
 ## THE MENU
 
-Level up and you're dealt a hand of cards. **38 of them**, across five aisles.
+Level up and you're dealt a hand of cards. **39 of them**, across five aisles.
 
 **Rarity is not a multiplier.** Every card carries a **RIDER** — a second,
 qualitative effect that only switches on if you take that card at **RARE or
@@ -70,15 +107,19 @@ COMMON · UNCOMMON · RARE · EPIC · LEGENDARY
 ```
 
 **Aisles commit back.** Four ranks anywhere in one aisle buys a standing perk,
-eight buys a louder one:
+eight buys a louder one, and fourteen buys an identity:
 
-| aisle | is | at 4 | at 8 |
-| --- | --- | --- | --- |
-| **BLADES** | hurting things | +12% damage | crits cleave everything behind the target |
-| **FRESH** | health and speed | +20 max health | clearing a wave heals a quarter back |
-| **FROZEN** | armour and slowing | −10% damage taken | anything that dies slowed shatters |
-| **TOOLS** | whatever gun you hold | +15% magazine | finishing a reload throws out a shockwave |
-| **JUNK** | bad for you. worth it. | +1 LUCK | every fourth card comes up a rarity better |
+| aisle | is | at 4 | at 8 | at 14 |
+| --- | --- | --- | --- | --- |
+| **BLADES** | hurting things | +12% damage | crits cleave everything behind the target | **THE RED WORK** |
+| **FRESH** | health and speed | +20 max health | clearing a wave heals a quarter back | **IN SEASON** |
+| **FROZEN** | armour and slowing | −10% damage taken | anything that dies slowed shatters | **DEEP STORAGE** |
+| **TOOLS** | whatever gun you hold | +15% magazine | finishing a reload throws out a shockwave | **THE WHOLE RACK** |
+| **JUNK** | bad for you. worth it. | +1 LUCK | every fourth card comes up a rarity better | **PAST THE DATE** |
+
+Fourteen is past what a spread build reaches on purpose. It's the rung you only
+see if you've been refusing cards from other aisles, and it pays like it — THE
+WHOLE RACK fires *every gun you own* alongside the one in your hands.
 
 **SPLIT is the one card with its own rules.** LEGENDARY, never dealt before
 floor 3, and about one hand in forty. It makes your shot two rounds, both
@@ -90,22 +131,12 @@ the first seat in your next hand, and the screen says so. CYCLE 3 + QUICK
 HANDS 2 gives you instant reloads below a quarter mag. The level-up footer
 prints your nearest unbuilt one with its progress.
 
-## THE COLD ROOM
-
-Kill a floor boss and it opens. Two of the five signature groceries, you take
-one, they stack to level 2:
-
-| item | what it does |
-| --- | --- |
-| BANANA | +35% speed, you leave peels that make enemies slip |
-| MELON | +55 max HP and a regenerating rind shield |
-| COOLADE | sugar rush: x1.6 damage, bullets pierce |
-| GLOCK-18 | a second gun that aims and fires itself |
-| STOLEN BICYCLE | +25% speed, and your dash becomes a ram |
-
-These used to be dealt into the level-up hand. A grocery and *+5% move speed*
-are not the same kind of reward and the hand couldn't price one against the
-other, so they got their own door.
+The deck is the only thing a kill pays out in now. The five **signature
+groceries** and the cold room they came from are gone — they were a fourth
+progression track with no decision in it, and their item text had been lying
+about its own numbers for three commits. Two of them came back as cards you
+build toward instead: **THE OTHER HAND** (a spare gun that fires itself) and
+**IGNITION** (your dash rams, and at RARE it leaves fire behind).
 
 ## TOMCE
 
@@ -128,7 +159,7 @@ can skip five floors of progression.
 
 | gun | cost | deal |
 | --- | --- | --- |
-| THE SIDEARM | free | it was in the drawer. slow. it gains a mark every floor |
+| THE SIDEARM | free | it was in the drawer. twelve rounds. it gains a mark every floor |
 | SCAR-L | 20 | reliable, boring, yours |
 | MEAT SPLITTER | 30 | nine pellets, and it shoves |
 | THE PRICE GUN | 80 | tags things ON SALE — everything else hits them 1.6× |
@@ -163,8 +194,15 @@ a small purple room with an enormous man in it. Twice a floor.
 
 > HELLO TRAVELER, WELCOME TO MY SHOP
 
-Three pedestals, four once you're a REGULAR. Buy, or don't, then walk out the
-door at the bottom.
+Three pedestals, four once you're a REGULAR, and **all of them are filled every
+visit**. What's on them is weighted by rarity rather than picked flat, so a
+LEGENDARY on a pedestal is about one seat in seventy — seeing THE FISH at all
+is the thing you tell someone about; affording it is a separate problem. Buy,
+or don't, then walk out the door at the bottom.
+
+The back room is also the one place with **no floor rule** running. The lights
+stay on, the floor isn't greased, and nothing is on fire. That's the point of
+it.
 
 **Do not shoot him.** He doesn't fight back. The first shot gets you a warning
 and a room that will not stop shaking, going redder the longer you stand in
@@ -176,7 +214,9 @@ stays on the pedestals.
 Eight cross-run objectives, and each one changes what the game does rather
 than adding a number. Take 25 RARE-or-better cards and every hand you're ever
 dealt runs +1 LUCK. Kill an APEX and you're dealt four cards instead of three.
-Put down 8 floor bosses and THE ROTISSERIE joins the crate.
+Put down 8 floor bosses and THE ROTISSERIE joins the crate. Put down THE MEAT
+PROTOCOL — **CLOSING TIME** — and every run afterwards starts on a hand of
+four.
 
 They survive everything, including EVOLVE.
 
@@ -250,5 +290,5 @@ wall. Consider what you have never once thought to shoot at.
   folder as a vault and start at `00 START HERE`
 
 `window.MEAT` is exposed in the console for poking at the guts
-(`MEAT.giveWeapon('omega')`, `MEAT.spawnBoss(2, true)`, `MEAT.openColdRoom()`,
-`MEAT.dealCards(3, 2)`, `MEAT.S` …).
+(`MEAT.giveWeapon('omega')`, `MEAT.spawnBoss(2, true)`, `MEAT.spawnBoss(-1)`
+for the finale, `MEAT.dealCards(3, 2)`, `MEAT.S` …).

@@ -45,20 +45,67 @@ If you already own everything he has nothing to sell, and says so instead.
 ## Stock
 
 Three pedestals — **four** once the REGULAR [[Contracts|contract]] is signed
-(`shopSlots()`) — drawn at random from whatever passes all three gates:
+(`shopSlots()`) — and **every visit fills all of them**.
+
+Three gates build the pool:
 
 | gate | is | fails when |
 |---|---|---|
-| `owned` | you already have it | always, once bought |
+| `owned` | you already have it | always, once bought — including guns from your [[Economy#Evolution\|evolution roster]] |
 | `lock` | a [[Contracts\|contract]] you have not signed | THE ROTISSERIE, until BREAK THE SEAL |
 | `floor` | how deep you are | see [[Weapons#When PACI starts carrying it]] |
 
 Price is the fourth gate, and the only one you can argue with.
 
-Nothing is exempt any more. **THE FISH** used to be appended to the pool
-unconditionally because [[Economy#Cards|cards]] were its gate; now that it
-costs **500 coins** it goes through the same three gates as every other gun,
-plus a price most of a run is spent reaching.
+Nothing is exempt. **THE FISH** used to be appended to the pool unconditionally
+because [[Economy#Cards|cards]] were its gate; now that it costs **500 coins**
+it goes through the same gates as every other gun.
+
+### Weighted by rarity, not uniform
+
+Uniform selection meant a COMMON and a LEGENDARY were equally likely to be
+standing on a pedestal, so the crate had no texture: every visit was a
+coin-flip between two things you could afford and one you could not.
+
+```js
+const SHOP_W = [100, 52, 24, 9, 2.5];
+```
+
+| grade | weight | ~share of pedestals |
+|---|---|---|
+| COMMON | 100 | 53% |
+| UNCOMMON | 52 | 32% |
+| RARE | 24 | 13% |
+| EPIC | 9 | <1% |
+| LEGENDARY | 2.5 | <1% |
+
+*(measured over 1,200 rolls)*
+
+A LEGENDARY on a pedestal is about **one seat in seventy**. Seeing THE FISH at
+all should be the thing you tell someone about; buying it is a separate problem
+costing 500 coins.
+
+Picks are **spliced** out of the pool, so a pedestal can never duplicate the one
+beside it, and the offer is sorted into `WORDER` so the crate reads in a
+consistent order rather than shuffling under your eyes between visits.
+
+### Three pedestals, always
+
+A shop with one thing on offer is not a shop, it is a receipt — and three
+pedestals in a room is a promise the room makes just by having three pedestals
+in it. Depth and an [[Economy#Evolution|evolved roster]] can both leave the pool
+short, so:
+
+```js
+if (pool.length < shopSlots())
+  for (const id of all)
+    if (!owned(id) && unlocked(id) && pool.indexOf(id) < 0) pool.push(id);
+```
+
+The **depth gate is dropped** — never the contract gate, and never ownership.
+The rarity weights then do the gating that `floor` was doing: a floor-1 player
+*can* be shown GOD FINGER this way, at odds of about one visit in thirty, and
+cannot afford it anyway.
 
 Stand on a pedestal and press **E**.
 
@@ -116,8 +163,13 @@ puts it all back and sets `waveState = 'clear'` so
 [[How A Run Goes#Per-wave loop|the wave clock]] resumes normally.
 
 The shop is **not a floor**. It never increments `S.room`, never counts toward
-the descent, and its room definition (`SHOP_ROOM`) lives outside the `ROOMS`
-progression entirely. `curRoom()` is what picks between them.
+the descent, and its room definition (`SHOP_ROOM`) lives outside the ten
+[[Floors|`ROOMS`]] entirely. `curRoom()` is what picks between them.
+
+It also has **no [[Floors#Twists|twist]]** — `twist()` returns `null` whenever
+`S.inShop` is set. That is not an oversight; it is what makes the back room a
+breather rather than just a room with things for sale in it. The floor is still
+greased or dark or on fire when you walk back out.
 
 ## Related
 - [[Weapons]] — what he sells, what it costs, and what he won't carry yet

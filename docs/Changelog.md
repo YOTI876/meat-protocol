@@ -52,7 +52,7 @@ banner crash]] before shipping.
 ## `f09a24b` — Weapon upgrade armory, per-floor rifle marks, longer shield
 [[Weapon Upgrades|The Armory]] (CYCLE/SPLIT/POWER per weapon); moved the
 rifle's mark cadence from **per-wave to per-floor** and raised its bonus
-5%→20% to compensate; the [[Rendering#GLUSEC banner|GLUSEC banner]]; AEGIS
+5%→20% to compensate; the [[Progression#The evolving sidearm|GLUSEC banner]]; AEGIS
 shield 2s→3s.
 
 ## `8fcfe50` — One typeface everywhere, animated enemies, cleaner pause screen
@@ -65,9 +65,9 @@ Collaborator commits. They added the embedded typeface (`js/font.js` +
 [[The Shop|PACI's back room]] every third boss, with guns removed from the
 arena floor entirely; SPLIT reduced to one flat 100-coin rank on every weapon
 and the OMEGA BEAM excluded from upgrades; the
-[[Rendering#GLUSEC banner|GLUSEC banner]] moved to the bottom of the screen;
+[[Progression#The evolving sidearm|GLUSEC banner]] moved to the bottom of the screen;
 five [[Rendering#Arena layouts|layout archetypes]] instead of one scatter
-pass; and [[Progression#Endless floors|generated floors past floor 4]] so the
+pass; and [[Progression|generated floors past floor 4]] so the
 descent has no bottom. Four real defects caught before shipping —
 [[Bugs Found#10. Wave 4 started while the shop was still fading in|#10]]
 through [[Bugs Found#13. Deep floors overshot the enemy cap|#13]]. This vault
@@ -88,7 +88,7 @@ The big one. Rarity stopped being a multiplier: every card carries a
 [[The Deck#Riders — the reason rarity is a moment|RIDER]] that only switches
 on at RARE or better, so a RARE MALICE is a different card rather than a
 bigger one. The ladder became plain — COMMON / UNCOMMON / RARE / EPIC /
-LEGENDARY. [[Groceries#THE COLD ROOM|Signatures left the deck]] for their own
+LEGENDARY. [[Groceries|Signatures left the deck]] for their own
 room. [[The Deck#The five aisles|Aisles]] became BLADES / FRESH / FROZEN /
 TOOLS / JUNK with perks at 4 and 8 ranks, and ten
 [[The Deck#Off-cuts — the fusions|off-cuts]] became the thing to build toward.
@@ -119,7 +119,7 @@ A balance pass, top to bottom.
 
 **[[Bosses|Bosses]].** The wave-10 roster went from five to **ten**, so a run
 no longer exhausts everything the game has by floor 5. Every one of them now
-**[[Bosses#Two phases|breaks at half health]]** and switches to a second
+**[[Bosses#Phases|breaks at half health]]** and switches to a second
 pattern — three new ones (`spiral`, `nova`, `rush`) exist purely so a phase
 change looks different rather than just harder. The HP band was *flattened*
 (1400→3000) on purpose: `bossIndexFor` wraps, so a steep roster ramp only buys
@@ -262,6 +262,119 @@ the fist that holds it, a caudal peduncle, offset dorsal and pelvic fins, an eye
 high on the head, and a tapered snout where the centre line alone reaches the
 muzzle — which is where the beam comes out.
 
+## `d0beda0` — Catch the vault up
+Docs only. Real commit hashes against `git log`, corrected counts, and the
+EVOLVE pick screen written up.
+
+## `9551e17` — Ten floors that end, ten boss kits, and no groceries
+
+The largest single change since the initial build: **+2,176 / −457** in
+`js/game.js`.
+
+### The descent has a bottom now
+
+**Ten authored [[Floors|floors]]**, and `roomDef()` clamps rather than
+generating. The four hand-built rooms and the hue-wheel generator past them are
+gone. Every floor carries its own palette, arena, layout, prop set, wall
+treatment and **rule**:
+
+| act | floors | |
+|---|---|---|
+| *it is only a building* | THE ABATTOIR, THE HOLLOW, THE MEAT LOOP | — · `dark` · `slick` |
+| *it starts taking an interest* | THE RED KITCHEN, THE FREEZER, THE RENDERING | `heat` · `frost` · `swarm` |
+| *it stops pretending* | THE LONG TABLE, THE SALT LINE, THE LAST AISLE, THE KILLING FLOOR | `blackout` · `frail` · `hunt` · the finale |
+
+Every [[Floors#Twists|twist]] had to pass one rule: **a tell, a rhythm, or a
+trade**. A twist that only subtracts is difficulty, not design. `slick` gives
+the dash back as a brake; the burners warn for 1.1s and never light within 90px
+of you; `frost` slows the enemies with you; `swarm` trades 1.5× the count for
+0.7× the health; the blackout dims for three full seconds first.
+
+An endless descent had no act structure, no finale, and no way for a run to end
+well. This one can be beaten.
+
+### The roster is shuffled, and that took a rewrite
+
+**HP left the boss entries.** `BOSS_HP[]` is indexed by *floor*; `bulk`
+(0.92–1.12) is all that identity still contributes. Without that, shuffling the
+roster puts a 3000-HP boss on floor 1 — the identity and the difficulty were
+the same number. One function, `bossBudget(floor)`, now answers "how much boss
+is this floor worth" for **both** `spawnBoss` and `spawnMini`.
+
+**Every boss has a kit**, an opening pattern and a different one it breaks
+into, and no two share a pair. Six new patterns, each asking a different
+question of the room: `hook` drags you back in when you kite; `brood` seeds the
+room and makes you choose between the boss and what it hatched; `mortar` walks
+a three-shell volley across where you are *going*; `curtain` turns the arena
+into a corridor with one moving door; `sweep` turns an unblockable beam;
+`mines` spends the floor you have already crossed. Backed by a new `S.haz`
+layer — marks, mines and anchored beams — drawn in two passes.
+
+### THE MEAT PROTOCOL
+
+Floor 10, wave 10, **4200 HP**, three phases, and none of them reuse a roster
+pattern. p1 holds the centre and denies the ring, so you play at range. p2
+hunts at 118 px/s and mortars where you are running *to*, so range stops
+working. p3 plants and turns two beams 180° apart while a spiral fills in
+behind them — one safe wedge, always moving, and no rest beat in the pattern at
+all.
+
+It **never summons in p3**. Adds during a bullet-hell phase is how you make a
+finale unreadable rather than hard.
+
+Killing it ends the run into a proper [[Rendering#The win screen|win screen]]
+and signs **CLOSING TIME**.
+
+### The groceries are gone
+
+`ITEMS`, `SIG_MAX`, THE COLD ROOM and all five signatures are deleted. Two came
+back as cards you build toward — **THE OTHER HAND** (the GLOCK-18) and
+**IGNITION** (the bicycle). THE FULL MENU, a contract that could no longer be
+signed promising a reward already removed, became CLOSING TIME. Full reasoning
+in [[Groceries]].
+
+### Numbers
+
+- **THE SIDEARM** 18 → **12** rounds. The reload is the biggest window the game
+  has and it effectively did not exist for two floors.
+- **OVERKILL** 18 → **10** a rank, radius 42 → 30, and **no screen shake at
+  all**. A full shake on every kill meant the camera never settled all run.
+- **FLASHPOINT** a nova every 12 kills → every **65** (48 at rank 2). A nova
+  that clears twelve things earns the next nova; it was a loop with no exit.
+- **WINDFALL** loot-from-anywhere → reach **190**.
+- **Knockback**: house default 60 → **38**, MEAT SPLITTER 140 → **45**, GOD
+  FINGER 200 → **110**, and self-recoil decoupled so the shotgun still kicks
+  *you*.
+- **THE ORDER** gained a **third rung at 14** — a named state per aisle, not
+  another percentage.
+- The [[The Shop#Weighted by rarity, not uniform|shop]] fills every pedestal
+  every visit, weighted `100/52/24/9/2.5`, dropping the depth gate before the
+  contract or ownership gate if the pool is short.
+
+### The look
+
+Twenty [[Floors#Props|prop kinds]] on a shared `box()` helper, four or five per
+floor, six of them putting real light into the room. Five wall treatments
+instead of one brick. The [[Rendering#Effects|effects layer]] rewritten around
+directional velocity-stroked sparks, eased rings with a hot leading edge, a
+rotated muzzle star, and `explode(..., quiet)` — which is what lets a card stop
+shaking the screen without becoming invisible. Everything capped: 900 particles,
+420 gibs, 80 rings.
+
+The GLUSEC banner is gone, replaced by a short mark on the weapon readout.
+
+### Found on the way
+
+Four defects, all caught numerically because screenshots don't work in this
+harness: [[Bugs Found#15. Every elite in the game spawned with a NaN health bar|NaN
+elite health]], [[Bugs Found#16. The level-up screen swallowed the ending|the
+level-up screen swallowing the ending]],
+[[Bugs Found#17. `pillars` floors furnished themselves from two props|two-prop
+pillars floors]], and
+[[Bugs Found#18. `drawDeck` threw the instant the deck screen opened|a dangling
+reference that broke the deck screen]].
+
 ## Related
-- [[Bugs Found]] — the defects behind each fix above, and three still open
+- [[Bugs Found]] — the defects behind each fix above, and two still open
 - [[Tuning Values]] — where the numbers stand today
+- [[Floors]] — the ten of them in full

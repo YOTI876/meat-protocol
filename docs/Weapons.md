@@ -12,9 +12,9 @@ the arena floor.
 
 | gun | rarity | cost | mag | dmg | what it does |
 |---|---|---|---|---|---|
-| **THE SIDEARM** | COMMON | free | 18 | 21 | *it was in the drawer. it will do.* Fires every **0.178s**. Evolves every floor — see [[Progression#The evolving sidearm]] |
+| **THE SIDEARM** | COMMON | free | 12 | 21 | *it was in the drawer. it will do.* Fires every **0.178s**. Evolves every floor — see [[Progression#The evolving sidearm]] |
 | **SCAR-L** | COMMON | 20 | 30 | 13 | *reliable. boring. yours.* |
-| **MEAT SPLITTER** | COMMON | 30 | 2 | 12 ×9 | shotgun, 140 knockback — *nine reasons to stand still* |
+| **MEAT SPLITTER** | COMMON | 30 | 2 | 12 ×9 | shotgun, **45** knockback — *nine reasons to stand still* |
 | **THE PRICE GUN** | UNCOMMON | **80** | 40 | 7 | tags things **ON SALE**: everything takes ×1.6 on a marked target |
 | **THE STAPLER** | UNCOMMON | 55 | 60 | 8 | nailgun, pins for 0.45s |
 | **MICROWAVE** | RARE | 80 | 16 | 34 | plasma orbs, ricochet ×3, burn 16 — *reheats the dead* |
@@ -100,6 +100,41 @@ that everything is at the centre when it goes.
 > multiplies everything else you own by 1.6× on a marked target, which made it
 > the strongest coin in the game at the cheapest tier — a floor-1 no-brainer
 > rather than a decision.
+
+## The magazine, and why 12
+
+THE SIDEARM carried **18** rounds. Between the mag and the free reload
+animation you could clear an early wave without ever being empty, which meant
+the reload — a four-stage animation with its own four sounds, and the single
+biggest window the game has for punishing you — effectively did not exist for
+the first two floors.
+
+**12** is the number where you notice it. It is still a full wave's worth of
+kills at floor-1 health, it still leaves the gun usable at MK X, and it makes
+CYCLE, HOPPER and QUICK HANDS cards you would actually take rather than cards
+about a problem you did not have.
+
+## Knockback
+
+Everything shoves less than it did.
+
+| | was | is |
+|---|---|---|
+| house default (any gun with no `knock` of its own) | 60 | **38** |
+| **MEAT SPLITTER** | 140 | **45** |
+| **GOD FINGER** | 200 | **110** |
+| self-recoil | tied to `knock` | **decoupled** — 26 shotgun / 22 charge / 10 everything else |
+
+The shotgun was the whole problem. At 140 across nine pellets a single shell
+launched a crawler most of a screen, which sounds good and plays badly: it
+removed the thing you were shooting from the fight instead of killing it,
+scattered packs you were trying to hold together for splash, and shoved enemies
+through the door you were standing in.
+
+Decoupling **self**-recoil from the pellet knockback is what let the shotgun
+stay a shotgun. It still kicks you backward hard — that is the gun's
+personality, and it is a real cost in a room with a boss in it — but the thing
+you hit now mostly stays where you hit it.
 
 ## THE FISH
 
@@ -189,8 +224,10 @@ SEAL** (8 floor bosses) is signed. `WEP.rot.lock = 'seal'` names the contract;
 > `WEP.chill` carries **no `lock`** — it has always been in `BUYABLE`
 > unconditionally, so the contract signs, toasts, displays as signed, and
 > changes nothing. This predates the depth gate; `floor: 3` is now the only
-> thing holding FREEZER BURN back. Same failure mode as
-> [[Bugs Found#B. THE FULL MENU contract has no reward|THE FULL MENU]].
+> thing holding FREEZER BURN back. It is the **last** contract with a promise
+> it doesn't keep — THE FULL MENU, which had the same failure mode, was
+> [[Contracts#CLOSING TIME replaced THE FULL MENU|replaced outright]]. See
+> [[Bugs Found#C. THE DESCENT's reward has no reward]].
 
 ## Handling notes
 

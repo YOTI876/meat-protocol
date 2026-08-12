@@ -187,7 +187,7 @@ part of the save that only goes up.
 | | dying | evolving | reset evo |
 |---|---|---|---|
 | level, [[The Deck\|deck]], [[Augments\|augments]] | reset | reset | reset |
-| owned guns, [[Groceries\|signature items]] | reset | reset | reset |
+| owned guns | reset | reset | reset |
 | coins, cards | **kept** | **wiped** | kept |
 | vault, cosmetics | kept | kept | kept |
 | contracts | kept | kept | kept |

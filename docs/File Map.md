@@ -29,30 +29,33 @@ SLOP/
 
 ## `js/game.js` — rough section order
 
-~6,400 lines, one IIFE, no modules.
+~8,000 lines, one IIFE, no modules.
 
 1. Setup: render scale (`RS`, `subCanvas`, `blit`), crisp UI text (`htxt`),
    input handling
-2. Content tables: `ROOMS` + `roomDef()`/`SHOP_ROOM`/`curRoom()`, `ETYPE`,
-   `BOSSES`, `MINIS`, `ITEMS`, `GRADE`, `WEP`, `COSMETICS`
+2. Content tables: the ten [[Floors|`ROOMS`]] + `roomDef()`/`SHOP_ROOM`/
+   `curRoom()`/`twist()`, `ETYPE`, `BOSSES` + `BOSS_FINAL` + `BOSS_HP`/
+   `bossBudget`/`rollRoster`, `MINIS`, `GRADE`, `WEP`, `COSMETICS`
 3. Save/vault (`loadSave`, `persist`) and **[[Economy#Evolution|EVOLVE]]**
    (`canEvolve`, `evolve`, `resetEvolution`, the `evoGuns`/`evoCards` roster
    helpers, `evoGunPool`/`evoCardPool`, `evoReward`, `openEvoPick`,
    `takeEvoGun`/`takeEvoCard`, `applyEvoLoadout`)
 4. State (`freshState`) and derived stats (`ST()`, `diff()`)
 5. **[[The Deck|THE MENU]]**: `AISLES`, `CARDS`, riders (`riderOn`/`rd`), aisle
-   mastery (`recalcAisles`, `aisleT1/T2`), `FUSIONS` and the off-cut reads,
+   mastery (`recalcAisles`, `aisleT1/T2/T3`), `FUSIONS` and the off-cut reads,
    `dealCards`, `takeCard`/`takeFusion`/`afterPick`
-6. **[[Groceries#THE COLD ROOM|THE COLD ROOM]]** (`sigPool`, `openColdRoom`,
-   `takeSig`)
-7. **[[Augments|AUGMENTS]]** (`dealAugments`, `openAugments`, `takeAugment`)
-8. **[[Contracts|CONTRACTS]]** (`cStat`, `bump`, `bumpMax`, `contractDone`,
+6. **[[Augments|AUGMENTS]]** (`dealAugments`, `openAugments`, `takeAugment`)
+7. **[[Contracts|CONTRACTS]]** (`cStat`, `bump`, `bumpMax`, `contractDone`,
    `checkContracts`)
-9. Room/floor generation (`buildRoom` + `place`/`scatter`, `bakeFloor`) and
-   [[The Shop]] (`shopStock`, `enterShop`, `angerPaci`, `exitShop`)
+8. [[Floors#Twists|Twists]] (`updateTwist`, `blackoutK`) and
+   [[Bosses#Hazards|hazards]] (`updateHaz`, `drawHaz`, `mortarAt`)
+9. Room building (`buildRoom` + `place`/`scatter`, `bakeFloor`), the
+   [[Floors#Props|prop library]] (`PROPS`, `box`, `FLOOR_PROPS`, `LIT_PROPS`,
+   `WALL_STYLE`) and [[The Shop]] (`shopStock`, `enterShop`, `angerPaci`,
+   `exitShop`)
 10. Entity spawning (`spawnEnemy`, `spawnBoss`, `spawnMini`, `makePlayer`)
-11. Juice helpers (`part`, `gib`, `blood`, `shred`, `ring`, `deathBurst`,
-    `float`, `shake`)
+11. Juice helpers (`part`, `sparks`, `impact`, `gib`, `blood`, `shred`, `ring`,
+    `deathBurst`, `float`, `shake`) — see [[Rendering#Effects]]
 12. Collision (`collideWalls`, `pointInWall`, `freeSpot`)
 13. Weapons (`fire`, `emit`, `updateBeam`, `chainZap`, `singularityPop`) and
     grenades (`throwNade`, `explode`)
@@ -63,8 +66,8 @@ SLOP/
 18. Drawing: `drawWorld`, `drawPlayer`, `drawEnemy`, `drawTomce`, `drawLight`,
     `post`
 19. HUD + every screen (`drawHUD`, `drawTitle`, `drawCosmetics`, `drawDeck`,
-    `drawLevelUp`, `drawColdRoom`, `drawEvoPick`, `drawAugments`,
-    `drawContracts`, `drawPause`, `drawDead`)
+    `drawLevelUp`, `drawEvoPick`, `drawAugments`, `drawContracts`, `drawPause`,
+    `drawDead`, `drawWin`)
 20. Main loop (`frame`), `fitCanvas`, boot
 
 ## Dev console hook

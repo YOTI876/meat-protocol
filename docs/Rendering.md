@@ -209,20 +209,49 @@ per-layout separation gap, a clear 92px circle at the arena centre, and
 keep-outs over the spawn pad and the door approach.
 
 > [!note] Verified, not assumed
-> A flood-fill audit over 400 generated arenas confirms every layout is fully
+> A flood-fill audit over 400 built arenas confirms every layout is fully
 > connected — no sealed pockets, spawn always clear, door always reachable.
 > See [[Bugs Found#11. Crates spawning on Damjan's head]].
 
-## GLUSEC banner
+What goes *into* the layout is per-floor: twenty [[Floors#Props|prop kinds]],
+four or five per floor, six of which put light into the room. The layout is the
+geometry; the props are what the geometry is made of.
 
-A band along the **bottom** of the screen on every
-[[Progression#The evolving sidearm|sidearm mark]], held 3 seconds. Two lines
-of text cycle hue continuously and independently, offset 140° apart on the
-colour wheel so they never land on the same colour at the same time.
+## Walls
 
-It sits low deliberately: the item-pickup banner ends at `H/2+61` and the
-grocery shelf starts around `H-42`. It used to be centred, where a floor
-transition stacked it directly on top of `msg()`'s floor-name text.
+Five treatments — `brick`, `panel`, `tile`, `concrete`, `rack` — assigned per
+floor by `WALL_STYLE`. The border wall is the single biggest surface on screen
+and it was the same brick on all ten floors, which quietly undid every palette
+change: you can repaint brick and it is still brick. See [[Floors#Walls]].
+
+Only the four border walls are wall. Everything else in `S.walls` is a
+[[Floors#Props|prop]] and draws through `PROPS[w.kind]`.
+
+## Effects
+
+The effects layer was rewritten around three ideas: **a hit should read as a
+direction**, **a shape should ease rather than fade**, and **nothing should be
+allowed to grow without a ceiling**.
+
+| | does |
+|---|---|
+| `sparks(x, y, ang, col, n, spd, life, cone)` | directional particles carrying `trail: 1` and `drag: 0.86` — drawn as a **stroked line along their own velocity**, so speed is visible |
+| `impact(x, y, ang, heavy)` | the standard hit: a back-spray cone, a thin forward spit of white, a ring, and a one-frame white core |
+| `ring()` | cubic ease-out on the radius, **squared** alpha fade, thinning width, and a hot white leading edge for the first 55% |
+| `S.muzzle` | a 4-point star rotated to the shot's angle, 0.06s |
+| `explode(x, y, r, dmg, col, quiet)` | `quiet` keeps the damage and halves the particles but drops shake, punch, hitstop, flash and the audio duck — and softens knock 340 → 150 |
+
+`quiet` is what lets [[The Deck#The balance pass|OVERKILL]] and the frag
+grenade stop shaking the screen without becoming invisible. A kill-triggered
+effect that shakes the camera means the camera never settles for a whole run.
+
+Every pool is capped, oldest-first: **900** particles, **420** gibs, **80**
+rings. Measured at 222–601 fps per floor and 188 under deliberate load.
+
+> [!note] The deferred queue is why any of this is safe
+> `S.fx` drains **3 entries a frame, capped at 12**. A kill that triggers an
+> effect that kills something that triggers an effect is a recursion, and this
+> is the thing that flattens it into a queue.
 
 ## Typefaces
 
@@ -273,12 +302,38 @@ were shortened.
 
 `drawDeck()` is panels. Each aisle is a boxed section with its own coloured
 edge and header bar, rows carry an alternating wash, riders indent under their
-card, and signatures and off-cuts sit in framed chips. Panels flow into
-whichever column has room.
+card, and off-cuts sit in framed chips. Panels flow into whichever column has
+room.
 
 It was two flat columns — name hard left, effect hard right across a 214px
 row — which left a void down the middle of every row and no visible grouping,
 so it read as two unrelated lists sharing a screen.
+
+The [[Groceries|signature]] chips are gone with the signatures — and took a
+`ReferenceError` with them on the way out. See
+[[Bugs Found#18. `drawDeck` threw the instant the deck screen opened]].
+
+## The win screen
+
+`drawWin()`, reached 3.4 seconds after [[Bosses#THE MEAT PROTOCOL|the finale]]
+dies. It is `drawDead()` with the temperature turned around: the same layout,
+the same three buttons in the same places, and every visual decision inverted.
+
+| | dead | win |
+|---|---|---|
+| wash | cold | warm amber radial |
+| motes | falling | **embers rising** |
+| headline | YOU ARE MEAT | **THE PROTOCOL IS MEAT** |
+| subtitle | how deep you got | *ten floors. all of them behind you.* |
+| buttons | RETRY · COSMETICS · TITLE | **PLAY AGAIN** · COSMETICS · TITLE |
+
+Under the score it prints guns owned, **clears** (`cStat('protocol')`), best
+score and EVO rung — and one editorial line pointing at
+[[Economy#Evolution|EVOLVE]], because the run being over is not the same as the
+game being over.
+
+Keeping the shape identical is the point. Winning and losing should feel like
+two readings of the same instrument, not two different screens.
 
 ## The title screen
 

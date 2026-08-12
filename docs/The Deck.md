@@ -9,13 +9,15 @@ The run's build. There is **no armory**: everything that used to be bought
 with coins is a card you pick on level-up.
 
 Three kinds of reward used to be shuffled into one pile. They are not the same
-kind of thing and they no longer share a screen:
+kind of thing and they no longer share a screen — and with the
+[[Groceries|groceries]] gone, the deck is now the **only** thing a kill pays
+out in:
 
 | source | you get | where |
 |---|---|---|
 | **a level** | a hand of cards | THE MENU |
 | **an elite** (waves 4, 8) | a hand of cards | THE MENU |
-| **a floor boss** (wave 10) | one of two [[Groceries\|signature groceries]] | [[Groceries#THE COLD ROOM\|THE COLD ROOM]] |
+| **a floor boss** (wave 10) | a hand of cards, at better odds | THE MENU |
 | **TOMCE** | one of three trades | [[Augments]] |
 
 Press **B** any time to read what you're holding — that screen is called
@@ -84,18 +86,32 @@ you ever took that card at**, not the last one.
 
 ## The five aisles
 
-Aisles stopped being decoration. Commit to one and it commits back — **four
-ranks** anywhere in an aisle buys a standing perk, **eight** buys a much
-louder one. This is what gives a run a shape instead of a pile of
-percentages.
+Aisles stopped being decoration. Commit to one and it commits back — **four**
+ranks anywhere in an aisle buys a standing perk, **eight** buys a much louder
+one, and **fourteen** buys an identity. This is what gives a run a shape
+instead of a pile of percentages.
 
-| aisle | is | THE ORDER (4) | MASTERED (8) |
-|---|---|---|---|
-| **BLADES** | hurting things | +12% damage | crits cleave everything behind the target |
-| **FRESH** | health and speed | +20 max health | clearing a wave heals a quarter of it back |
-| **FROZEN** | armour and slowing | −10% damage taken | anything that dies slowed shatters for 45 |
-| **TOOLS** | whatever gun you hold | +15% magazine | finishing a reload throws out a shockwave |
-| **JUNK** | bad for you. worth it. | **+1 LUCK** | every fourth card dealt comes up a rarity better |
+```js
+const AISLE_T1 = 4, AISLE_T2 = 8, AISLE_T3 = 14;
+```
+
+| aisle | is | THE ORDER (4) | MASTERED (8) | rung 3 (14) |
+|---|---|---|---|---|
+| **BLADES** | hurting things | +12% damage | crits cleave everything behind the target | **THE RED WORK** — +28% damage, +15% crit, and crits ignite |
+| **FRESH** | health and speed | +20 max health | clearing a wave heals a quarter of it back | **IN SEASON** — +45 max health, +10% speed, and you regrow 2/s |
+| **FROZEN** | armour and slowing | −10% damage taken | anything that dies slowed shatters for 45 | **DEEP STORAGE** — −16% more damage taken, +1 rind, and taking a hit freezes the room |
+| **TOOLS** | whatever gun you hold | +15% magazine | finishing a reload throws out a shockwave | **THE WHOLE RACK** — +35% magazine, −22% reload, and every gun you own fires with you |
+| **JUNK** | bad for you. worth it. | **+1 LUCK** | every fourth card dealt comes up a rarity better | **PAST THE DATE** — +2 LUCK, and one card in every hand is dealt RARE or better |
+
+> [!note] Why there is a third rung at all
+> THE ORDER stopped at eight, which is a ceiling you hit around floor 5 with any
+> focused build and then never think about again — the aisle you committed to
+> went quiet for the whole back half of the run. Fourteen is deliberately past
+> what a casual spread reaches: it is the rung you only see if you have
+> **refused cards from other aisles on purpose**, and it pays like it.
+>
+> Rung 3 is a **named state**, not another percentage, and the deck screen
+> prints the name. MASTERED is a tier; ABSOLUTE is an identity.
 
 Names are one word each and the word says what the aisle does. The old
 BUTCHERY / PRODUCE / HARDWARE / EXPIRED were flavour you had to memorise a
@@ -142,9 +158,13 @@ something you aim at.
 ## The hand
 
 ```js
-handSize()   = (contractDone('apex') ? 4 : 3) + ag('hollow')   // 3 to 5
+handSize()   = ((contractDone('apex') || contractDone('menu')) ? 4 : 3) + ag('hollow')
 rerollCost() = 20 + rerolls * 15
 ```
+
+Three to five. **Two** [[Contracts|contracts]] widen it now and they do not
+stack — APEX PREDATOR and CLOSING TIME are the same reward reached two
+different ways, so whichever you sign first is the one that pays.
 
 `dealCards()` seats any unlocked off-cut first (never a hand of nothing but
 off-cuts), then fills from cards you haven't maxed and can unlock. Each rolls
@@ -242,10 +262,44 @@ Gating tier 1 behind wave 10 meant a whole floor fought on plain numbers,
 which is not difficulty, it is a flat line. The wave-4 elite exists partly to
 open the deck early.
 
-**38 cards**, up from 28 once the five groceries were taken out.
+**39 cards**, up from 28 once the five groceries were taken out — and two of
+the current thirty-nine exist *because* they were taken out.
+
+## The two cards the groceries left behind
+
+Removing the [[Groceries|signatures]] took two things out of the game that were
+worth keeping, so they came back as cards you can actually build toward rather
+than items a boss hands you:
+
+| card | aisle | is the old | does |
+|---|---|---|---|
+| **THE OTHER HAND** | TOOLS | GLOCK-18 | 1–2 spare guns fire themselves at whatever is closest. Rider **AKIMBO**: 0.20s → 0.12s |
+| **IGNITION** | FRESH | STOLEN BICYCLE | your dash RAMS for 32/rank. Rider **BURNOUT**: and leaves a trail of fire behind you |
+
+The other three signatures had no card-shaped version worth having. BANANA and
+MELON were flat stat blocks that ADRENALINE and ROUGHAGE already cover, and
+COOLADE was a damage multiplier with pierce stapled on — which is MALICE and
+CARVE, in one item, at no cost.
+
+## The balance pass
+
+Three cards were carrying runs on their own and were cut back:
+
+| card | was | is | why |
+|---|---|---|---|
+| **OVERKILL** | 18/rank, radius 42, full screen shake | **10/rank, radius 30, no shake at all** | 54 damage at max rank is more than a CRAWLER has, so every kill killed its neighbours — and each of those bursts too. A queued chain, but still a chain that cleared packs you never shot at. |
+| **FLASHPOINT** | a nova every **12** kills | a nova every **65**, 48 at rank 2 (`max(30, 65 - v*17)`), and the nova itself is smaller | a nova that clears twelve things earns the next nova. It was a loop with no exit — you stopped shooting and watched. |
+| **RIPE** (WINDFALL) | loot came to you **from anywhere in the room** | reach **190**, which is most of a room but not all of it | a RARE pick that deleted an entire mechanic. Walking to the loot is the reason the loot is placed where it is. |
+
+> [!note] The screen shake was the real OVERKILL problem
+> Three things were wrong with it and only one of them was the number. A
+> full-strength shake on **every kill** meant the camera never settled for the
+> whole run, and it read as the game being broken rather than the card being
+> strong. The burst now uses [[Rendering#Effects|`explode(..., quiet)`]] —
+> same damage, same particles, no shake, no punch, no hitstop.
 
 ## Related
-- [[Groceries]] — the signatures, and the cold room they come from
+- [[Groceries]] — the five signatures that used to sit alongside this, and why they went
 - [[Augments]] — TOMCE's parallel system, which is *not* the deck
 - [[Contracts]] — three of them change how the deck behaves
 - [[Progression]] — XP, levels, and the sidearm's marks

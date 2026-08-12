@@ -15,7 +15,7 @@ tags: [reference]
 | `1`–`0` | select weapon by slot |
 | `Q` | cycle to previous weapon |
 | `R` | reload |
-| `Shift` / `Space` | dash (grants i-frames; becomes a ram with [[Groceries\|STOLEN BICYCLE]]) |
+| `Shift` / `Space` | dash (grants i-frames; becomes a ram with the [[The Deck\|IGNITION]] card) |
 | `E` | buy the gun you're standing on in [[The Shop\|PACI's shop]], **or** talk to [[Augments\|TOMCE]] |
 | `B` | open/close [[The Deck\|THE DECK]] — everything you're holding |
 | `C` | open [[Cosmetics]] — works from title, pause, or the death screen |
@@ -50,14 +50,18 @@ menu read as the same door.
 ## Menu navigation
 
 Every screen (title, cosmetics, the deck, contracts, pause, level-up,
-augments, the cold room, death) is mouse-driven: buttons highlight on hover
-and animate a lift before you click. See [[Rendering#Menus]].
+augments, death, the win screen) is mouse-driven: buttons highlight on hover
+and animate a lift before you click. See [[Rendering#Menus]]. All eleven are
+render-tested in a loop, which is how the deck screen's
+[[Bugs Found#18. `drawDeck` threw the instant the deck screen opened|dangling
+reference]] was found.
 
 `B` reaches the deck from **play or pause**; `CONTRACTS` is on the title
 screen; `Esc` walks back out of whichever one you're in.
 
 The **title screen is three buttons on one centred row** — PLAY, COSMETICS,
-CONTRACTS — and the **death screen** is RETRY, COSMETICS, TITLE. EVOLVE and
+CONTRACTS — the **death screen** is RETRY, COSMETICS, TITLE, and the **win
+screen** is PLAY AGAIN, COSMETICS, TITLE in the same three places. EVOLVE and
 RESET EVO used to sit on both, which forced a second row that was centred on a
 different axis depending on whether you had evolved: the row physically shifted
 under the cursor between visits.

@@ -6,9 +6,13 @@ tags: [moc, index]
 # MEAT PROTOCOL
 
 A top-down pixel-art horror wave shooter. Zero dependencies, no build step, no
-asset files — every sprite is plotted in code and every sound is synthesized
-at runtime. Ten waves a floor, two elites and a two-phase boss on the way
-through, PACI at half time and again at the end, and no bottom to it.
+asset files — every sprite is plotted in code and every sound is synthesized at
+runtime. Ten waves a floor, two elites and a two-phase boss on the way through,
+PACI at half time and again at the end.
+
+**Ten floors, and then it ends.** Each one has its own palette, layout, props,
+walls and rule; the boss roster is shuffled per run; and floor 10 wave 10 is a
+three-phase fight you can actually beat.
 
 > [!info] Live
 > Play: https://meat-protocol.vercel.app
@@ -19,23 +23,23 @@ through, PACI at half time and again at the end, and no bottom to it.
 ## Start here
 
 - [[Controls]] — every key and button
-- [[How A Run Goes]] — the loop, floor by floor
+- [[How A Run Goes]] — the loop, floor by floor, and how it ends
+- [[Floors]] — the ten of them, and the rule each one runs under
 - [[Secrets]] — the three hidden things (spoilers)
 
 ## The build
 
-- [[The Deck]] — cards, rarity, riders, aisle mastery, off-cuts
-- [[Groceries]] — the five signatures, and THE COLD ROOM
+- [[The Deck]] — cards, rarity, riders, THE ORDER's three rungs, off-cuts
 - [[Augments]] — TOMCE, and what he charges
 - [[Contracts]] — the permanent, cross-run track
-- [[Progression]] — XP, levels, the evolving sidearm, the endless descent
+- [[Progression]] — XP, levels, the evolving sidearm
 
 ## Systems
 
 - [[Weapons]] — the thirteen guns, and the three LEGENDARIES
 - [[The Shop]] — PACI, the only place guns are sold, and his temper
 - [[Enemies]] — the six types and how they think
-- [[Bosses]] — the ten two-phase floor bosses, six elites, and the APEX
+- [[Bosses]] — ten shuffled boss kits, six elites, the APEX, and THE MEAT PROTOCOL
 - [[Pickups]] — everything that drops
 - [[Economy]] — coins, cards, the vault, and the ten rungs of evolution
 - [[Cosmetics]] — what the vault buys
@@ -51,12 +55,13 @@ through, PACI at half time and again at the end, and no bottom to it.
 ## Records
 
 - [[Changelog]] — every release, in order
-- [[Bugs Found]] — fourteen real defects, what caused each, and three still open
+- [[Bugs Found]] — eighteen real defects, what caused each, and two still open
 - [[Tuning Values]] — the single-number knobs
 - [[Deployment]] — GitHub and Vercel setup
 
 ## Removed
 
+- [[Groceries]] — the five signatures, THE COLD ROOM, and why none of it is here
 - [[Weapon Upgrades]] — the armory, and why it isn't here any more
 
 ---

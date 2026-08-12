@@ -55,13 +55,15 @@ docs/
 ├── 00 START HERE.md      the index — start every visit here
 ├── Controls.md
 ├── How A Run Goes.md
+├── Floors.md             the ten of them, and their rules
 ├── Secrets.md            spoilers
 ├── Weapons.md
 ├── The Shop.md
-├── Weapon Upgrades.md
 ├── Enemies.md
 ├── Bosses.md
-├── Groceries.md
+├── The Deck.md
+├── Augments.md
+├── Contracts.md
 ├── Pickups.md
 ├── Progression.md
 ├── Economy.md
@@ -75,6 +77,8 @@ docs/
 ├── Bugs Found.md
 ├── Tuning Values.md
 ├── Deployment.md
+├── Groceries.md          removed system, kept as a record
+├── Weapon Upgrades.md    removed system, kept as a record
 └── Obsidian Setup.md      this file
 ```
 

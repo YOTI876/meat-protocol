@@ -42,9 +42,10 @@ coins, a frag, an AEGIS, a card roll, and a guaranteed pick.
 
 3 seconds of total damage immunity (`p.tempShield`), rendered as a pulsing
 cyan bubble. Stacks by refreshing duration, not adding it. Blocks contact
-damage, projectiles and boss charges alike — checked before the
-[[Groceries|MELON]] rind shield and before the AEGIS PLATING card's dodge
-roll in `hurtPlayer()`.
+damage, projectiles and boss charges alike — checked before the rind shield
+(now a FROZEN [[The Deck#The five aisles|aisle]] reward rather than a
+[[Groceries|grocery]]) and before the AEGIS PLATING card's dodge roll in
+`hurtPlayer()`.
 
 ## NOVA
 

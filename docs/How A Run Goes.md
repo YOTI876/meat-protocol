@@ -5,25 +5,35 @@ tags: [reference, loop]
 
 # How a run goes
 
-Ten waves per floor. Clear wave 10, spend your money, and the north door opens
-onto the next floor — stronger, but you keep everything. **There is no last
-floor.**
+Ten waves per floor, **ten floors**, and then it is over. Clear wave 10, spend
+your money, and the north door opens onto the next floor — stronger, but you
+keep everything. The tenth floor has no door.
 
 ```mermaid
 flowchart LR
   T[Title] --> F1[Floor 1: waves 1-10]
   F1 -->|wave 5 clear| S1[PACI's shop]
   S1 --> F1b[Floor 1: waves 6-10]
-  F1b -->|wave 10 boss, 2 phases| C[THE COLD ROOM]
-  C --> S[PACI's shop]
+  F1b -->|wave 10 boss, 2 phases| S[PACI's shop]
   S -->|door north| F2[Floor 2]
-  F2 --> F3[Floor 3]
-  F3 --> F4[Floor 4]
-  F4 -->|generated| FN[Floor 5 ... forever]
+  F2 --> F3[Floors 3-4]
+  F3 -->|wave 10| A[Floor 5: APEX]
+  A --> F6[Floors 6-9]
+  F6 --> F10[Floor 10: THE KILLING FLOOR]
+  F10 -->|wave 10| P[THE MEAT PROTOCOL: 3 phases]
+  P --> W[Win screen]
   F1 -.death.-> D[Dead screen]
-  FN -.death.-> D
+  F10 -.death.-> D
   D -->|RETRY| T
+  W -->|PLAY AGAIN| T
 ```
+
+> [!note] The descent used to have no bottom
+> Four authored floors and a generator past them. It never ran out, which
+> meant it never resolved either — no act structure, no finale, and the only
+> way a run could end was badly. Ten authored floors and a boss that closes
+> the building is the version where **winning is a thing that can happen**.
+> See [[Floors]].
 
 ## The shape of a floor
 
@@ -35,12 +45,15 @@ flowchart LR
 | 6–7 | ordinary waves |
 | **8** | the second elite |
 | 9 | ordinary wave |
-| **10** | the [[Bosses\|floor boss]], **[[Bosses#Two phases\|two phases]]** — or an **APEX** on floors 5, 10, 15 … |
-| — | [[Groceries#THE COLD ROOM\|THE COLD ROOM]] — pick one of two signatures |
+| **10** | the [[Bosses\|floor boss]], **[[Bosses#Phases\|two phases]]** — an **APEX** on floor 5, **[[Bosses#THE MEAT PROTOCOL\|THE MEAT PROTOCOL]]** on floor 10 |
 | — | **PACI again**, then the door north |
 
 Three boss-class kills a floor, all of which hand you a card; only the
-tenth-wave boss opens the cold room and deck tier 2.
+tenth-wave boss opens deck tier 2.
+
+On [[Floors|THE LAST AISLE]] the `hunt` twist moves the elites to waves **3, 6
+and 8** — four boss-class kills on that floor instead of three, which is the
+floor's whole reward for being the worst one to walk through.
 
 **PACI keeps wave hours, not boss hours** — `SHOP_WAVES = [5, 10]`. The
 half-time shop is the one that changes how you fight the back half of a floor;
@@ -72,29 +85,44 @@ instead of the next wave.
 
 On `nextRoom()`:
 
-- A new floor is generated (bigger arena, darker palette, one of five
-  [[Rendering#Arena layouts|layout archetypes]])
+- The next of the ten [[Floors|authored floors]] is built — its own palette,
+  arena size, [[Rendering#Arena layouts|layout]], [[Floors#Props|prop set]],
+  [[Floors#Walls|wall treatment]] and [[Floors#Twists|twist]]
 - Player heals `+30hp`, gets `+2` frags, all owned weapons refill their mags
 - `S.savesLeft` is reset to your SECOND HELPING rank — the refusals are
   **per floor**, not per run
-- **The sidearm gets a new mark** — see
-  [[Progression#The evolving sidearm]] — with the GLUSEC banner along the
-  bottom of the screen
+- **The sidearm gets a new mark** — see [[Progression#The evolving sidearm]]
+- The floor's name and subtitle come up for 4 seconds, and its **twist is
+  announced 4.4 seconds in**, after the name has finished being read
 - [[Music]] shifts key and tempo for the new floor
 
-Past floor 4 the floor definition is **generated** rather than authored — name,
-palette, arena size and darkness all derive from the floor index, so the
-descent has no bottom. See [[Progression#Endless floors]].
+`S.introT = 2.6` holds wave 1 off in **game time**, so opening a menu pauses
+the opening beat rather than consuming it — see
+[[Bugs Found#14. A menu inside the first 2.2 seconds killed the floor permanently]].
 
-## Ending a run
+## Winning
 
-Death is permanent for the run's level, deck, augments, items and weapons —
-but **coins, cards, the vault and every [[Contracts|contract]] survive**. See
+Kill [[Bosses#THE MEAT PROTOCOL|THE MEAT PROTOCOL]] on floor 10 wave 10 and the
+run **ends**. The kill clears the room — bullets, hazards, cracks, the deferred
+effect queue, and anything still breathing — banks the score, and counts down
+3.4 seconds into the [[Rendering#The win screen|win screen]].
+
+It signs **CLOSING TIME** ([[Contracts]]), and the win screen's one editorial
+line points at the only thing left to do: *EVOLVE and come back holding
+something.* An [[Economy#Evolution|evolved]] roster makes the next ten floors a
+different ten floors.
+
+## Ending a run badly
+
+Death is permanent for the run's level, deck, augments and weapons — but
+**coins, cards, the vault and every [[Contracts|contract]] survive**. See
 [[Economy#What resets, and when]].
 
-The death screen offers RETRY, COSMETICS and TITLE, centred on one row. Pause
-carries THE DECK, COSMETICS, **EVOLVE**, RESET EVO and **MAIN MENU** — the
-last of which abandons the run deliberately: everything that survives death is
+The death screen offers RETRY, COSMETICS and TITLE, centred on one row; the win
+screen offers PLAY AGAIN, COSMETICS and TITLE in the same shape and the same
+place, because it is the same screen with the temperature turned around. Pause
+carries THE DECK, COSMETICS, **EVOLVE**, RESET EVO and **MAIN MENU** — the last
+of which abandons the run deliberately: everything that survives death is
 persisted continuously, so quitting costs exactly the floor you're standing on.
 It is the death path minus the death.
 
@@ -106,6 +134,7 @@ It is the death path minus the death.
 > too.
 
 ## Related
+- [[Floors]] — the ten of them, and the rule each one runs under
 - [[Difficulty Scaling]] — every formula behind "harder"
 - [[The Deck]] — what the three boss kills a floor actually pay out
 - [[Secrets]] — the three things not covered by any of the above

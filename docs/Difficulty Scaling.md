@@ -12,7 +12,8 @@ Six independent axes stack multiplicatively.
 
 | axis | grows from | feeds |
 |---|---|---|
-| **floor** (`S.room`) | descending, unbounded | HP, damage, speed, score, spawn count, spawn cap, boss add-cap, elite adds, arena size |
+| **floor** (`S.room`) | descending, **0–9** | HP, damage, speed, score, spawn count, spawn cap, boss add-cap, elite adds |
+| **[[Floors#Twists\|the floor's twist]]** | which of the ten you are on | spawn count and health (`swarm`), damage both ways (`frail`), sight (`dark`), grip (`slick`), tempo (`frost`) |
 | **wave** (`S.wave`) | 1→10 per floor | spawn count (quadratic), enemy type mix |
 | **evolution** (`S.evo`) | [[Economy#Evolution]], capped at 10 | HP, damage, speed, score, spawn count, boss add-cap, spawn cap |
 | **weapons owned** | buying guns, **and the [[Economy#What a rung pays out\|evolution roster]]** | spawn count (+10%/gun), spawn cap |
@@ -43,9 +44,14 @@ score = (1 + floor*0.70) * (1 + evo*0.50)
 > [[Bosses#They scale to your build, not just to the floor]].
 
 Applied per-spawn in `spawnEnemy()`/`spawnBoss()`, on top of each type's base
-stats in [[Enemies]]/[[Bosses]]. **None of these terms is capped** — floor 8
-enemies carry ~10× HP and ~6× damage, and it keeps going from there. This is
-the mechanism behind [[Progression#Endless floors]].
+stats in [[Enemies]]/[[Bosses]]. **None of these terms is capped**, but the
+floor term now runs out: floor 10 (`S.room === 9`) is the last rung, at ~12×
+HP and ~7.5× damage over floor 1.
+
+That bound is the point. An unbounded curve had to stay gentle enough to be
+survivable at floor 30, which made floors 1–10 — the only ones most runs ever
+saw — flatter than they should have been. Nine rungs of ramp, each one felt,
+beats an asymptote nobody reaches.
 
 The HP and damage curves are both much steeper than they were (0.95 and 0.62
 respectively) because [[The Deck|the deck]] gives you far more power per floor
@@ -110,9 +116,13 @@ See [[Bugs Found#13. Deep floors overshot the enemy cap]].
 | 15 / 7 | 420 | 95 | 100 | 2.69 |
 | 26 / 7 | 721 | 95 | 109 | 2.04 |
 
-That's the intended shape for an endless game: the **total** you have to kill
-climbs without limit, while concurrency stays bounded so the frame budget
-doesn't.
+> [!note] The last two rows are from the endless era
+> Floors 15 and 26 no longer exist — the run stops at ten. They are kept
+> because they are the rows that prove the **shape** is right: the total you
+> have to kill can climb as far as you like while concurrency stays bounded, so
+> the frame budget never was the thing that limited how deep the game could go.
+> Floor 10 wave 7 is the real ceiling now, and it sits comfortably inside the
+> floor-8 row.
 
 Live sits over cap for three compounding reasons, all bounded: a spawn batch
 is `1 + wave/4 + floor` enemies and lands whole (at floor 26 that's up to 28
@@ -129,7 +139,9 @@ cnt    = min(addN + floor/2, addCap - S.en.length)
 
 Gated on `S.en.length < addCap` *and* clamped so a summon can never carry the
 count past the ceiling. Each boss also has its own interval and roster — see
-[[Bosses#Summoning]].
+[[Bosses#Summoning]]. The gate carries a third condition now: **the finale's
+third phase does not summon at all**, because adds during a bullet-hell phase
+is how you make a fight unreadable rather than hard.
 
 ## Elite summons are not capped
 
@@ -168,6 +180,13 @@ that these measurements were re-run against — *does* gate its own hatching on
 > away from one," which is a reasonable intent. The missing part is the
 > ceiling — `updateBoss()` has one and `updateEnemy()`'s elite branch does
 > not. A deep elite fight is bounded only by how fast you kill it.
+
+> [!note] Ten floors caps how bad this can get
+> The measurements above go to floor 26 because they were taken when the
+> descent had no bottom. `1 + floor*0.7` on the deepest floor that now exists
+> is **7** adds a cycle, not 18, and the floor-8 row (79 live) is the closest
+> real analogue. The defect is unchanged and still worth fixing — it is just no
+> longer capable of the numbers in the table.
 
 ## Related
 - [[Bugs Found]] — the budget-vs-headcount bug this formula set replaced

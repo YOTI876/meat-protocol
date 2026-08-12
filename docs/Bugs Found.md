@@ -10,6 +10,13 @@ shipped to you — driving the game via `window.MEAT` and `frame()` calls in
 the browser console, not just reading the code. Kept here so the reasoning
 behind each fix isn't lost.
 
+> [!note] Screenshots don't work in this harness
+> The browser pane won't composite the canvas, so **every** check in this file
+> is numerical: overlay ink bounding boxes instead of "does it look right",
+> driven `MEAT.frame(t)` calls instead of watching, entity and particle counts
+> instead of eyeballing a burst. That constraint is why the bugs below were
+> found at all — you cannot squint at a number.
+
 ## 1. The secret was unreachable
 **Found:** during the very first build, before the first commit.
 Bullets stop at a wall's *inner face*, but the hidden brick's hit-test
@@ -157,12 +164,76 @@ the half-built room the fade is hiding, and `freshState()` clears both, so
 restarting can no longer leave an orphaned timer from an abandoned run pointing
 at the new one.
 
+## 15. Every elite in the game spawned with a NaN health bar
+
+**Found:** by an elite-vs-boss ratio test that returned `null`.
+
+Shuffling the [[Bosses#The roster is shuffled, and that took a rewrite|boss
+roster]] meant taking `hp` off the roster entries — a floor's difficulty cannot
+be a property of *which* boss it is if the order is random. `spawnBoss()` was
+moved onto the new `BOSS_HP` table. `spawnMini()` was not: it still read
+`BOSSES[bossIndexFor(S.room)].hp`, a field that no longer existed.
+
+`undefined * 0.22 * flavour * powerMul()` is `NaN`, so every elite spawned with
+`hp = max = NaN` — an unkillable enemy behind an empty bar.
+
+**Fix:** one function, `bossBudget(floor)`, and both spawn paths go through it.
+An elite can no longer be priced against a different number than the boss it is
+a share of, because there is only one number.
+
+## 16. The level-up screen swallowed the ending
+
+**Found:** driving the finale to death in the harness and watching `S.won` stay
+true while `S.winT` never moved.
+
+The finale's own kill still runs `gainXP`, which can level you up on the last
+hit. Two things then went wrong at once: the hand opened **over** the victory
+beat, and it **stalled** it, because the win countdown only ticks in
+`mode === 'play'`.
+
+**Fix:** `if (!S.won && S.upgPts > 0)` on the level-up branch, and the win path
+zeroes `S.upgPts`, `S.sigDue` and `S.pendingLuck`. You have won; there is
+nothing left to spend a pick on.
+
+## 17. `pillars` floors furnished themselves from two props
+
+**Found:** a distribution audit over 120 `buildRoom()` calls per floor.
+
+`place()` takes a `kind` hint, and the `'vat'` hint — which the `pillars`
+layout passes for **every** column — mapped to `kinds[0..1]` only. So THE
+HOLLOW and THE SALT LINE, the two `pillars` floors, drew from a two-item list
+while every other floor drew from four or five. The prop sets were written and
+then half-ignored.
+
+**Fix:** a triangular bias (`rng() * rng()`) that favours the head of the list
+without excluding the tail, plus a post-layout pass that **retags the blocks
+furthest from the arena centre** until each floor holds at least two of
+`kinds[0]` and one of `kinds[1]`. The guarantee is paid for at the edges of the
+room, where a swapped prop changes the fight least.
+
+## 18. `drawDeck` threw the instant the deck screen opened
+
+**Found:** rendering all eleven screens in a loop, which is a test that exists
+precisely because a screen nobody opened during a code change is a screen
+nobody tested.
+
+`ReferenceError: sigs is not defined` — a leftover local from the
+[[Groceries|signature]] chip block, still being read by the "you have taken no
+cards yet" branch after the block around it was deleted.
+
+**Fix:** `if (!S.cardsTaken)`. The lesson is the test, not the typo: a deleted
+system leaves references in places that only run on screens you are not
+looking at.
+
 ---
 
 # Open
 
-Two defects found while re-measuring the docs against the current build. Both
-are recorded here rather than fixed, because they are engine changes.
+Two defects, recorded here rather than fixed, because both are engine changes.
+
+**THE FULL MENU** (previously B on this list) is **closed** — not by fixing it,
+but because the contract it lived in no longer exists. See
+[[Contracts#CLOSING TIME replaced THE FULL MENU]].
 
 ## A. Elite summons bypass the enemy cap
 
@@ -181,25 +252,19 @@ door. Notably the CYST, added later, *does* gate its own hatching on
 Measured tables in
 [[Difficulty Scaling#Elite summons are not capped]].
 
-## B. THE FULL MENU contract has no reward
+> [!note] Ten floors bounds it, but does not fix it
+> Those measurements were taken when the descent had no bottom. `1 + floor*0.7`
+> on the deepest floor that now exists is **7** adds a cycle rather than 18, so
+> the 291-live figure is no longer reachable. The missing guard is still
+> missing — `updateBoss()` has a ceiling and `updateEnemy()`'s elite branch
+> does not — and the `hunt` twist on [[Floors|THE LAST AISLE]] puts three
+> elites on that floor instead of two.
 
-Its unlock reads *"signature cards turn up far more often."* That was the
-signature weight in `dealCards()`:
+## C. THE DESCENT's reward has no reward
 
-```js
-const sigW = contractDone('menu') ? 0.9 : 0.4;
-```
-
-Signatures left the deck for [[Groceries#THE COLD ROOM|the cold room]] and the
-weight went with them. `contractDone('menu')` is now referenced **nowhere** in
-`js/game.js`. The contract still tracks, completes, fires its toast and
-displays as signed — and does nothing. The description is doubly stale:
-signatures are not cards any more either.
-
-## C. THE DESCENT's reward has no reward either
-
-Same shape as **B**, different contract. Its unlock line reads *"FREEZER BURN
-joins the crate"* — but `WEP.chill` has never carried a `lock`:
+The last surviving contract with a promise it doesn't keep. Its unlock line
+reads *"FREEZER BURN joins the crate"* — but `WEP.chill` has never carried a
+`lock`:
 
 ```js
 const BUYABLE = ['scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot', 'rail'];

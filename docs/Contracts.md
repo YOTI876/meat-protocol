@@ -21,14 +21,26 @@ Read them from the title screen (**CONTRACTS** button). `CONTRACTS` in
 | **BUTCHER'S DOZEN** | 3000 kills, all runs counted | start every run **one level up** |
 | **HOARDER** | bank 12000 coins in the vault | start every run holding **60 coins** |
 | **APEX PREDATOR** | kill an APEX | you are dealt **four** cards, not three |
-| **THE FULL MENU** | hold all five signatures | ~~signature cards turn up far more often~~ — **nothing, see below** |
+| **CLOSING TIME** | put down [[Bosses#THE MEAT PROTOCOL\|THE MEAT PROTOCOL]] | every run starts on a hand of four |
 
-> [!warning] THE FULL MENU's reward is dead code
-> Its unlock was the signature weight in `dealCards()`. Signatures left the
-> deck for [[Groceries#THE COLD ROOM|the cold room]] and the weight went with
-> them — `contractDone('menu')` is now referenced **nowhere** in
-> `js/game.js`. The contract still tracks, still completes, still shows as
-> signed, and does nothing. See [[Bugs Found#Open]].
+### CLOSING TIME replaced THE FULL MENU
+
+> [!note] A contract that could never be signed
+> The old eighth contract read *"hold all five signature cards"* and counted a
+> stat only the cold room could advance. With the [[Groceries|groceries]] gone
+> it became a contract that **could never be signed**, tracking a system that
+> no longer existed, promising a reward that had already been removed once
+> before — the signature weight in `dealCards()`, which went with the
+> signatures.
+>
+> It was replaced rather than deleted. The slot is worth keeping, and
+> **clearing the building** was the one achievement the game had no contract
+> for. It reuses the `menu` id, so old saves keep their row.
+
+CLOSING TIME and APEX PREDATOR pay the same thing and do not stack —
+`handSize()` reads `contractDone('apex') || contractDone('menu')`. That is
+deliberate: they are the two hardest things in the game and either one should
+be enough.
 
 Two of them are the only way to reach two of the [[Weapons|guns]]: THE
 ROTISSERIE and FREEZER BURN are not in `shopStock()`'s pool at all until
@@ -47,8 +59,8 @@ being tracked for the title screen:
 
 `bump()` fires on the event (a boss dies, a shop opens, a RARE-or-better card
 is taken); kills are batched every 25 rather than written on each death.
-`bumpMax()` is for high-water marks like "five signatures held at once", which
-can go down within a run and must not.
+`bumpMax()` is for high-water marks — a count that can go **down** within a run
+and must not be allowed to take the record with it.
 
 The `prime` counter behind GRADED is keyed off `RIDER_AT`, so it counts
 exactly the picks that lit a [[The Deck#Riders — the reason rarity is a moment|rider]].
@@ -60,9 +72,16 @@ once — so a contract you signed three runs ago stays quiet.
 ## Where each one pays out
 
 - **at the top of a run** (`startRun()`) — BUTCHER'S DOZEN and HOARDER
-- **when a hand is dealt** — GRADED, APEX PREDATOR
+- **when a hand is dealt** — GRADED, APEX PREDATOR, CLOSING TIME
 - **when PACI stocks his room** — REGULAR, BREAK THE SEAL, THE DESCENT
-- **nowhere** — THE FULL MENU
+
+> [!warning] THE DESCENT's reward still doesn't exist
+> Its unlock reads *"FREEZER BURN joins the crate"*, but `WEP.chill` has never
+> carried a `lock` — `shopStock()` filters on `WEP[id].lock` and `chill` sets
+> none, so FREEZER BURN has always been buyable from the first shop that rolled
+> it. The [[Weapons#When PACI starts carrying it|depth gate]] masks it slightly
+> (`floor: 3` holds it back to floor 4) but that is a different gate with a
+> different number. See [[Bugs Found#C. THE DESCENT's reward has no reward]].
 
 > [!note] Contracts survive EVOLVE
 > Evolving wipes coins and cards. It does **not** touch contract progress or
@@ -70,6 +89,7 @@ once — so a contract you signed three runs ago stays quiet.
 > up.
 
 ## Related
-- [[The Deck]] — what GRADED, APEX PREDATOR and THE FULL MENU change
+- [[The Deck]] — what GRADED, APEX PREDATOR and CLOSING TIME change
+- [[Bosses#THE MEAT PROTOCOL]] — the thing CLOSING TIME asks you to put down
 - [[The Shop]] — the fourth pedestal and the two locked guns
 - [[Economy]] — the vault total HOARDER reads
