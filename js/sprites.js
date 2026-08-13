@@ -152,116 +152,241 @@ function stamp(rows, x0, y0, patch) {
 
 const SPR = {};
 
-/* ---------- DAMJAN (body, headband, no legs) 16x15 ----------
-   He is the only thing in the building that is just a person, and he stays
-   that way: an ordinary face, an ordinary jacket, no glowing anything. The
-   only thing that happens to him is that he gets taken apart.
+/* ============================================================
+   DAMJAN — rebuilt from the silhouette in.
 
-   His shading map deliberately stays inside the palette keys the cosmetics
-   already own, so a repaint recolours the highlight and the shadow with it
-   instead of leaving the old jacket showing through the bevel. */
+   The old figure was a mascot: the head was TWENTY-TWO of his thirty-two rows,
+   about two thirds of the whole sprite, sitting straight on a flat green
+   rectangle with no neck, no shoulders and no arms, wearing a knotted bandana.
+   At a glance that is a bobblehead in a headband, and no amount of face detail
+   fixes a proportion problem.
+
+   The rebuild is structural, and every decision serves reading him at 16 game
+   pixels tall:
+
+     PROPORTION   head 22 rows -> 14, so it is ~44% of him instead of 69%. This
+                  single change does more than everything else combined.
+     A NECK       he has one now. It is what lets the head read as attached
+                  rather than balanced.
+     SHOULDERS    a real shoulder line that slopes out from the neck, with arms
+                  that separate from the torso on a shadow gap, so you can see
+                  where the body ends and the limb starts.
+     ONE BIG SHAPE  a bone-white BUTCHER'S APRON down the front, bib to hem.
+                  A silhouette this small cannot carry texture; it can carry
+                  one strong value contrast, and a pale apron against a dark
+                  coat is legible at any distance. Everything else — the coat,
+                  the sleeves, the belt — is the dark frame around it.
+     WORN, NOT WORN OUT  the apron is stained (`#`, dried blood) because he
+                  works here. It is characterisation that costs six pixels.
+
+   The reference is not any one game — it is the discipline the good top-down
+   pixel work shares: commit to a shape, let value do the work, and spend
+   detail only where the eye already goes (the face, and the throat).
+
+   THE COSMETIC MOVED. `r`/`R`/`w` used to be the headband. They are now a
+   NECKERCHIEF at his throat, which is the second place the eye lands and is a
+   thing an abattoir worker would actually own. Every COSMETICS entry repaints
+   the same three keys, so all six still work untouched — see cosDef(). */
+
+/* `u`/`U` is the apron. Added to the shading map so the form-shading pass
+   rounds it like every other material rather than leaving it a flat cutout. */
 const DAM_MAP = { j: ['j', 'J'], J: ['j', 'J'], s: ['s', 'S'], S: ['s', 'S'],
                   h: ['h', 'H'], H: ['h', 'H'], r: ['r', 'R'], R: ['r', 'R'],
-                  n: ['n', 'N'], N: ['n', 'N'] };
-const DAM_BODY = [
-  '.....oooooo.....',
-  '...oohhhhhhoo...',
-  '..ohhhhhhhhhho..',
-  '..oHhhhhhhhhHo..',
-  '..orrrrrrrrrro..',
-  '..oRrwrrrrwrRo..',
-  '..osssssssssso..',
-  '..osepsssspeso..',
-  '..osssssssssso..',
-  '..osssmmmmssso..',
-  '...osssssssso...',
-  '.ojjjjjjjjjjjjo.',
-  '.ojjjjbbbbjjjjo.',
-  '.ojjjjjjjjjjjjo.',
-  '.ojjjjjjjjjjjjo.',
-  '.oJJJJJJJJJJJJo.'
-];
-/* an ordinary face, drawn at the density where a face is possible at all */
-const DAM_FACE = [
-  '     ,SSSSSSSSSSSSSSSSSSSS,     ',
-  '     SSssssssssssssssssssSS     ',
-  '     SSoppeossssssssoeppoSS     ',
-  '     SSoppeossssssssoeppoSS     ',
-  '     SSooooossssssssoooooSS     ',
-  '     SssssssssssssssssssssS     ',
-  '     SSsssssmmmmmmmmsssssSS     ',
-  '     SSssssssmmmmmmssssssSS     ',
-  '      SSssssssssssssssssSS      ',
-  '       SSSssssssssssssSSS       '
-];
-/* the headband: a knot on the left, and the tail of it hanging past his ear */
-const DAM_BAND = [
-  '   ,RRRRRRRRRRRRRRRRRRRRRR,     ',
-  '   RRrrrrrrrrrrrrrrrrrrrrrrR    ',
-  '  RwwRrrrrrrrrrrrrrrrwwrrrrR    ',
-  '  RwwRrrrrrrrrrrrrrrrwwrrrrR    ',
-  '  RRrrRRrrrrrrrrrrrrrrrrrrRR    ',
-  '  ,RR,,RRRRRRRRRRRRRRRRRR,,     '
-];
-SPR.body = SPRITE(stamp(stamp(shade(up2(DAM_BODY), DAM_MAP), 0, 12, DAM_FACE), 0, 8, DAM_BAND),
-                  null, { ss: 2 });
+                  n: ['n', 'N'], N: ['n', 'N'], u: ['u', 'U'], U: ['u', 'U'] };
 
-/* DAMAGE.
-   Four states, driven by how much of him is left. Cloth goes first — a seam
-   opens, then a sleeve, then the shoulder of the jacket is simply not there
-   any more and neither is the shoulder. `.` in these patches punches a hole
-   clean through the sprite, which is how you can see the room through him by
-   the time he is nearly finished. Blood is the only thing here the cosmetics
-   do not repaint, because blood is blood whatever the headband costs. */
+/* The 16x16 silhouette and its big masses. Detail is stamped at 2x on top —
+   this grid exists to be EPX-doubled and form-shaded, so it holds shape only.
+
+   Rows 9-12 put a `,` between the sleeve and the torso deliberately: without
+   that one-pixel shadow the arm and the body merge into a single blob the
+   moment the sprite is more than a few feet away. */
+const DAM_BODY = [
+  /* The crown is FLAT, not domed. Rows widening 6 -> 10 -> 14 drew a circle,
+     and a circle of one flat colour on top of a head is a helmet. A haircut
+     has a top, and then it turns down at the temples. */
+  '....oooooooo....',   //  0  crown
+  '..oohhhhhhhhoo..',   //  1  hair
+  '..ohhhhhhhhhho..',   //  2  hair
+  '..ohhsssssssho..',   //  3  fringe, parted off-centre — thin enough to leave
+                        //     an actual forehead above the brows
+  '..osssssssssso..',   //  4  eyes
+  '..osssssssssso..',   //  5  nose
+  '...osssssssso...',   //  6  jaw
+  '....osrrrrso....',   //  7  NECK — and the neckerchief round it
+  '..ojjjuuuujjjo..',   //  8  shoulders, apron bib between them
+  '.ojj,uuuuuu,jjo.',   //  9  chest
+  '.oj,,uuuuuu,,jo.',   // 10  arms clear of the body
+  '.oj,uuuuuuuu,jo.',   // 11  apron at its widest
+  '.oj,uuuuuuuu,jo.',   // 12
+  '.oj,bbbbbbbb,jo.',   // 13  belt
+  '.ojjuuuuuuuujjo.',   // 14  apron skirt
+  '..oJJJJJJJJJJo..'    // 15  coat hem
+];
+
+/* THE FACE — 20 pixels across, which is all the room there is.
+
+   What actually carries a human read at this size, in order of importance:
+   brows, then the shape of the eye socket, then a nose that casts a shadow.
+   Not big eyes. The old face had two five-pixel black-and-white blocks and
+   nothing else, which is a doll.
+
+   Eyelids are `,` rather than `o` on purpose: the universal outline is nearly
+   black and turns an eye into a hole punched in the head, while `,` is a warm
+   dark that reads as a lash line lying on skin.
+
+   THE MOUSTACHE PROBLEM. The first pass put a FOUR-pixel dark nose base on row
+   11 and a SIX-pixel dark mouth on row 12, directly beneath it. Two solid
+   horizontal bars, stacked, immediately under the nose — at sixteen pixels
+   tall the eye does not resolve that as "nose, then mouth", it resolves it as
+   a moustache, and once you have seen it you cannot unsee it.
+
+   Two rules came out of it, and they are general:
+     - never stack bars of similar width; make them differ enough to read as
+       separate features (the nose base is 2px now, the mouth 4px)
+     - a mouth is a SHORT line, not a wide one. Anything approaching the width
+       of the jaw stops being a mouth. */
+const DAM_FACE = [
+  '      ss,HHH,ssssss,HHH,ss      ',   //  7  brows, under the fringe
+  '      ss,ee,ssssssss,ee,ss      ',   //  8  upper lid over the white
+  '      ss,pp,ssssssss,pp,ss      ',   //  9  pupils
+  '      ssSSSSsssSSsssSSSSss      ',   // 10  sockets, and the bridge between
+  '      sssssssss,,sssssssss      ',   // 11  nose base — 2px, not 4
+  '        SSssssmmmmssssSS        ',   // 12  mouth — 4px, not 6
+  '        SSssssssssssssSS        '    // 13  jawline
+];
+
+/* THE HAIR.
+
+   The old mass was a single flat `h` filling a dome — one colour, one shape,
+   no direction. That is not hair, it is a swimming cap, and it was the loudest
+   thing wrong with him after the proportions.
+
+   Three things make hair read at this size, in order:
+     DIRECTION   strands run somewhere. Here they fall from a part at x12-13
+                 and sweep right, so the whole mass has a grain.
+     VALUE       `H` is the lighter tone. It pools on the top-left where the
+                 building's one strip light falls, exactly like every other
+                 surface in the game, and thins out as it turns away.
+     A BROKEN EDGE  the fringe dips into the forehead at two points instead of
+                 ruling a straight line across it, and short sideburns carry
+                 the mass down past the temple so the hair connects to the
+                 jaw rather than sitting on top of the skull like a lid.
+
+   Stamped AFTER the face, because the sideburns on rows 7-9 have to win
+   against the skin the face lays down there. */
+const DAM_HAIR = [
+  //   01234567890123456789012345678901
+  '       hHHHHH,hhhhhhhhhh        ',   //  2  crown, part opening at x13
+  '     hhHHHHH,hhhhhhhhhhhhhh     ',   //  3
+  '     hhhHHHH,hhhhhhhhhhhhhh     ',   //  4
+  '      hhHHH,hhhhhhhhhhhhhh      ',   //  5  — x6-25: the outline at x4-5 and
+  '      hHHh,h          hhhh      ',   //  6    x26-27 is the base's, leave it
+  '      hh                hh      ',   //  7  sideburns
+  '      hh                hh      ',   //  8
+  '      Hh                hH      '    //  9  tapering out
+];
+
+/* THE NECKERCHIEF — where the headband went.
+   Round the throat, knotted, spilling onto the collarbone. Three rows, and
+   the `w` highlight is one pixel: at this size a shine is a suggestion. */
+const DAM_KERCHIEF = [
+  '          ssrrrrrrrrss          ',   // 14  round the neck
+  '         ,wrrrrrrrrrrr,         ',   // 15  wider at the collarbone
+  '           ,RRrrrrRR,           '    // 16  the knot, hanging
+];
+
+/* The apron's bib carrying up over the shoulders. Two rows is all it takes to
+   turn "pale rectangle on a dark body" into "he is wearing something". */
+const DAM_STRAPS = [
+  '          uu        uu          ',   // 16
+  '          uu        uu          '    // 17
+];
+
+/* What the job has done to the apron, plus the gloves. `#` is dried blood and
+   it is placed asymmetrically on purpose — a symmetrical stain reads as a
+   pattern, and a pattern reads as intentional. */
+const DAM_WEAR = [
+  //   01234567890123456789012345678901   gloves sit on the sleeve at x4-5 / x26-27
+  '             #                  ',   // 20
+  '            ##                  ',   // 21
+  '    tt       #       ##   tt    ',   // 22  gloves start
+  '    tt                #   tt    ',   // 23
+  '    tt  #                 tt    ',   // 24
+  '    tt  ##                tt    ',   // 25
+  '              gggg              ',   // 26  belt buckle
+  '              gGGg              ',   // 27
+  '              #   ##            ',   // 28
+  '                  #             '    // 29
+];
+SPR.body = SPRITE(
+  [[0, 7, DAM_FACE], [0, 2, DAM_HAIR], [0, 16, DAM_STRAPS], [0, 14, DAM_KERCHIEF], [0, 20, DAM_WEAR]]
+    .reduce((r, p) => stamp(r, p[0], p[1], p[2]), shade(up2(DAM_BODY), DAM_MAP)),
+  null, { ss: 2 });
+
+/* DAMAGE — retargeted to the new body.
+
+   Three states, driven by how much of him is left, and each one reads off the
+   APRON rather than the coat. That is the point of having put a big pale
+   surface on his front: blood shows on it. On the old dark-green jacket every
+   wound was a dark mark on a dark shape and the whole system was invisible
+   until stage 3.
+
+   Order of destruction: the apron gets wet, then it tears and the sleeve opens
+   on the arm inside it, then the apron is mostly gone and so is some of him.
+   `.` punches a hole clean through the sprite, which is how you can see the
+   room through him by the end. Blood is the one thing here the cosmetics never
+   repaint, because blood is blood whatever the neckerchief cost. */
 const DAM_HURT = [
-  // 1 — scuffed. a seam has gone at the shoulder and something has landed on him
-  [[0, 22, [
-    '                                ',
-    '          ,o,                   ',
-    '         ,oJo,     %            ',
-    '          ,o,     %%%           ',
-    '                   %            ',
-    '                                ',
-    '      ,oo,                      ',
-    '       ,o,             ,oo,     ',
-    '                        ,o,     '
+  //   01234567890123456789012345678901
+  // 1 — it has started landing on him. A split at the left shoulder seam, and
+  //     the apron is no longer clean.
+  [[0, 17, [
+    '      ,o,                       ',
+    '     ,oJo,            %         ',
+    '      ,o,            %%%        ',
+    '                      %         ',
+    '           %%                   ',
+    '          %%%%                  ',
+    '           %%          %%       ',
+    '                       %%%      ',
+    '                        %       '
   ]]],
-  // 2 — the sleeve is open and there is an arm inside it
-  [[0, 20, [
+  // 2 — the apron is torn open down the middle and a sleeve has gone with it
+  [[0, 16, [
     '                                ',
-    '            %                   ',
-    '   ,oo,     %%           ,oo,   ',
-    '  ,osSo,                ,oSso,  ',
-    '  ,oSSo,        %%      ,oSSo,  ',
-    '   ,oo,        %%%%      ,oo,   ',
-    '        ,oJJo,  %%%             ',
-    '        oJ..Jo   %%             ',
-    '         ,oo,     %             ',
-    '     %%                  %%     ',
-    '    %%%%                %%%     ',
-    '     &%%                 %%     '
+    '   ,oo,                 ,oo,    ',
+    '  ,osSo,      %%       ,oSso,   ',
+    '  ,oSSo,     %%%%      ,oSSo,   ',
+    '   ,oo,       %%        ,oo,    ',
+    '        ,ouuo,    %%            ',
+    '        ou..uo   %%%%           ',
+    '         ,oo,     %%            ',
+    '     %%       &%&          %%   ',
+    '    %%%%      %%%         %%%   ',
+    '     &%%       %           %%   ',
+    '                    %%          '
   ]]],
-  // 3 — most of the jacket is on the floor behind him, and so is some of him
-  [[0, 12, [
-    '                                ',
+  // 3 — most of the apron is on the floor behind him, and so is some of him
+  [[0, 8, [
     '           %                    ',
     '           %%          %        ',
     '            %          %%       ',
     '                        %       ',
-    '                                ',
     '        %%                      ',
-    '       %%%%                     '
-  ]], [0, 22, [
+    '        %%%                     '
+  ]], [0, 17, [
     '  ,o..o,                ,o..o,  ',
-    '  o~%so,        &&      ,os%~o  ',
-    '  o~%SSo       &%%&     oSS%~o  ',
-    '   oo~%o       %%%%     o%~oo   ',
-    '     ,oJJo,     &&     ,oJJo,   ',
-    '     oJ..Jo     %%     oJ..Jo   ',
-    '      o..o,     %%      ,o..o   ',
-    '  %%   ,oo,    %%%%     ,oo   %%',
-    ' &%%%          &%%&         %%%&',
-    '  %%%           %%           %%%'
+    '  o~%so,       &&       ,os%~o  ',
+    '  o~%SSo      &%%&      oSS%~o  ',
+    '   oo~%o      %%%%      o%~oo   ',
+    '     ,ouuo,    &&      ,ouuo,   ',
+    '     ou..uo    %%      ou..uo   ',
+    '      o..o,    %%       ,o..o   ',
+    '  %%   ,oo,   %%%%      ,oo  %% ',
+    ' &%%%         &%%&          %%%&',
+    '  %%%    %%    %%     %%     %%%',
+    '        %%%%         %%%%       ',
+    '         %%           %%        '
   ]]]
 ];
 SPR.bodyHurt = DAM_HURT.map(patches => SPRITE(

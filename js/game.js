@@ -533,7 +533,17 @@ const WEP = {
   rot:   { id: 'rot',   name: 'THE ROTISSERIE',spr: SPR.rot,   gr: 3, floor: 5, price: 165, mag: 70,  rate: 0.050, dmg: 14, spread: 0.05,  spd: 330, pellets: 1, reload: 2.6,  sfx: 'plasma',   col: '#ff9a3a', radial: 0.55, burn: 10, size: 2, lock: 'seal', tag: 'it does not care where you point it' },
   // knock 200 -> 110. A rail slug should still throw what it hits; it should
   // not clear the lane it punched through.
-  rail:  { id: 'rail',  name: 'GOD FINGER',    spr: SPR.rail,  gr: 3, floor: 6, price: 190, mag: 5,   rate: 0.55,  dmg: 165, spread: 0,    spd: 950, pellets: 1, reload: 2.4,  sfx: 'railgun',  col: '#a8e8ff', charge: 0.5, pierce: 99, size: 3, knock: 110, tag: 'points. things stop existing.' },
+  /* GOD FINGER never reloads. `noReload` means the magazine is not a resource:
+     it does not deplete, so it cannot run out and there is nothing to rack.
+
+     The gun already pays for itself twice before a shot leaves it — a 0.5s
+     charge you have to hold still through, and a 0.55s floor between shots.
+     That is the cost. A 2.4-second reload every five shots on top was a third
+     tax on the same decision, and the one that made you stop playing: you
+     spent it standing in the open having already committed to the fight. A
+     charge weapon's rhythm should be charge / release / charge, and now it is.
+     Its rate of fire is unchanged, so its damage-per-second is untouched. */
+  rail:  { id: 'rail',  name: 'GOD FINGER',    spr: SPR.rail,  gr: 3, floor: 6, price: 190, mag: 5,   rate: 0.55,  dmg: 165, spread: 0,    spd: 950, pellets: 1, reload: 2.4,  noReload: 1, sfx: 'railgun',  col: '#a8e8ff', charge: 0.5, pierce: 99, size: 3, knock: 110, tag: 'points. it does not need reloading. things stop existing.' },
   // THE FISH. Coins, not cards — 500 of them, which at COIN_RATE is most of a
   // deep run. `prism: 1` is what makes its beam cycle colour; see drawWorld.
   omega: { id: 'omega', name: 'THE FISH',      spr: SPR.omega, gr: 4, floor: 4, price: OMEGA_COINS, mag: 300, rate: 0.02, dmg: 720, spread: 0, spd: 0, pellets: 0, reload: 2.6, sfx: 'beam', col: '#c05cff', beam: 1, prism: 1, girth: 11, tag: 'it is a fish. it fires a laser. do not ask.' },
@@ -557,14 +567,26 @@ const WORDER = ['pistol', 'scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog
    LEGENDARY can never fall out of an evolution rung. */
 const BUYABLE = ['scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot', 'rail', 'zap', 'void'];
 
-/* ---- COSMETICS. bought from the vault, kept forever. ---- */
+/* ---- COSMETICS. bought from the vault, kept forever. ----
+
+   These all used to be called BANDs because they repainted a headband. The
+   headband is gone — `r`/`R`/`w` are the NECKERCHIEF at his throat now — so
+   the word went with it. The ids are untouched, so every save keeps whatever
+   it had unlocked and equipped.
+
+   The ones that repaint the coat also repaint the APRON (`u`/`U`). It is the
+   biggest single surface on him; leaving it bone-white under VOID would put a
+   floodlit rectangle in the middle of a cosmetic whose entire idea is that he
+   stopped casting a shadow. */
 const COSMETICS = [
-  { id: 'crimson', name: 'CRIMSON BAND', price: 0,     pal: {},                                                                                    tag: 'the one he showed up in' },
-  { id: 'gold',    name: 'GOLD BAND',    price: 1000,  pal: { r: '#f0c243', R: '#a37c12', w: '#fff3c0' },                                           tag: 'earned, technically' },
-  { id: 'toxic',   name: 'TOXIC BAND',   price: 2500,  pal: { r: '#8ef04a', R: '#3f8a1e', w: '#e8ffcc', j: '#2a4a2a', J: '#16301a' },               tag: 'do not lick' },
-  { id: 'void',    name: 'VOID',         price: 5000,  pal: { r: '#2a1030', R: '#140618', w: '#a05cff', j: '#2a1c3a', J: '#180f24', h: '#120a18', H: '#1e1226' }, tag: 'he stopped casting a shadow' },
-  { id: 'bone',    name: 'BONE MASK',    price: 9000,  pal: { s: '#e8e2d0', S: '#b0a894', m: '#0a0508', e: '#0a0508', p: '#c02020', r: '#5a5248', R: '#332f2a' }, tag: 'nobody asked where the face went' },
-  { id: 'flame',   name: 'LIVING FLAME', price: 15000, pal: { r: '#ff8a20', R: '#c02a00', w: '#ffe08a' }, fx: 'fire',                               tag: 'the headband is on fire. it is fine.' }
+  { id: 'crimson', name: 'CRIMSON',      price: 0,     pal: {},                                                                                    tag: 'the one he showed up in' },
+  { id: 'gold',    name: 'GOLD',         price: 1000,  pal: { r: '#f0c243', R: '#a37c12', w: '#fff3c0' },                                           tag: 'earned, technically' },
+  { id: 'toxic',   name: 'TOXIC',        price: 2500,  pal: { r: '#8ef04a', R: '#3f8a1e', w: '#e8ffcc', j: '#2a4a2a', J: '#16301a', u: '#cfe8b4', U: '#93ad7c' }, tag: 'do not lick' },
+  { id: 'void',    name: 'VOID',         price: 5000,  pal: { r: '#2a1030', R: '#140618', w: '#a05cff', j: '#2a1c3a', J: '#180f24', h: '#120a18', H: '#1e1226', u: '#4a3a5e', U: '#2c2138' }, tag: 'he stopped casting a shadow' },
+  /* BONE MASK turns his face bone-white, and the apron already was — so the
+     apron goes butcher's-slate here or his head disappears into his chest. */
+  { id: 'bone',    name: 'BONE MASK',    price: 9000,  pal: { s: '#e8e2d0', S: '#b0a894', m: '#0a0508', e: '#0a0508', p: '#c02020', r: '#5a5248', R: '#332f2a', u: '#6b6560', U: '#454140' }, tag: 'nobody asked where the face went' },
+  { id: 'flame',   name: 'LIVING FLAME', price: 15000, pal: { r: '#ff8a20', R: '#c02a00', w: '#ffe08a' }, fx: 'fire',                               tag: 'the kerchief is on fire. it is fine.' }
 ];
 
 /* ============================================================
@@ -995,18 +1017,28 @@ const rd = riderOn;                 // short name, used all over the engine hook
    a glance which colour means "quality" and which means "category". Nothing
    on a card is ever drawn in an aisle colour — the aisle colours live on THE
    ORDER strip and the deck headings, and nowhere else. */
-/* ---- THREE RUNGS, NOT TWO ----
+/* ---- THREE RUNGS, ONE CADENCE ----
 
    THE ORDER stopped at eight ranks, which was a ceiling you hit around floor 5
    with any focused build and then never thought about again — the aisle you had
-   committed to went quiet for the whole back half of the run. A third rung at
-   FOURTEEN is deliberately past what a casual spread reaches: it is the rung
-   you only see if you have refused cards from other aisles on purpose, and it
-   pays like it.
+   committed to went quiet for the whole back half of the run. So there is a
+   third rung.
+
+   The three sit at 4 / 8 / 12: **one rung every four cards, three times.**
+   That regularity is the whole point and it is worth more than any individual
+   number. The rungs were 4 / 8 / 14 for one build, and 14 is unlearnable — it
+   is not a multiple of anything, the strip could not draw a sensible bar
+   toward it, and a player counting cards had no way to know when the next
+   thing was coming. "Every four" is a rule you can hold in your head on the
+   level-up screen, which is the only place it matters.
+
+   Twelve ranks in one aisle across ten floors is still a real commitment: it
+   is the rung you only see if you have refused cards from other aisles on
+   purpose, and it pays like it.
 
    Rung 3 is a NAMED STATE, not another percentage. Each one turns the aisle
    into the thing it has been hinting at all run, and the deck screen prints the
-   name — MASTERED is a tier, ABSOLUTE is an identity. */
+   name — MASTERED is a tier, THE RED WORK is an identity. */
 const AISLES = {
   butchery: { n: 'BLADES', col: '#a8564e', sub: 'hurting things',
               p1: '+12% damage', p2: 'crits cleave everything behind the target',
@@ -1025,7 +1057,19 @@ const AISLES = {
               t3: 'PAST THE DATE', p3: '+2 LUCK, and one card in every hand is dealt RARE or better' }
 };
 const AISLE_ORDER = ['butchery', 'produce', 'frozen', 'hardware', 'expired'];
-const AISLE_T1 = 4, AISLE_T2 = 8, AISLE_T3 = 14;
+const AISLE_T1 = 4, AISLE_T2 = 8, AISLE_T3 = 12;
+/* The rungs in order, so anything that draws progress can walk them instead of
+   hardcoding which two of the three it knows about — which is exactly how the
+   strip ended up claiming an aisle was MAXed at 8 while a rung sat at 14. */
+const AISLE_RUNGS = [AISLE_T1, AISLE_T2, AISLE_T3];
+/* How many rungs an aisle has earned, and what it is working toward. `goal` is
+   null once all three are in, which is the only honest way to say MAX. */
+function aisleProgress(k) {
+  const n = ais(k);
+  let done = 0;
+  for (const r of AISLE_RUNGS) if (n >= r) done++;
+  return { n, done, goal: done < AISLE_RUNGS.length ? AISLE_RUNGS[done] : null };
+}
 /* Recomputed on every pick rather than derived on read — ST() runs many times
    a frame and this would otherwise walk the whole card list each time. */
 function recalcAisles() {
@@ -1138,8 +1182,22 @@ const CARDS = [
     r: { n: 'LOCK', d: 'they pick their own target and keep it' } },
   { id: 'munitions', name: 'MUNITIONS',     aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 2, d: v => '+' + v + ' frag every wave',
     r: { n: 'INCENDIARY', d: 'frags leave the ground burning' } },
-  /* ---- inherited from the GLOCK-18 ---- */
-  { id: 'sidearm',   name: 'THE OTHER HAND',aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 2,
+  /* ---- inherited from the GLOCK-18 ----
+
+     A second gun that aims and fires itself is not a percentage. It is a whole
+     extra source of damage that runs while you are reloading, dashing, or
+     doing nothing at all — and at rank 2 it is two of them. Rolled at COMMON,
+     that arrived as a shrug of a card carrying a permanent 40% uplift; there
+     was no version of the hand where you did not take it.
+
+     So it is dealt the way SPLIT is dealt, and for the same reason: `leg`
+     means it never rolls a grade, it is LEGENDARY or it is not dealt at all,
+     and `w` makes it about one hand in thirty rather than one in thirty-nine.
+     Because LEGENDARY always clears RIDER_AT, AKIMBO is never off — the fast
+     spare gun IS the card now, rather than a tier of it. Held back to floor 4
+     on top, so the run has a shape before it turns up. */
+  { id: 'sidearm',   name: 'THE OTHER HAND',aisle: 'hardware', max: 2, b: 2, floor: 3, leg: 1, w: 0.40,
+    v: 1, int: 1, cap: 2,
     d: v => v + ' spare gun' + (v > 1 ? 's fire' : ' fires') + ' itself at whatever is closest',
     r: { n: 'AKIMBO', d: 'and they never stop to think about it' } },
   /* ---- EXPIRED: the bad idea aisle ---- */
@@ -1449,8 +1507,8 @@ function takeCard(o) {
   if (before < AISLE_T1 && after >= AISLE_T1) { msg(ai.n + ' — THE ORDER', ai.p1, 3.4); A.secret(); }
   else if (before < AISLE_T2 && after >= AISLE_T2) { msg(ai.n + ' — MASTERED', ai.p2, 4); A.god(); S.flash = 0.7; S.flashCol = ai.col; }
   /* The third rung is the loudest thing a card can do that is not an off-cut,
-     and it should be: fourteen ranks in one aisle is most of a run's picks
-     spent on one idea. */
+     and it should be: twelve ranks in one aisle is most of a run's picks spent
+     on one idea. */
   else if (before < AISLE_T3 && after >= AISLE_T3) {
     msg(ai.n + ' — ' + ai.t3, ai.p3, 4.6);
     A.god(); A.roar();
@@ -2043,7 +2101,12 @@ function makePlayer() {
   return {
     x: S.aw / 2, y: S.ah / 2, vx: 0, vy: 0, r: 6, ang: 0,
     hp: 100, shield: 0, shieldT: 0,
-    owned: ['pistol'], wi: 0, mags: { pistol: 14 },
+    /* Read off the gun, never typed twice. This was a literal `14` left over
+       from an older magazine size, so cutting the pistol to 12 left every run
+       starting on 14 rounds in a 12-round magazine — the HUD opened on
+       `14/12` and you got two shots the gun does not have. It cannot drift
+       again from here. */
+    owned: ['pistol'], wi: 0, mags: { pistol: WEP.pistol.mag },
     reT: 0, reMax: 0, reStage: 0, fireT: 0, recoil: 0,
     spin: 0, charge: 0, beamT: 0,
     nades: 3, nadeCd: 0,
@@ -2414,6 +2477,7 @@ function cycleWeapon(dir) {
 
 function startReload() {
   const p = S.p, w = curW();
+  if (w.noReload) return;                   // its magazine is not a resource
   if (p.reT > 0 || S.god || p.mags[w.id] >= magCap(w)) return;
   /* HAIR TRIGGER: run it dry and it is already loaded. Deliberately rewards
      emptying the magazine rather than tapping R, so it changes how you fire. */
@@ -2444,7 +2508,7 @@ function emit(w) {
   const p = S.p, st = ST();
   const spin = w.spin ? p.spin : 1;
   p.fireT = (w.spin ? lerp(0.16, w.rate, p.spin) : w.rate) * st.rateMul;
-  if (!S.god) p.mags[w.id]--;
+  if (!S.god && !w.noReload) p.mags[w.id]--;
 
   const base = (w.spread + p.recoil * 0.05) * (S.god ? 0.4 : 1);
   const mx = p.x + Math.cos(p.ang) * 11, my = p.y + Math.sin(p.ang) * 11 - 1;
@@ -6139,10 +6203,13 @@ function drawPlayer(p) {
   drawSpr(ctx, bodySprite(), 0, -5 + bob, 1, p.flip, alpha, tint);
   ctx.restore();
 
-  // burning headband
+  /* LIVING FLAME burns where the cloth actually is. The body sprite spans
+     y-13 to y+3 and the neckerchief sits on its rows 14-16 of 32, which lands
+     at about y-6 — the fire used to be emitted at y-13, the top of his skull,
+     because that is where the headband was. */
   const cos = cosDef(equippedCos());
   if (cos.fx === 'fire' && Math.random() < 0.9)
-    part(px + rnd(-5, 5), py - 13 + bob, pick(['#ff8a20', '#ffd05a', '#ff3b1e']), 1, 22, 0.4);
+    part(px + rnd(-4, 4), py - 6 + bob, pick(['#ff8a20', '#ffd05a', '#ff3b1e']), 1, 22, 0.4);
 
   /* ---- the rifle, with the reload animation ---- */
   const shx = px, shy = py - 1 + bob;
@@ -6701,6 +6768,13 @@ function drawHUD() {
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(8, H - 19, 62, 3);
     ctx.fillStyle = '#c8a04a'; ctx.fillRect(8, H - 19, 62 * prog, 3);
     if (prog > 0.9) { ctx.fillStyle = '#fff'; ctx.fillRect(8, H - 19, 62, 3); }
+  } else if (w.noReload) {
+    /* A full pip row that never empties is a bar you learn to stop reading.
+       Say what is actually true instead, in the gun's own colour. */
+    txt('NO RELOAD', 8, H - 22, w.col);
+    ctx.globalAlpha = 0.45 + Math.sin(S.t * 2) * 0.12;
+    ctx.fillStyle = w.col; ctx.fillRect(8, H - 19, 62, 2);
+    ctx.globalAlpha = 1;
   } else {
     /* Pips, not a string of '|' and '.'. That bar only ever held a steady
        width because Courier was monospaced; in a proportional face it would
@@ -7383,30 +7457,37 @@ function cardFace(o, x, y, cw, ch, t, held) {
     wrapped(txt2, cx, by + 11, cw - 16, '#ded2c0', 6.5);
   }
 
-  /* Foot: which aisle it came from, and how many of this card you already
-     hold. The aisle is the one thing on the card a player scans for when they
-     are building toward THE ORDER, so it gets a glow — but in the rarity's
-     colour, not the aisle's. Aisle colours live on the strip and nowhere near
-     a card, or the hand becomes two colour systems again. */
+  /* ---- THE FOOT: two numbers, and it must be obvious which is which ----
+
+     This used to be the aisle's NAME followed immediately by a row of pips —
+     and the pips counted this CARD's ranks, not the aisle's. Two different
+     scopes, touching, with only one of them labelled: "BLADES ▪▪▪▪▪▪" reads
+     as six of something to do with BLADES, which is not what it was. Worse,
+     the count you actually wanted while deciding — how close this aisle is to
+     its next rung — was the one thing the card did not tell you.
+
+     So: the aisle half now shows the AISLE's progress (which is what a player
+     reads it for), the card half is labelled HELD, and neither is a pip.
+     Numbers are unambiguous at 6px in a way that two adjacent ladders are
+     not. */
   const foot = yy + ch - 9;
   if (fusion) {
     htxt('OFF-CUT', cx, foot, '#d8ccb8', 'center', 6, { track: 0.26, mid: 1, glow: g.col, glowSize: 9 });
     return 1;
   }
   const ai = AISLES[c.aisle], rank = dkr(c.id);
-  const lbl = ai.n, lw = htxtWidth(lbl, 6, 0.26);
-  const pw = 4, pg = 2, pipsW = c.max * pw + (c.max - 1) * pg;
-  const tot = lw + 9 + pipsW, sx = cx - tot / 2;
-  htxt(lbl, sx, foot, '#d8ccb8', 'left', 6, { track: 0.26, mid: 1, glow: g.col, glowSize: 9 });
-  /* Filled means held. Nothing else. The pip at `rank` used to pulse as a
-     preview of what this pick would add, which in a still frame is simply a
-     filled pip — so a card you owned none of read as one you owned one of. */
-  for (let j = 0; j < c.max; j++) {
-    const px = sx + lw + 9 + j * (pw + pg);
-    if (j < rank) { ctx.fillStyle = g.col; ctx.globalAlpha = 0.9; ctx.fillRect(px, foot - 1.5, pw, 3); }
-    else { ctx.fillStyle = '#ffffff'; ctx.globalAlpha = 0.13; ctx.fillRect(px, foot - 0.5, pw, 1); }
-    ctx.globalAlpha = 1;
-  }
+  const ap = aisleProgress(c.aisle);
+  const lbl = ai.n + ' ' + (ap.goal ? ap.n + '/' + ap.goal : 'MAX');
+  const rgt = 'HELD ' + rank + '/' + c.max;
+  /* Both halves have to fit a five-card hand's 84px card. Shrink together
+     rather than letting the right one slide off the edge unnoticed. */
+  let fs = 6;
+  while (fs > 4.6 && htxtWidth(lbl, fs, 0.12) + htxtWidth(rgt, fs, 0.06) + 8 > cw - 12) fs -= 0.25;
+  htxt(lbl, x + 7, foot, '#d8ccb8', 'left', fs, { track: 0.12, mid: 1, glow: g.col, glowSize: 9 });
+  /* Dimmed when you hold none of it, so "HELD 0/3" does not compete with the
+     aisle count for attention on a card you have never taken. */
+  htxt(rgt, x + cw - 7, foot, rank ? '#d8ccb8' : 'rgba(150,138,124,0.7)', 'right', fs,
+       { track: 0.06, mid: 1, glow: rank ? g.col : null, glowSize: 9 });
   return 1;
 }
 
@@ -7437,34 +7518,57 @@ function wrapped(str, cx, y, maxw, col, size, max) {
 function drawOrderStrip(y) {
   const any = AISLE_ORDER.some(k => ais(k) > 0);
   htxt('THE ORDER', 20, y, '#9d8a7a', 'left', 7, { track: 0.26, mid: 1, noShadow: true });
-  htxt(any ? 'collect from one aisle — 4 cards earns its perk, 8 masters it'
-           : 'cards come from five aisles. take 4 from one and it starts paying you back.',
+  /* This line used to read "4 cards earns its perk, 8 masters it", which was
+     written when there were two rungs and never updated when a third arrived —
+     so the strip told you an aisle was finished at 8 while a whole rung sat
+     above it. Say the cadence instead of listing the numbers: it is true, it
+     stays true if the numbers move, and "every 4" is the only part of this a
+     player needs to carry. */
+  htxt(any ? 'keep taking from one aisle — it pays you again every 4 cards, three times'
+           : 'cards come from five aisles. every 4 you take from one, it pays you back.',
        20 + htxtWidth('THE ORDER', 7, 0.26) + 8, y, 'rgba(126,114,104,0.75)', 'left', 6.5,
        { track: 0.04, mid: 1, noShadow: true });
 
   const cw = 88, gap = 6, x0 = W / 2 - (cw * 5 + gap * 4) / 2, cy = y + 8;
   AISLE_ORDER.forEach((key, i) => {
-    const ai = AISLES[key], n = ais(key), x = x0 + i * (cw + gap);
-    const t2 = n >= AISLE_T2, t1 = n >= AISLE_T1;
-    const goal = t2 ? AISLE_T2 : AISLE_T1;
-    const f = clamp(n / goal, 0, 1);
+    const ai = AISLES[key], x = x0 + i * (cw + gap);
+    const { n, done, goal } = aisleProgress(key);
+    /* The bar fills toward the NEXT rung from the LAST one, not from zero.
+       Filling from zero meant an aisle at 9 of 12 showed a three-quarters-full
+       bar that had not moved since 8, which reads as progress you are not
+       making. */
+    const from = done ? AISLE_RUNGS[done - 1] : 0;
+    const f = goal ? clamp((n - from) / (goal - from), 0, 1) : 1;
     ctx.fillStyle = 'rgba(10,8,12,0.85)'; ctx.fillRect(x, cy, cw, 22);
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = t2 ? 0.20 : t1 ? 0.13 : 0.07;
+    ctx.globalAlpha = 0.07 + done * 0.06;
     ctx.fillStyle = ai.col; ctx.fillRect(x, cy, cw * f, 22);
     ctx.restore();
-    ctx.fillStyle = ai.col; ctx.globalAlpha = t1 ? 0.9 : 0.35;
+    ctx.fillStyle = ai.col; ctx.globalAlpha = done ? 0.9 : 0.35;
     ctx.fillRect(x, cy, 2, 22);
     ctx.globalAlpha = 1;
-    htxt(ai.n, x + 6, cy + 6, t1 ? ai.col : 'rgba(150,136,124,0.85)', 'left', 6,
+    htxt(ai.n, x + 6, cy + 6, done ? ai.col : 'rgba(150,136,124,0.85)', 'left', 6,
          { track: 0.16, mid: 1, noShadow: true });
-    htxt(t2 ? 'MAX' : n + '/' + goal, x + cw - 5, cy + 6, t1 ? ai.col : 'rgba(130,118,108,0.7)', 'right', 6,
+    /* Three pips for three rungs, the same shape the HUD corner uses, so the
+       ladder is countable rather than inferred from a number. */
+    for (let j = 0; j < AISLE_RUNGS.length; j++) {
+      ctx.globalAlpha = j < done ? 0.95 : 0.22;
+      ctx.fillStyle = ai.col;
+      ctx.fillRect(x + cw - 9 - (AISLE_RUNGS.length - 1 - j) * 4, cy + 3, 3, 3);
+    }
+    ctx.globalAlpha = 1;
+    htxt(goal ? n + '/' + goal : 'MAX', x + cw - 5, cy + 15,
+         done ? ai.col : 'rgba(130,118,108,0.7)', 'right', 5.5,
          { track: 0.04, mid: 1, noShadow: true });
-    /* What the aisle actually pays. Without this the chip is a progress bar
-       toward an unnamed prize, which is not a reason to do anything. */
-    const perk = t2 ? ai.p2 : ai.p1;
-    htxt(perk.length > 30 ? perk.slice(0, 29) + '…' : perk, x + 6, cy + 15,
-         t1 ? 'rgba(210,196,180,0.85)' : 'rgba(120,110,102,0.6)', 'left', 5.5,
+    /* What the NEXT rung pays — the one you are working toward, not the one
+       you already have. A chip advertising a perk you own is not a reason to
+       do anything. */
+    const perk = goal ? [ai.p1, ai.p2, ai.p3][done] : ai.t3;
+    const room = cw - 12 - htxtWidth(goal ? n + '/' + goal : 'MAX', 5.5, 0.04);
+    let txt = perk;
+    while (txt.length > 4 && htxtWidth(txt + '…', 5.5, 0.02) > room) txt = txt.slice(0, -1);
+    htxt(txt === perk ? perk : txt + '…', x + 6, cy + 15,
+         done ? 'rgba(210,196,180,0.85)' : 'rgba(120,110,102,0.6)', 'left', 5.5,
          { track: 0.02, mid: 1, noShadow: true });
   });
 }
@@ -7723,10 +7827,14 @@ function drawDeck() {
     ctx.fillRect(x, py, colW, 1); ctx.fillRect(x, py + h - 1, colW, 1); ctx.fillRect(x + colW - 1, py, 1, h);
     ctx.globalAlpha = 1;
 
-    const n = ais(key);
-    const tag = n >= AISLE_T2 ? 'MASTERED' : n >= AISLE_T1 ? 'ORDER ' + n + '/' + AISLE_T2 : n + '/' + AISLE_T1;
+    /* The header said MASTERED at 8 and then had nothing left to say, so an
+       aisle sitting at 11 of 12 looked finished. It walks all three rungs
+       now: what you have earned, and how far to the next one. */
+    const ap = aisleProgress(key);
+    const earned = ap.done === 3 ? ai.t3 : ap.done === 2 ? 'MASTERED' : ap.done === 1 ? 'THE ORDER' : '';
+    const tag = ap.goal ? (earned ? earned + '  ' : '') + ap.n + '/' + ap.goal : earned;
     htxt(ai.n, x + 7, py + 6, ai.col, 'left', 7, { track: 0.24, mid: 1 });
-    htxt(tag, x + colW - 6, py + 6, n >= AISLE_T1 ? ai.col : 'rgba(130,118,108,0.75)', 'right', 6,
+    htxt(tag, x + colW - 6, py + 6, ap.done ? ai.col : 'rgba(130,118,108,0.75)', 'right', 6,
          { track: 0.08, mid: 1, noShadow: true });
 
     let ry = py + 14, row = 0;
@@ -7916,8 +8024,7 @@ function drawPause() {
   for (const k of AISLE_ORDER) {
     const n = ais(k); if (!n) continue; any = true;
     const ai = AISLES[k];
-    const rung = aisleT3(k) ? 3 : aisleT2(k) ? 2 : aisleT1(k) ? 1 : 0;
-    const next = rung === 0 ? AISLE_T1 : rung === 1 ? AISLE_T2 : rung === 2 ? AISLE_T3 : 0;
+    const { done: rung, goal: next } = aisleProgress(k);
     // rank tick, then the aisle, then where it stands
     ctx.fillStyle = ai.col; ctx.globalAlpha = 0.6;
     ctx.fillRect(32, y - 4, 2, 7); ctx.globalAlpha = 1;
@@ -7930,7 +8037,7 @@ function drawPause() {
     y += 10;
   }
   if (S.god) { drawSpr(ctx, SPR.eye, 38, y - 2, 0.8); htxt('THE THIRD EYE — you cannot die', 50, y + 1, '#ff5b5b', 'left', 8); y += 10; any = true; }
-  if (!any) { htxt('nothing committed to yet. four ranks in one aisle buys the first rung.', 38, y + 1, '#5f5044', 'left', 7.5); y += 10; }
+  if (!any) { htxt('nothing committed to yet. every 4 ranks in one aisle buys a rung — there are three.', 38, y + 1, '#5f5044', 'left', 7.5); y += 10; }
 
   /* Arsenal, divided by rarity — one row per rung, guns laid along it.
 
