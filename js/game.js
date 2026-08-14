@@ -268,7 +268,10 @@ const isTwist = k => twist() === k;
 const SHOP_ROOM = {
   name: "PACI'S", sub: 'the back room // he was expecting you',
   aw: 440, ah: 330, floor: ['#3a3040', '#322838', '#2a2030'], grout: '#191320',
-  wall: ['#5a4a64', '#332a3c', '#75608a'], fog: 'rgba(70,25,95,0.09)', dark: 0.52
+  wall: ['#5a4a64', '#332a3c', '#75608a'], fog: 'rgba(70,25,95,0.09)', dark: 0.52,
+  /* His own surface, and it belongs to nobody else — you know you are out of
+     the building the moment you look down. */
+  tex: 'quarry'
 };
 function curRoom() { return S.inShop ? SHOP_ROOM : roomDef(S.room); }
 /* PACI now keeps wave hours, not boss hours.
@@ -789,10 +792,21 @@ function cosDef(id) { return COSMETICS.find(c => c.id === id) || COSMETICS[0]; }
    STATE
    ============================================================ */
 const S = {};
+/* MM:SS, and H:MM:SS only once there is an hour to show — a leading `0:` on
+   every run of a game whose floors take four minutes is two characters of
+   nothing. Floors are padded so the number never changes width mid-wave and
+   jitters the right edge of the HUD. */
+function runClock(t) {
+  const s = Math.max(0, (t === undefined ? S.runT : t) | 0);
+  const h = (s / 3600) | 0, m = ((s / 60) | 0) % 60;
+  const p2 = v => (v < 10 ? '0' : '') + v;
+  return h ? h + ':' + p2(m) + ':' + p2(s % 60) : m + ':' + p2(s % 60);
+}
+
 function freshState() {
   const sv = loadSave();
   Object.assign(S, {
-    mode: 'title', t: 0, deadT: 0,
+    mode: 'title', t: 0, deadT: 0, runT: 0,
     room: 0, wave: 0, waveState: 'idle', waveT: 0,
     queue: [], spawnT: 0,
     aw: 0, ah: 0, walls: [], deco: [],
@@ -1801,7 +1815,7 @@ function buildRoom(idx) {
     }
   }
 
-  bakeFloor(R, rng);
+  bakeFloor(R, rng, idx);
   S.cracks = [];
   S.shops = [];
 }
@@ -2015,63 +2029,266 @@ function exitShop() {
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 const bay = (x, y) => BAYER[((y & 3) << 2) | (x & 3)] / 16;
 
-function bakeFloor(R, rng) {
-  const sc = subCanvas(R.aw, R.ah);
-  floorCan = sc.can; floorCtx = sc.ctx;
-  const g = floorCtx, P = 1 / RS;          // one device pixel, in game units
-  const TS = 16, cols = Math.ceil(R.aw / TS), rows = Math.ceil(R.ah / TS);
-  /* Pick every tile's two tones and how worn it is up front, then resolve the
-     whole floor in one buffer pass. Doing the dither with fillRect would be a
-     million calls a room. */
-  const tone = new Int8Array(cols * rows), wear = new Float32Array(cols * rows);
-  for (let i = 0; i < cols * rows; i++) {
-    const v = rng();
-    tone[i] = v < 0.30 ? 1 : v < 0.44 ? 2 : 0;
-    wear[i] = 0.35 + rng() * 0.5;
+/* ============================================================
+   THE FLOOR
+
+   ---- why this is not one big pixel loop any more ----
+
+   It used to resolve every device pixel of the arena in JS: a
+   `createImageData` the size of the whole room, one pass, tone + dither +
+   grain per pixel. Measured, that is a flat ~32 NANOSECONDS PER DEVICE PIXEL,
+   and the arena is 4.75 million of them on floor 9. Then it drew grout with
+   four fillRects per tile (19,000 of them) and painted spills a device pixel
+   at a time (55,000 more).
+
+     pixel loop  ~100ms
+     spills       ~37ms
+     grout         ~9ms
+     ------------------
+     ~149ms, once per floor, ~1.2 SECONDS and 71 dropped frames a run
+
+   That is the hitch you feel walking through a door. Every part of it was
+   doing per-pixel work for something that repeats.
+
+   So: bake a small ATLAS of tile variants once (12 tiles at 32x32 = 12,288
+   pixels instead of 4.75 million, a 386x reduction), bake the grout INTO
+   those variants so it costs nothing, pre-render a handful of spill blobs and
+   `drawImage` them, and blit the atlas across the room. Same idea, ~8x less
+   time, and it now scales with tile COUNT rather than pixel count — which
+   means it barely grows as the arenas do.
+   ============================================================ */
+
+/* Ten floors, ten surfaces. The palettes already differed; the PATTERN did
+   not, so every room was the same 16-unit grid of tiles in a different colour
+   and read as one building with the lights changed. A surface says more about
+   where you are than its hue does — you know a freezer from a wooden floor
+   with the colour turned off. */
+const FLOOR_TEX = ['tile', 'grate', 'plate', 'quarry', 'ice',
+                   'sludge', 'board', 'salt', 'lino', 'drain'];
+function floorTex(idx) { return FLOOR_TEX[clamp(idx | 0, 0, FLOOR_TEX.length - 1)]; }
+
+/* One tile variant, painted at DEVICE resolution over the shared tone base.
+   `s` is the tile's span in device pixels (32). Everything here is drawn once
+   per variant per floor — twelve times — so it can afford to be detailed. */
+const TEXTURE = {
+  tile(g, s, R, rng) {                      // 1. THE ABATTOIR — glazed, grouted
+    g.fillStyle = R.grout; g.fillRect(0, 0, s, 2); g.fillRect(0, 0, 2, s);
+    g.fillStyle = 'rgba(255,244,224,0.05)'; g.fillRect(0, 2, s, 1); g.fillRect(2, 0, 1, s);
+  },
+  grate(g, s, R, rng) {                     // 2. THE HOLLOW — you are standing on a drain
+    g.fillStyle = 'rgba(0,0,0,0.55)';
+    for (let i = 0; i < 4; i++) g.fillRect(3, 4 + i * 7, s - 6, 3);
+    g.fillStyle = 'rgba(255,250,235,0.09)';
+    for (let i = 0; i < 4; i++) g.fillRect(3, 3 + i * 7, s - 6, 1);
+    g.fillStyle = 'rgba(0,0,0,0.35)'; g.fillRect(0, 0, s, 1); g.fillRect(0, 0, 1, s);
+    g.fillStyle = 'rgba(200,205,215,0.14)';
+    g.fillRect(1, 1, 2, 2); g.fillRect(s - 3, 1, 2, 2); g.fillRect(1, s - 3, 2, 2);
+  },
+  plate(g, s, R, rng) {                     // 3. THE MEAT LOOP — riveted tread plate
+    g.fillStyle = 'rgba(0,0,0,0.40)'; g.fillRect(0, 0, s, 1); g.fillRect(0, 0, 1, s);
+    g.fillStyle = 'rgba(255,250,240,0.06)'; g.fillRect(0, 1, s, 1); g.fillRect(1, 0, 1, s);
+    for (let y = 0; y < s; y += 8) for (let x = 0; x < s; x += 8) {
+      const ox = (y / 8) % 2 ? 4 : 0;
+      g.fillStyle = 'rgba(255,250,240,0.10)';
+      g.fillRect(x + ox + 1, y + 3, 4, 1); g.fillRect(x + ox + 2, y + 4, 2, 1);
+      g.fillStyle = 'rgba(0,0,0,0.28)'; g.fillRect(x + ox + 1, y + 5, 4, 1);
+    }
+    g.fillStyle = 'rgba(220,225,235,0.16)'; g.fillRect(2, 2, 2, 2); g.fillRect(s - 4, s - 4, 2, 2);
+  },
+  quarry(g, s, R, rng) {                    // 4. THE RED KITCHEN — small tiles, staggered
+    const h = s / 2;
+    g.fillStyle = R.grout;
+    g.fillRect(0, 0, s, 1); g.fillRect(0, h, s, 1);
+    g.fillRect(0, 0, 1, h); g.fillRect(h, h, 1, h);
+    g.fillStyle = 'rgba(255,244,224,0.06)';
+    g.fillRect(0, 1, s, 1); g.fillRect(0, h + 1, s, 1);
+  },
+  ice(g, s, R, rng) {                       // 5. THE FREEZER — rime and stress cracks
+    g.fillStyle = 'rgba(220,245,255,0.10)';
+    for (let i = 0; i < 14; i++) g.fillRect((rng() * s) | 0, (rng() * s) | 0, 1 + ((rng() * 2) | 0), 1);
+    g.fillStyle = 'rgba(255,255,255,0.12)'; g.fillRect(0, 0, s, 1); g.fillRect(0, 0, 1, s);
+    g.fillStyle = 'rgba(120,180,205,0.30)';
+    let cx = rng() * s, cy = rng() * s, a = rng() * TAU;
+    for (let i = 0; i < 10; i++) { g.fillRect(cx | 0, cy | 0, 1, 1); a += rng() - 0.5; cx += Math.cos(a) * 2; cy += Math.sin(a) * 2; }
+  },
+  sludge(g, s, R, rng) {                    // 6. THE RENDERING — poured, and something got on it
+    g.fillStyle = 'rgba(0,0,0,0.22)';
+    for (let i = 0; i < 5; i++) g.fillRect((rng() * s) | 0, (rng() * s) | 0, (3 + rng() * 8) | 0, (2 + rng() * 5) | 0);
+    g.globalAlpha = 0.16; g.fillStyle = R.vat || '#4a6a12';
+    for (let i = 0; i < 3; i++) g.fillRect((rng() * s) | 0, (rng() * s) | 0, (2 + rng() * 6) | 0, (2 + rng() * 4) | 0);
+    g.globalAlpha = 1;
+  },
+  board(g, s, R, rng) {                     // 7. THE LONG TABLE — floorboards
+    const ph = 8;
+    g.fillStyle = 'rgba(0,0,0,0.42)';
+    for (let y = 0; y < s; y += ph) g.fillRect(0, y, s, 1);
+    g.fillStyle = 'rgba(255,236,200,0.055)';
+    for (let y = 0; y < s; y += ph) g.fillRect(0, y + 1, s, 1);
+    g.fillStyle = 'rgba(0,0,0,0.16)';                       // grain, along the plank
+    for (let y = 0; y < s; y += ph) for (let i = 0; i < 3; i++)
+      g.fillRect((rng() * s) | 0, y + 2 + ((rng() * (ph - 3)) | 0), (3 + rng() * 9) | 0, 1);
+    // an end joint only sometimes, so the planks read long instead of square
+    if (rng() < 0.35) {
+      g.fillStyle = 'rgba(0,0,0,0.42)';
+      g.fillRect((rng() * s) | 0, ((rng() * (s / ph)) | 0) * ph, 1, ph);
+    }
+    g.fillStyle = 'rgba(210,200,180,0.15)';
+    for (let y = ph; y < s; y += ph) if (rng() < 0.5) g.fillRect((rng() * s) | 0, y - 3, 1, 1);
+  },
+  salt(g, s, R, rng) {                      // 8. THE SALT LINE — crusted over
+    g.fillStyle = 'rgba(240,238,225,0.15)';
+    for (let i = 0; i < 26; i++) g.fillRect((rng() * s) | 0, (rng() * s) | 0, 1, 1);
+    g.fillStyle = 'rgba(255,255,250,0.19)';
+    for (let i = 0; i < 6; i++) g.fillRect((rng() * s) | 0, (rng() * s) | 0, 2, 1);
+    g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(0, 0, s, 1); g.fillRect(0, 0, 1, s);
+  },
+  lino(g, s, R, rng) {                      // 9. THE LAST AISLE — supermarket vinyl
+    g.fillStyle = 'rgba(255,250,240,0.07)';
+    for (let i = 0; i < 30; i++) g.fillRect((rng() * s) | 0, (rng() * s) | 0, 1, 1);
+    g.fillStyle = 'rgba(0,0,0,0.16)';
+    for (let i = 0; i < 18; i++) g.fillRect((rng() * s) | 0, (rng() * s) | 0, 1, 1);
+    g.fillStyle = 'rgba(0,0,0,0.24)'; g.fillRect(0, 0, 1, s);   // the seam between rolls
+    g.fillStyle = 'rgba(255,255,255,0.05)'; g.fillRect(1, 0, 1, s);
+  },
+  drain(g, s, R, rng) {                     // 10. THE KILLING FLOOR — a slab that has seen use
+    g.fillStyle = 'rgba(0,0,0,0.30)';
+    for (let i = 0; i < 4; i++)
+      g.fillRect((rng() * s) | 0, (rng() * s) | 0, (3 + rng() * 10) | 0, (1 + rng() * 3) | 0);
+    g.fillStyle = 'rgba(0,0,0,0.34)'; g.fillRect(0, 0, s, 1); g.fillRect(0, 0, 1, s);
+    g.fillStyle = 'rgba(255,240,230,0.04)'; g.fillRect(0, 1, s, 1);
   }
+};
+
+/* Whole-room features that cannot be a repeating tile, because the point of
+   them is that they run across the floor. Only the styles that need one. */
+const TEX_ARENA = {
+  drain(g, R, rng, P) {                     // channels, running the length of the room
+    for (let i = 0; i < 3; i++) {
+      const y = Math.round((0.22 + i * 0.28) * R.ah);
+      g.fillStyle = 'rgba(0,0,0,0.62)'; g.fillRect(16, y, R.aw - 32, 3);
+      g.fillStyle = 'rgba(150,150,155,0.12)';
+      for (let x = 18; x < R.aw - 32; x += 3) g.fillRect(x, y, P, 3);
+      g.fillStyle = 'rgba(255,240,230,0.05)'; g.fillRect(16, y - P, R.aw - 32, P);
+    }
+  },
+  grate(g, R, rng, P) {                     // one wide sump the grating drains into
+    const x = Math.round(R.aw * 0.5) - 26, y = Math.round(R.ah * 0.5) - 10;
+    g.fillStyle = 'rgba(0,0,0,0.5)'; g.fillRect(x, y, 52, 20);
+    g.fillStyle = 'rgba(190,196,206,0.10)';
+    for (let i = 0; i < 52; i += 4) g.fillRect(x + i, y, P * 2, 20);
+  }
+};
+
+/* Twelve variants is enough that the eye stops finding the repeat, and few
+   enough that baking them is free. */
+const TILE_VARIANTS = 12;
+
+function bakeTileAtlas(R, rng, tex) {
+  const TS = 16, span = TS * RS;
+  const can = document.createElement('canvas');
+  can.width = span * TILE_VARIANTS; can.height = span;
+  const g = can.getContext('2d');
+  g.imageSmoothingEnabled = false;
+
+  /* The shared base: tone, the worn-edge dither, and one-device-pixel grain.
+     Identical maths to the old full-arena loop — it just runs over 12,288
+     pixels instead of 4,752,000. */
   const rgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
   const TONES = [rgb(R.floor[0]), rgb(R.floor[1]), rgb(R.floor[2])];
-  const ALT = [1, 2, 1];                    // which tone each one dithers toward
-
-  const dw = floorCan.width, dh = floorCan.height;
-  const img = g.createImageData(dw, dh), px = img.data;
-  const span = TS * RS;
-  for (let dy = 0; dy < dh; dy++) {
-    const ty = (dy / span) | 0, fy = (dy % span) / span - 0.5;
-    for (let dx = 0; dx < dw; dx++) {
-      const tx = (dx / span) | 0;
-      const ti = ty * cols + tx;
-      const t = tone[ti] || 0;
-      const u = Math.max(Math.abs((dx % span) / span - 0.5), Math.abs(fy)) * 2;
-      const c = (u * u * wear[ti] > bay(dx, dy)) ? TONES[ALT[t]] : TONES[t];
-      // fine grain, one device pixel — the surface never sits perfectly flat
-      const n = ((dx * 73856093) ^ (dy * 19349663)) & 255;
+  const ALT = [1, 2, 1];
+  const tone = [], wear = [];
+  for (let v = 0; v < TILE_VARIANTS; v++) {
+    const q = rng();
+    tone.push(q < 0.30 ? 1 : q < 0.44 ? 2 : 0);
+    wear.push(0.35 + rng() * 0.5);
+  }
+  const W = can.width, img = g.createImageData(W, span), px = img.data;
+  for (let y = 0; y < span; y++) {
+    const fy = y / span - 0.5;
+    for (let X = 0; X < W; X++) {
+      const v = (X / span) | 0, x = X % span;
+      const t = tone[v];
+      const u = Math.max(Math.abs(x / span - 0.5), Math.abs(fy)) * 2;
+      const c = (u * u * wear[v] > bay(X, y)) ? TONES[ALT[t]] : TONES[t];
+      const n = ((X * 73856093) ^ (y * 19349663)) & 255;
       const k = n < 40 ? -14 : n > 232 ? 10 : 0;
-      const o = (dy * dw + dx) << 2;
+      const o = (y * W + X) << 2;
       px[o] = clamp(c[0] + k, 0, 255); px[o + 1] = clamp(c[1] + k, 0, 255);
       px[o + 2] = clamp(c[2] + k, 0, 255); px[o + 3] = 255;
     }
   }
   g.putImageData(img, 0, 0);
 
+  // then the surface itself, clipped so a variant can never bleed into its neighbour
+  const paint = TEXTURE[tex] || TEXTURE.tile;
+  for (let v = 0; v < TILE_VARIANTS; v++) {
+    g.save();
+    g.translate(v * span, 0);
+    g.beginPath(); g.rect(0, 0, span, span); g.clip();
+    paint(g, span, R, rng);
+    g.restore();
+  }
+  return { can, span };
+}
+
+/* Spills were 55,000 fillRects a room. They are six blobs now, rendered once
+   into their own little canvases and stamped. */
+function bakeSpills(rng, n) {
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const rr = 2 + rng() * 5;                       // radius, game units
+    const d = Math.ceil(rr * RS * 2) + 2;
+    const c = document.createElement('canvas');
+    c.width = d; c.height = d;
+    const g = c.getContext('2d');
+    const img = g.createImageData(d, d), px = img.data;
+    const h = d / 2;
+    for (let y = 0; y < d; y++) for (let x = 0; x < d; x++) {
+      const tx = x - h, ty = y - h;
+      const dist = Math.hypot(tx, ty * 1.7) / (rr * RS);
+      if (dist > 1) continue;
+      const core = dist < 0.55;
+      if (!core && !(1 - dist > bay(x + 64, y + 64) * 0.9)) continue;
+      const o = (y * d + x) << 2;
+      px[o] = core ? 48 : 60; px[o + 1] = core ? 8 : 12; px[o + 2] = core ? 12 : 16;
+      px[o + 3] = core ? 107 : 77;                  // the old 0.42 / 0.30 alphas
+    }
+    g.putImageData(img, 0, 0);
+    out.push({ can: c, w: d / RS, h: d / RS });
+  }
+  return out;
+}
+
+function bakeFloor(R, rng, idx) {
+  const sc = subCanvas(R.aw, R.ah);
+  floorCan = sc.can; floorCtx = sc.ctx;
+  const g = floorCtx, P = 1 / RS;          // one device pixel, in game units
+  const TS = 16, cols = Math.ceil(R.aw / TS), rows = Math.ceil(R.ah / TS);
+  const tex = R.tex || floorTex(idx === undefined ? S.room : idx);
+
+  /* ---- the surface, blitted rather than computed ---- */
+  const atlas = bakeTileAtlas(R, rng, tex);
+  const span = atlas.span;
+  g.save();
+  g.setTransform(1, 0, 0, 1, 0, 0);        // blit in device pixels, 1:1, no resampling
+  for (let ry = 0; ry < rows; ry++) {
+    for (let rx = 0; rx < cols; rx++) {
+      const v = (rng() * TILE_VARIANTS) | 0;
+      g.drawImage(atlas.can, v * span, 0, span, span, rx * span, ry * span, span, span);
+    }
+  }
+  g.restore();
+
+  // whatever this surface does at room scale rather than tile scale
+  if (TEX_ARENA[tex]) TEX_ARENA[tex](g, R, rng, P);
+
+  /* ---- spills and cracks: the sparse detail that makes it a place ---- */
+  const blobs = bakeSpills(rng, 6);
   for (let y = 0; y < R.ah; y += TS) {
     for (let x = 0; x < R.aw; x += TS) {
-      // grout: a dark channel with a lit lip on the side the room's lamp finds
-      g.fillStyle = R.grout;
-      g.fillRect(x, y, TS, P * 2); g.fillRect(x, y, P * 2, TS);
-      g.fillStyle = 'rgba(255,244,224,0.05)';
-      g.fillRect(x, y + P * 2, TS, P); g.fillRect(x + P * 2, y, P, TS);
-      // old spill: a dark core with a dithered halo, not a flat rectangle
       if (rng() < 0.07) {
-        const cx = x + rng() * TS, cy = y + rng() * TS, rr = 2 + rng() * 5;
-        for (let ty = -rr * RS; ty < rr * RS; ty++) {
-          for (let tx = -rr * RS; tx < rr * RS; tx++) {
-            const d = Math.hypot(tx, ty * 1.7) / (rr * RS);
-            if (d > 1) continue;
-            g.fillStyle = d < 0.55 ? 'rgba(48,8,12,0.42)' : 'rgba(60,12,16,0.30)';
-            if (d < 0.55 || 1 - d > bay(tx + 64, ty + 64) * 0.9) g.fillRect(cx + tx * P, cy + ty * P, P, P);
-          }
-        }
+        const b = blobs[(rng() * blobs.length) | 0];
+        g.drawImage(b.can, x + rng() * TS - b.w / 2, y + rng() * TS - b.h / 2, b.w, b.h);
       }
       // a hairline crack, one device pixel wide
       if (rng() < 0.05) {
@@ -3656,6 +3873,21 @@ function update(rdt) {
   // the win screen keeps the wreckage moving behind it, same as the death one
   if (S.mode === 'win') { updateParticles(dt); updateCam(rdt); return; }
   if (S.mode !== 'play') { updateCam(rdt); return; }
+
+  /* THE RUN CLOCK, and it lives BELOW the mode guard on purpose.
+
+     `update()` is called every frame in every mode — the guard three lines up
+     is what makes the rest of this function play-only. Counting the clock
+     above it (where it started) meant the run timer kept ticking through the
+     pause screen, THE DECK and every level-up hand: measured at 15.06s after
+     10s of play and 5s of sitting on a menu. Here it measures time you
+     actually spent in the building, which is the only version of a run timer
+     worth reading. Same reasoning as S.introT; see Bugs Found #14.
+
+     It also stops on the winning hit rather than when the win screen appears,
+     because the 3.4s the finale takes to fall over is not time you spent
+     clearing the game. */
+  if (!S.won) S.runT += rdt;
 
   const p = S.p, st = ST(), w = curW();
 
@@ -6828,7 +7060,13 @@ function drawHUD() {
   }
 
   txt(String(S.score).padStart(7, '0'), W - 6, 12, '#d8c49a', 'right');
-  if (S.combo > 1) txt('x' + S.combo, W - 6, 22, 'hsl(' + (40 + S.combo * 6) + ',90%,60%)', 'right');
+  /* THE RUN CLOCK, under the score — the other number that only ever counts
+     up. Dimmer than the score on purpose: it is something you check between
+     waves, not something you play toward. The combo drops below it rather
+     than sharing the line, because a combo is loud and brief and would fight
+     a clock that is always there. */
+  txt(runClock(), W - 6, 22, '#7b6a58', 'right', 7.5);
+  if (S.combo > 1) txt('x' + S.combo, W - 6, 32, 'hsl(' + (40 + S.combo * 6) + ',90%,60%)', 'right');
 
   drawMinimap();
   if (S.vacuum > 0) htxt('COLLECTING', W / 2, 68, 'rgba(245,197,24,' + clamp(S.vacuum, 0, 1) + ')', 'center', 8, { track: 0.3 });
@@ -7228,30 +7466,27 @@ function drawDead() {
     htxt(String(S.score), W / 2, 102, '#e8d2a4', 'center', 22, { weight: '700', track: 0.06 });
     htxt('SCORE', W / 2, 112, '#6b5a4e', 'center', 7, { track: 0.34 });
 
+    /* One row of numbers, and then the buttons.
+
+       There were two more lines under this: a run of "guns 3/13 · cards 14 ·
+       level 9 · best 41200 · EVO 2/10 — next 600 coins", and the nearest
+       unsigned contract with its progress. Both were written to give you a
+       reason to press RETRY, and both did the opposite — you have just died,
+       and the screen answered by handing you a paragraph to read before it
+       would let you at the button. The information was real but the moment is
+       wrong for it: EVO and the contract ladder both live on screens you go to
+       deliberately, and the wallet numbers are on the HUD every second of the
+       next run anyway.
+
+       What is left is what you actually want at the instant you die: how far
+       you got, what you scored, how long it took, and RETRY. */
     statRow([
       { spr: SPR.coin, v: String(S.coins), col: '#f5c518' },
       { spr: SPR.card, v: String(S.cards), sc: 0.6, col: '#d8b8b8' },
       { v: 'VAULT ' + S.vault, col: '#9d8a7a' },
-      { v: 'KILLS ' + S.kills, col: '#9d8a7a' }
+      { v: 'KILLS ' + S.kills, col: '#9d8a7a' },
+      { v: runClock(), col: '#9d8a7a' }
     ], 128);
-    const sv = loadSave();
-    const evoNext = (S.evo | 0) >= EVO_MAX ? 'MAX' : EVO_COST(S.evo | 0) + ' coins';
-    htxt('guns ' + S.p.owned.length + '/' + WORDER.length + '  ·  cards ' + S.cardsTaken +
-         '  ·  level ' + S.level + (S.god ? '  ·  THE EYE' : '') + '  ·  best ' + (sv.best || 0) +
-         '  ·  EVO ' + (S.evo | 0) + '/' + EVO_MAX + ' — next ' + evoNext,
-         W / 2, 142, '#5f5044', 'center', 7, { track: 0.10 });
-
-    /* The nearest unsigned contract, so there is always one visible reason to
-       press RETRY rather than close the tab. */
-    const open = CONTRACTS.filter(c => !contractDone(c.id))
-                          .sort((a, b) => cStat(b.stat) / b.goal - cStat(a.stat) / a.goal)[0];
-    if (open) {
-      const have = Math.min(cStat(open.stat), open.goal);
-      htxt('NEXT CONTRACT  ·  ' + open.name + '  ' + have + '/' + open.goal + '  →  ' + open.u,
-           W / 2, 152, '#a8905c', 'center', 7, { track: 0.06 });
-    } else {
-      htxt('every contract signed. there is still no bottom.', W / 2, 152, '#a8905c', 'center', 7, { track: 0.06 });
-    }
 
     if (S.deadT > 1.0) {
       /* Also centred, also without EVOLVE. There is no run here to restart, so
@@ -7260,8 +7495,8 @@ function drawDead() {
                   ['COSMETICS', '#b558ff', () => { S.cosReturn = 'dead'; S.mode = 'cos'; }],
                   ['TITLE', '#8b7a68', () => { S.mode = 'title'; }]];
       const dbw = 96, dgap = 8, drow = db.length * dbw + (db.length - 1) * dgap;
-      db.forEach((b, i) => uiBtn(W / 2 - drow / 2 + i * (dbw + dgap), 160, dbw, 22, b[0], b[1], b[2]));
-      htxt('R retry · C cosmetics', W / 2, 208, 'rgba(120,106,94,0.6)', 'center', 7, { track: 0.10, noShadow: true });
+      db.forEach((b, i) => uiBtn(W / 2 - drow / 2 + i * (dbw + dgap), 150, dbw, 22, b[0], b[1], b[2]));
+      htxt('R retry · C cosmetics', W / 2, 184, 'rgba(120,106,94,0.6)', 'center', 7, { track: 0.10, noShadow: true });
     }
   }
   crosshair();
@@ -7298,11 +7533,14 @@ function drawWin() {
   if (t > 0.5) {
     htxt(String(S.score), W / 2, 100, '#e8d2a4', 'center', 22, { weight: '700', track: 0.06 });
     htxt('FINAL SCORE', W / 2, 110, '#6b5a4e', 'center', 7, { track: 0.34 });
+    /* The clearance time belongs here more than anywhere: it is the one number
+       on this screen you can actually try to beat next time. */
     statRow([
       { spr: SPR.coin, v: String(S.coins), col: '#f5c518' },
       { v: 'KILLS ' + S.kills, col: '#9d8a7a' },
       { v: 'CARDS ' + S.cardsTaken, col: '#9d8a7a' },
-      { v: 'LEVEL ' + S.level, col: '#9d8a7a' }
+      { v: 'LEVEL ' + S.level, col: '#9d8a7a' },
+      { v: runClock(), col: '#e8b25a' }
     ], 126);
     const sv = loadSave();
     htxt('guns ' + S.p.owned.length + '/' + WORDER.length +
@@ -8201,6 +8439,7 @@ window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantGod, breakSe
                 AISLE_T1, AISLE_T2, AISLE_T3,
                 FUSIONS, FUSION_BY_ID, fz, fusionReady, fusionHint, availableFusions, takeFusion,
                 frostPulse, knockRoom, PROPS, propKinds,
+                FLOOR_TEX, floorTex, TEXTURE, bakeTileAtlas, bakeSpills, runClock,
                 CONTRACTS, cStat, bump, bumpMax, contractDone, checkContracts,
                 AUGMENTS, ag, dealAugments, openAugments, takeAugment, refuseAugments,
                 spawnMini, MINIS, BOSS_WAVE, MINI_WAVES, miniWaves, isApexFloor, bossIndexFor,
