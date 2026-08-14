@@ -45,9 +45,9 @@ COMMON · UNCOMMON · RARE · EPIC · LEGENDARY
 > it was shown.
 
 LEGENDARY has weight 0 and cannot be **rolled**. Three things reach it anyway:
-[[#Off-cuts|off-cuts]]; any card carrying the `leg` flag — which is
-[[#SPLIT|SPLIT]] and nothing else, and does not roll a grade at all, it is
-dealt LEGENDARY or it is not dealt; and an
+[[#Off-cuts|off-cuts]]; any card carrying the `leg` flag — [[#SPLIT|SPLIT]] and
+[[#The two legendary cards|THE OTHER HAND]], which do not roll a grade at all,
+they are dealt LEGENDARY or they are not dealt; and an
 [[Economy#What a rung pays out|EVOLVE rung]] once the roster holds a gun of
 every rarity, which deals three cards at LEGENDARY and hands you the one you
 take **at the start of every run afterwards**.
@@ -86,16 +86,16 @@ you ever took that card at**, not the last one.
 
 ## The five aisles
 
-Aisles stopped being decoration. Commit to one and it commits back — **four**
-ranks anywhere in an aisle buys a standing perk, **eight** buys a much louder
-one, and **fourteen** buys an identity. This is what gives a run a shape
-instead of a pile of percentages.
+Aisles stopped being decoration. Commit to one and it commits back — **a rung
+every four cards, three times.** This is what gives a run a shape instead of a
+pile of percentages.
 
 ```js
-const AISLE_T1 = 4, AISLE_T2 = 8, AISLE_T3 = 14;
+const AISLE_T1 = 4, AISLE_T2 = 8, AISLE_T3 = 12;
+const AISLE_RUNGS = [AISLE_T1, AISLE_T2, AISLE_T3];
 ```
 
-| aisle | is | THE ORDER (4) | MASTERED (8) | rung 3 (14) |
+| aisle | is | THE ORDER (4) | MASTERED (8) | rung 3 (12) |
 |---|---|---|---|---|
 | **BLADES** | hurting things | +12% damage | crits cleave everything behind the target | **THE RED WORK** — +28% damage, +15% crit, and crits ignite |
 | **FRESH** | health and speed | +20 max health | clearing a wave heals a quarter of it back | **IN SEASON** — +45 max health, +10% speed, and you regrow 2/s |
@@ -106,12 +106,29 @@ const AISLE_T1 = 4, AISLE_T2 = 8, AISLE_T3 = 14;
 > [!note] Why there is a third rung at all
 > THE ORDER stopped at eight, which is a ceiling you hit around floor 5 with any
 > focused build and then never think about again — the aisle you committed to
-> went quiet for the whole back half of the run. Fourteen is deliberately past
+> went quiet for the whole back half of the run. Twelve is deliberately past
 > what a casual spread reaches: it is the rung you only see if you have
 > **refused cards from other aisles on purpose**, and it pays like it.
 >
 > Rung 3 is a **named state**, not another percentage, and the deck screen
-> prints the name. MASTERED is a tier; ABSOLUTE is an identity.
+> prints the name. MASTERED is a tier; THE RED WORK is an identity.
+
+> [!warning] The rungs were 4 / 8 / 14, and 14 was the wrong number
+> Not because it was too far — because it is **unlearnable**. It is not a
+> multiple of anything, the strip could not draw a sensible bar toward it, and
+> a player counting cards had no way to know when the next thing was coming.
+> "Every four" is a rule you can hold in your head on the level-up screen,
+> which is the only place it matters.
+>
+> Twelve is the better number on its own terms too. JUNK holds **18 ranks in
+> total**, so 14 was 78% of the entire aisle; 12 is 67%, still a real
+> commitment. All five aisles can reach it — verified, with headroom of 6
+> (JUNK) to 20 (FRESH).
+>
+> The three thresholds live in `AISLE_RUNGS` and everything that draws progress
+> walks that array, which is what stopped the UI from
+> [[Rendering#THE ORDER strip|claiming an aisle was finished at 8]] while a
+> whole rung sat above it.
 
 Names are one word each and the word says what the aisle does. The old
 BUTCHERY / PRODUCE / HARDWARE / EXPIRED were flavour you had to memorise a
@@ -273,8 +290,34 @@ than items a boss hands you:
 
 | card | aisle | is the old | does |
 |---|---|---|---|
-| **THE OTHER HAND** | TOOLS | GLOCK-18 | 1–2 spare guns fire themselves at whatever is closest. Rider **AKIMBO**: 0.20s → 0.12s |
+| **THE OTHER HAND** | TOOLS | GLOCK-18 | 1–2 spare guns fire themselves at whatever is closest. **LEGENDARY only** — see below |
 | **IGNITION** | FRESH | STOLEN BICYCLE | your dash RAMS for 32/rank. Rider **BURNOUT**: and leaves a trail of fire behind you |
+
+## The two legendary cards
+
+[[#SPLIT|SPLIT]] used to be the only card in the deck dealt at a fixed rarity.
+**THE OTHER HAND** joined it, for the same reason and by the same mechanism.
+
+A second gun that aims and fires itself is not a percentage. It is a whole
+extra source of damage that runs while you are reloading, dashing, or doing
+nothing at all — and at rank 2 it is two of them. Rolled at COMMON, that
+arrived as a shrug of a card carrying a permanent uplift, and there was no
+version of the hand where you did not take it.
+
+| | SPLIT | THE OTHER HAND |
+|---|---|---|
+| `leg` | 1 — never rolls a grade | 1 |
+| `w` (pool weight) | 0.30 | 0.40 |
+| unlock | an elite (`b: 1`) | a floor boss (`b: 2`) |
+| depth gate | floor 3 (`floor: 2`) | floor 4 (`floor: 3`) |
+| measured | ~1 hand in 48 | **~1 hand in 33** |
+
+Measured over 4,000 hands under fully-unlocked conditions: THE OTHER HAND
+appeared 121 times and **every one of the 121 was LEGENDARY**.
+
+Because LEGENDARY always clears `RIDER_AT`, **AKIMBO is never off** — the fast
+spare gun (0.20s → 0.12s) *is* the card now rather than a tier of it. Exactly
+the trick [[#SPLIT|CROSSFIRE]] pulls.
 
 The other three signatures had no card-shaped version worth having. BANANA and
 MELON were flat stat blocks that ADRENALINE and ROUGHAGE already cover, and

@@ -225,6 +225,68 @@ cards yet" branch after the block around it was deleted.
 system leaves references in places that only run on screens you are not
 looking at.
 
+## 19. The pistol opened every run on 14 rounds in a 12-round magazine
+
+**Found:** reading the HUD during an unrelated check, which is the only reason
+it was found at all — nothing throws, and `14/12` is the kind of thing you see
+a hundred times without registering.
+
+`makePlayer()` hardcoded the starting magazine:
+
+```js
+owned: ['pistol'], wi: 0, mags: { pistol: 14 },
+```
+
+That `14` was correct when the pistol held 18 and something else set it; when
+[[Weapons#The magazine, and why 12|the pistol was cut to 12]] the literal was
+missed. Every run therefore started with **two rounds the gun does not have**,
+and the ammo readout opened on `14/12`.
+
+**Fix:** `mags: { pistol: WEP.pistol.mag }`. The number is read off the gun and
+never typed twice, so it cannot drift again.
+
+> The lesson is the duplication, not the arithmetic. A magazine size that
+> appears in two places is a magazine size that will disagree with itself.
+
+## 20. The run clock ran while you were reading a menu
+
+**Found:** by testing the thing immediately after building it — 600 frames of
+play, then 300 frames on the pause screen, asserting the clock had not moved.
+It had, from 10.05s to 15.06s.
+
+`S.runT += rdt` went at the top of `update()`. But `update()` is called **every
+frame in every mode** — the `if (S.mode !== 'play') return` guard sits forty
+lines further down, and it is that guard, not the call site, that makes the
+rest of the function play-only. So the run timer counted the pause screen, THE
+DECK, level-up hands and PACI's room.
+
+**Fix:** move the increment below the guard. Verified frozen across all eight
+non-play modes, and it resumes correctly.
+
+This is the same misreading as
+[[#14. A menu inside the first 2.2 seconds killed the floor permanently|#14]]
+from the other direction: there, wall-clock time ran when it should not have;
+here, a game-time counter ran on menus because it was placed above the line
+that defines "in play".
+
+## 21. A moustache, from two bars of similar width
+
+**Found:** reported on sight — *"he looks so weird now with his mustache"* —
+after the [[Rendering#He was rebuilt from the silhouette in|character
+rebuild]].
+
+Not a code defect; an art one, and worth recording because the rule
+generalises. The face put a **4px dark nose base** on row 11 and a **6px dark
+mouth** on row 12, directly beneath it. Two solid horizontal bars, stacked,
+immediately under the nose. At sixteen pixels tall the eye does not resolve
+that as "nose, then mouth" — it resolves it as a moustache.
+
+**Fix:** nose base to 2px, mouth to 4px. Two rules came out of it:
+
+- **never stack bars of similar width** — make them differ enough to read as
+  separate features
+- **a mouth is a short line**, not one approaching the width of the jaw
+
 ---
 
 # Open

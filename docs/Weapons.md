@@ -21,7 +21,7 @@ the arena floor.
 | **FREEZER BURN** | RARE | 95 | 55 | 9 | chills for 2.2s — *the cold aisle, weaponised* |
 | **THE HOG** | RARE | 120 | 120 | 10 | minigun, spins up, slows you 45% — *never stops* |
 | **THE ROTISSERIE** | EPIC | 165 | 70 | 14 | **fires in a spinning circle** regardless of aim, burn 10 |
-| **GOD FINGER** | EPIC | 190 | 5 | 165 | railgun, 0.5s charge, pierces everything |
+| **GOD FINGER** | EPIC | 190 | 5 | 165 | railgun, 0.5s charge, pierces everything, **never reloads** |
 | **THE FISH** | LEGENDARY | **500 coins** | 300 (as fuel) | 720/s | a fish. it opens its mouth and a laser comes out, and the laser cycles colour |
 | **THE FLYKILLER** | LEGENDARY | **380** | 24 | 44 | the current **chains** up to five more throats — *the blue light above the deli. it has opinions.* |
 | **BLACK FRIDAY** | LEGENDARY | **460** | 5 | 250 | a singularity that **drags the room together** and then goes off in the middle of it — *everything comes to the sale* |
@@ -113,6 +113,34 @@ the first two floors.
 kills at floor-1 health, it still leaves the gun usable at MK X, and it makes
 CYCLE, HOPPER and QUICK HANDS cards you would actually take rather than cards
 about a problem you did not have.
+
+> [!warning] And it opened on 14 rounds in a 12-round magazine for two commits
+> `makePlayer()` hardcoded `mags: { pistol: 14 }`, a literal left over from an
+> older magazine size. Cutting the pistol to 12 left every run starting with
+> two rounds the gun does not have and a HUD reading `14/12`. It reads off the
+> weapon now, so it cannot drift again. See
+> [[Bugs Found#19. The pistol opened every run on 14 rounds in a 12-round magazine]].
+
+## GOD FINGER does not reload
+
+`noReload: 1`. The magazine is not a resource: it does not deplete, so it
+cannot run out and there is nothing to rack. `startReload()` returns
+immediately and `emit()` skips the decrement.
+
+The gun already pays for itself **twice** before a shot leaves it — a 0.5s
+charge you have to hold still through, and a 0.55s floor between shots. A
+2.4-second reload every five shots on top was a third tax on the same decision,
+and the one that made you stop playing: you spent it standing in the open
+having already committed to the fight. A charge weapon's rhythm should be
+charge / release / charge, and now it is.
+
+**Rate of fire is unchanged, so damage per second is untouched.** The HUD says
+`NO RELOAD` in the gun's colour instead of drawing a pip row that never empties
+— a full bar that never moves is a bar you learn to stop reading.
+
+One knock-on: BOTTOM OF THE BOX (the HOPPER rider, "the last third of a mag
+hits 35% harder") can never fire on GOD FINGER, because the magazine is always
+full. That is coherent rather than a gap — no mag, no dregs.
 
 ## Knockback
 

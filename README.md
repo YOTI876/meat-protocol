@@ -106,10 +106,10 @@ shot always crits*. That's the whole reason to care what comes up.
 COMMON · UNCOMMON · RARE · EPIC · LEGENDARY
 ```
 
-**Aisles commit back.** Four ranks anywhere in one aisle buys a standing perk,
-eight buys a louder one, and fourteen buys an identity:
+**Aisles commit back.** One rung every four cards you take from an aisle, three
+times — a standing perk, then a louder one, then an identity:
 
-| aisle | is | at 4 | at 8 | at 14 |
+| aisle | is | at 4 | at 8 | at 12 |
 | --- | --- | --- | --- | --- |
 | **BLADES** | hurting things | +12% damage | crits cleave everything behind the target | **THE RED WORK** |
 | **FRESH** | health and speed | +20 max health | clearing a wave heals a quarter back | **IN SEASON** |
@@ -117,13 +117,15 @@ eight buys a louder one, and fourteen buys an identity:
 | **TOOLS** | whatever gun you hold | +15% magazine | finishing a reload throws out a shockwave | **THE WHOLE RACK** |
 | **JUNK** | bad for you. worth it. | +1 LUCK | every fourth card comes up a rarity better | **PAST THE DATE** |
 
-Fourteen is past what a spread build reaches on purpose. It's the rung you only
+Twelve is past what a spread build reaches on purpose. It's the rung you only
 see if you've been refusing cards from other aisles, and it pays like it — THE
 WHOLE RACK fires *every gun you own* alongside the one in your hands.
 
-**SPLIT is the one card with its own rules.** LEGENDARY, never dealt before
-floor 3, and about one hand in forty. It makes your shot two rounds, both
-steering themselves in, and neither of them goes where you pointed.
+**Two cards are LEGENDARY or nothing.** They don't roll a rarity — they're
+dealt at the top of the ladder or they aren't dealt at all. **SPLIT** (about
+one hand in 48) makes your shot two rounds, both steering themselves in, and
+neither goes where you pointed. **THE OTHER HAND** (one in 33) is a spare gun
+that aims and fires itself while you're reloading, dashing, or doing nothing.
 
 **Ten OFF-CUTS are the thing to go looking for.** Hold two named cards at rank
 and a third thing exists that neither of them was — it's LEGENDARY, it takes
@@ -135,8 +137,8 @@ The deck is the only thing a kill pays out in now. The five **signature
 groceries** and the cold room they came from are gone — they were a fourth
 progression track with no decision in it, and their item text had been lying
 about its own numbers for three commits. Two of them came back as cards you
-build toward instead: **THE OTHER HAND** (a spare gun that fires itself) and
-**IGNITION** (your dash rams, and at RARE it leaves fire behind).
+build toward instead: **THE OTHER HAND** (above) and **IGNITION** (your dash
+rams, and at RARE it leaves fire behind).
 
 ## TOMCE
 
@@ -168,7 +170,7 @@ can skip five floors of progression.
 | FREEZER BURN | 95 | the cold aisle, weaponised |
 | THE HOG | 120 | minigun — spins up, slows you down, never stops |
 | **THE ROTISSERIE** | 165 | fires in a spinning circle. it does not care where you point it |
-| GOD FINGER | 190 | railgun, charges, pierces the entire room |
+| GOD FINGER | 190 | railgun, charges, pierces the entire room, **never reloads** |
 | **THE FISH** | **500 coins** | a fish. it opens its mouth and a laser comes out, and the laser cycles colour |
 | **THE FLYKILLER** | **380** | the current chains through up to five more throats |
 | **BLACK FRIDAY** | **460** | a singularity. it drags the room into one place, then goes off there |
@@ -229,8 +231,10 @@ cosmetic progress.
 Coins come in **30% slower** than they used to, which is what makes THE FISH a
 decision rather than a milestone you walk past.
 
-**Cosmetics**: GOLD BAND (1000), TOXIC BAND (2500), VOID (5000), BONE MASK
-(9000), LIVING FLAME (15000, and it actually burns).
+**Cosmetics**: GOLD (1000), TOXIC (2500), VOID (5000), BONE MASK (9000),
+LIVING FLAME (15000, and the cloth is actually on fire). They repaint the
+neckerchief at his throat — and the ones that touch the coat take the apron
+with them.
 
 ## EVOLVE
 

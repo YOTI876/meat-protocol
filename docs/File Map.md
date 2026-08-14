@@ -49,10 +49,11 @@ SLOP/
    `checkContracts`)
 8. [[Floors#Twists|Twists]] (`updateTwist`, `blackoutK`) and
    [[Bosses#Hazards|hazards]] (`updateHaz`, `drawHaz`, `mortarAt`)
-9. Room building (`buildRoom` + `place`/`scatter`, `bakeFloor`), the
-   [[Floors#Props|prop library]] (`PROPS`, `box`, `FLOOR_PROPS`, `LIT_PROPS`,
-   `WALL_STYLE`) and [[The Shop]] (`shopStock`, `enterShop`, `angerPaci`,
-   `exitShop`)
+9. Room building (`buildRoom` + `place`/`scatter`), the
+   [[Rendering#The floor|floor bake]] (`FLOOR_TEX`, `TEXTURE`, `TEX_ARENA`,
+   `bakeTileAtlas`, `bakeSpills`, `bakeFloor`), the [[Floors#Props|prop
+   library]] (`PROPS`, `box`, `FLOOR_PROPS`, `LIT_PROPS`, `WALL_STYLE`) and
+   [[The Shop]] (`shopStock`, `enterShop`, `angerPaci`, `exitShop`)
 10. Entity spawning (`spawnEnemy`, `spawnBoss`, `spawnMini`, `makePlayer`)
 11. Juice helpers (`part`, `sparks`, `impact`, `gib`, `blood`, `shred`, `ring`,
     `deathBurst`, `float`, `shake`) — see [[Rendering#Effects]]

@@ -32,7 +32,7 @@ All in `js/game.js` unless noted.
 | rarity weights | `w: 100 / 30 / 8 / 1.6 / 0` | `GRADE` | how often RARE turns up, and so how often riders happen at all |
 | rarity multipliers | `1.00 / 1.35 / 1.75 / 2.25 / 3.00` | `GRADE` | what a high roll is worth numerically, on top of its rider |
 | luck slope | `1 + luck * 0.55 * i` | `rollGrade()` | how hard one point of LUCK tilts the ladder |
-| aisle thresholds | `AISLE_T1 = 4`, `AISLE_T2 = 8`, `AISLE_T3 = 14` | deck section | how far you must commit to an [[The Deck#The five aisles\|aisle]] before it pays. T3 is deliberately past what a spread build reaches |
+| aisle thresholds | `AISLE_RUNGS = [4, 8, 12]` | deck section | how far you must commit to an [[The Deck#The five aisles\|aisle]] before it pays. **Keep the spacing even** — a rung every 4 is a rule a player can hold; 4/8/14 was unlearnable and the UI could not draw a bar toward it. Anything that shows progress walks this array |
 | hand size | `3 + (apex ‖ menu) + hollow` | `handSize()` | reaches 5; card width scales to fit, do not hardcode it again |
 | reroll cost | `20 + rerolls * 15` | `rerollCost()` | how repeatable a reroll is within a run |
 | XP curve | `xpNext = 80`, `*= 1.30` | `freshState` / `gainXP()` | how fast levels slow down. Went 65/1.32 -> 48/1.23 -> 80/1.30 — see [[Progression#XP & levels]] |
@@ -70,6 +70,11 @@ All in `js/game.js` unless noted.
 | house knockback | `38` | `fire()` | the default shove for any gun with no `knock` of its own. Was 60; the shotgun's own went 140 → 45 |
 | particle ceilings | 900 part / 420 gib / 80 ring | `updateParticles()` | oldest-first splice. The frame budget's real backstop — see [[Rendering#Effects]] |
 | deferred effect drain | 3 a frame, cap 12 | `S.fx` | how fast kill-triggered effects resolve. This is what stops an OVERKILL chain recursing |
+| tile variants | `TILE_VARIANTS = 12` | above `bakeTileAtlas` | how much floor there is before the eye finds the repeat. Raising it costs bake time **linearly**, unlike the old per-pixel loop — see [[Rendering#The floor]] |
+| floor surface | `FLOOR_TEX[]` | top of the floor section | which of the ten [[Floors#Surfaces\|surfaces]] a floor is made of |
+| spill blobs | 6, at 7% of tiles | `bakeSpills` / `bakeFloor` | how used the floor looks. Pre-rendered, so the rate is nearly free now |
+| never-reload guns | `noReload: 1` | `WEP` | the magazine stops being a resource. Only GOD FINGER — see [[Weapons#GOD FINGER does not reload]] |
+| starting magazine | `WEP.pistol.mag` | `makePlayer()` | **read off the gun, never a literal** — see [[Bugs Found#19. The pistol opened every run on 14 rounds in a 12-round magazine]] |
 | sidearm mark bonus | `0.20` in `scarMul` | `ST()` | damage per [[Progression#The evolving sidearm\|floor mark]] |
 | music intensity curve | `0.12 + (wave/10)*0.72 + floor*0.16` | `startWave()` | how fast [[Music]] builds within a floor |
 | frame delta clamp | `[0, 0.05]` | `frame()` | see [[Bugs Found#4. Negative frame delta crashed the render loop]] — do not remove |

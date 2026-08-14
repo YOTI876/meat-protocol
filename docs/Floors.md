@@ -98,6 +98,47 @@ in the lightmap.
 > where you are standing. A hazard that spawns under you is not a hazard, it
 > is a tax.
 
+## Surfaces
+
+The palettes always differed. The **pattern** did not: every room was the same
+16-unit grid of tiles in a different colour, which read as one building with
+the lights changed. A surface says more about where you are than its hue does —
+you know a freezer from a wooden floor with the colour turned off.
+
+```js
+const FLOOR_TEX = ['tile', 'grate', 'plate', 'quarry', 'ice',
+                   'sludge', 'board', 'salt', 'lino', 'drain'];
+```
+
+| # | floor | surface | is |
+|---|---|---|---|
+| 1 | THE ABATTOIR | `tile` | glazed and grouted |
+| 2 | THE HOLLOW | `grate` | you are standing on a drain |
+| 3 | THE MEAT LOOP | `plate` | riveted tread plate, diamond pattern |
+| 4 | THE RED KITCHEN | `quarry` | small tiles in staggered courses |
+| 5 | THE FREEZER | `ice` | rime and stress cracks |
+| 6 | THE RENDERING | `sludge` | poured, and something got on it |
+| 7 | THE LONG TABLE | `board` | floorboards with grain and nails |
+| 8 | THE SALT LINE | `salt` | crusted over |
+| 9 | THE LAST AISLE | `lino` | supermarket vinyl with roll seams |
+| 10 | THE KILLING FLOOR | `drain` | a slab that has seen use |
+
+`TEXTURE[style]` paints **one tile** at device resolution over a shared
+tone-and-grain base, and it is called twelve times per floor — once per variant
+in the [[Rendering#The floor|atlas]] — so it can afford to be detailed.
+
+Two surfaces also carry a **room-scale** feature that a repeating tile cannot
+express, in `TEX_ARENA`: drainage channels running the length of the killing
+floor, and a sump the grating drains into on THE HOLLOW.
+
+[[The Shop|PACI's back room]] gets `quarry` of its own, so you know you have
+left the building by looking down.
+
+> [!note] Twelve variants
+> Enough that the eye stops finding the repeat, few enough that baking them is
+> free. Which variant a tile gets is a `rng()` draw at blit time, so two
+> adjacent tiles of the same kind are rare.
+
 ## Walls
 
 The border wall was the same brick on all ten floors, which quietly undid every
@@ -172,6 +213,7 @@ edges of the room where a swapped prop changes the fight least.
 
 ## Related
 - [[Bosses]] — the ten roster bosses, shuffled across these floors, and the finale on the tenth
+- [[Rendering#The floor]] — how a surface is baked, and why it is 8× faster than it was
 - [[Rendering#Arena layouts]] — the five geometries the props are placed into
 - [[How A Run Goes]] — the wave shape inside a floor, and the ending
 - [[Difficulty Scaling]] — how much harder each of the ten is than the last

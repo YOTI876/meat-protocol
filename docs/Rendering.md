@@ -110,29 +110,115 @@ their mix at 0.5 alpha (0.7 where three or more colours meet).
 
 ## The floor
 
-`bakeFloor()` builds per-tile `tone` and `wear` arrays, then resolves the
-whole floor in **one `createImageData` pass** with ordered dithering and a
-hash grain, followed by grout with a lit lip, dithered spills and hairline
-cracks.
+`bakeFloor()` bakes a small **atlas of 12 tile variants**, blits it across the
+arena, and then stamps sparse spills and hairline cracks over the top. Each
+floor picks a [[Floors#Surfaces|surface]] from `FLOOR_TEX`, and `TEXTURE[style]`
+paints one variant at device resolution over a shared tone-and-grain base.
 
-> [!note] Why one pass
-> Dithering the floor per-pixel with `fillRect` would have been roughly a
-> million calls per room build. The `createImageData` version is a single
-> buffer write. Ordered dithering is also what lets three flat floor tones
-> read as a value gradient without inventing a fourth colour — at this pixel
-> density it looks like grime settling rather than like a pattern.
-
-`BAYER`/`bay()` at the top of the shop section is the same 4×4 matrix the
+Ordered dithering is what lets three flat floor tones read as a value gradient
+without inventing a fourth colour — at this pixel density it looks like grime
+settling rather than a pattern. `BAYER`/`bay()` is the same 4×4 matrix the
 sprite shader uses.
 
-## Damage on Damjan
+### It used to be one enormous pixel loop, and that was the lag
+
+The old version resolved **every device pixel of the arena in JS**: a
+`createImageData` the size of the room, tone and dither and grain per pixel.
+Then grout with four `fillRect`s per tile, and spills painted a device pixel at
+a time. Measured, that is a flat **~32 nanoseconds per device pixel**, and
+floor 9 is **4.75 million** of them.
+
+| | |
+|---|---|
+| pixel loop | ~100 ms |
+| spills | ~37 ms (55,000 `fillRect`s) |
+| grout | ~9 ms (19,000 `fillRect`s) |
+
+Every part of it was doing per-pixel work for something that **repeats**. So:
+bake 12 tile variants once (12,288 pixels instead of 4,752,000, a **386×**
+reduction), bake the grout *into* those variants so it costs nothing,
+pre-render six spill blobs and `drawImage` them, and blit.
+
+| bake | before | after |
+|---|---|---|
+| worst floor | 234 ms | **31 ms** |
+| whole run | 1,791 ms | **220 ms** |
+| dropped frames | 107 | **13** |
+
+**8.1× overall.** The cost now scales with tile *count* rather than pixel
+count, so it barely grows as the arenas do — floor 9 is the biggest room and no
+longer the worst bake.
+
+> [!warning] Measure a canvas bake with the pipeline drained
+> Raw `performance.now()` around a bake **under-reports** it: `drawImage` calls
+> queue, and the cost lands on whatever later call forces a flush. Both figures
+> above were taken with a forced drain after the bake and the drain's own
+> overhead (~16.6 ms) subtracted, old and new, on the same machine in the same
+> session. Without that the "after" looked like 26 ms and the "before" like
+> 149 ms — flattering to both, and not comparable.
+
+> [!note] What the profiling ruled out first
+> "It lags sometimes" is not the framerate. Steady play is **1.3 ms a frame at
+> the enemy cap** against a 16.7 ms budget; the heap is flat at 5–7 MB; the
+> sprite cache creates **29 canvases for an entire ten-floor run**; and enemy
+> cost scales linearly, not quadratically. The floor bake was the only real
+> stall.
+>
+> Beware the harness, too: driving frames synchronously with no
+> `requestAnimationFrame` between them makes draw calls batch and periodically
+> flush inside the timing window, which manufactures 40–90 ms "spikes" that no
+> player ever sees.
+
+## Damjan
 
 The player is deliberately the one thing in the game that stays natural — no
 exaggerated face, no horror styling. What happens to him is physical.
 
+### He was rebuilt from the silhouette in
+
+The old figure was a mascot. His head was **22 of his 32 rows** — two thirds of
+the whole sprite — sitting straight on a flat green rectangle with no neck, no
+shoulders and no arms, wearing a knotted bandana with a tail. At a glance that
+is a bobblehead in a headband, and no amount of face detail fixes a proportion
+problem.
+
+| | |
+|---|---|
+| **proportion** | head 22 rows → **14**, ~44% of him instead of 69%. Does more than everything else combined. |
+| **a neck** | he has one. It is what lets the head read as attached rather than balanced. |
+| **shoulders** | a real shoulder line sloping out from the neck, with arms separated from the torso by a one-pixel shadow gap so the limb does not merge into the body at distance. Gloves on the forearms. |
+| **one big shape** | a bone-white butcher's apron, bib to hem, against a dark coat. A silhouette this small cannot carry texture; it can carry one strong value contrast. Stained asymmetrically with dried blood, because he works here. |
+| **hair** | direction (strands falling from a part and sweeping right), two tones with the highlight pooling top-left under the same strip light as everything else, a flat crown instead of a circle, a fringe that dips into the forehead instead of ruling a line across it, and sideburns carrying the mass down past the temple. |
+
+The reference is not any one game — it is the discipline the good top-down
+pixel work shares: commit to a shape, let value do the work, and spend detail
+only where the eye already goes.
+
+> [!warning] The moustache, and the rule that came out of it
+> The first pass put a **4px dark nose base** on row 11 and a **6px dark
+> mouth** on row 12, directly beneath it. Two solid horizontal bars, stacked,
+> immediately under the nose — at sixteen pixels tall the eye does not resolve
+> that as "nose, then mouth", it resolves it as a moustache. And once you have
+> seen it you cannot unsee it.
+>
+> Two rules, and they are general at this density:
+> - **never stack bars of similar width.** Make them differ enough to read as
+>   separate features — the nose base is 2px now, the mouth 4px.
+> - **a mouth is a short line.** Anything approaching the width of the jaw
+>   stops being a mouth.
+
+The `r`/`R`/`w` palette keys that were the headband are a **neckerchief** at
+his throat now, so every [[Cosmetics]] repaint still lands.
+
+### Damage on Damjan
+
 `hurtStage()` returns 0–3 from his health fraction (thresholds .72 / .46 /
 .22), and `bodySprite()` / `legSprite()` swap in progressively wrecked
-versions: cloth tears open, then what's under it shows.
+versions. Retargeted with the rebuild, and they now read off the **apron** — on
+the old dark-green jacket every wound was dark-on-dark and the whole system was
+invisible until stage 3. Order of destruction: the apron gets wet, then it
+tears and the sleeve opens on the arm inside it, then the apron is mostly gone
+and so is some of him.
 
 `shred()` throws two kinds of debris on every hit — **cloth rags** and
 **meat gibs**. Rags get drag, gravity and spin, render as flat rotating
@@ -279,9 +365,8 @@ clothes. See `fonts/README.md`.
 A [[The Deck|card face]] is a price tag: a punched hole with a ring, paper
 grain, a hard drop shadow, and a halo behind anything RARE or better. The face
 carries only what you choose between — rarity, name, effect, and the rider
-when there is one. It lost the locked-rider band, the ladder pips, the aisle
-line and the "held" line, because everything on it competing for the eye is
-something you are not reading.
+when there is one. It lost the locked-rider band and the rarity ladder, because
+everything on it competing for the eye is something you are not reading.
 
 Everything inside the frame is the **rarity's** colour. Aisle colours appear
 only on THE ORDER strip and the deck headings: two colour systems in five
@@ -293,10 +378,102 @@ Cards **size themselves to the space**. Width was hardcoded to two values, and
 width too, and the strings that silently truncated at the narrowest layout
 were shortened.
 
-> [!note] A pulsing pip is a filled pip
-> The rank pips used to animate a "preview" pip for the rank you were about to
-> buy. In a still frame that reads as filled, so a card you owned none of
-> looked owned. They don't pulse any more.
+### The foot: two numbers, and it must be obvious which is which
+
+The bottom of a card carried the **aisle's name** followed immediately by a row
+of **pips** — and the pips counted that *card's* ranks, not the aisle's. Two
+different scopes, touching, with only one of them labelled. `BLADES ▪▪▪▪▪▪`
+reads as six of something to do with BLADES, which is not what it was.
+
+Worse, the count you actually want while deciding — how close **that aisle** is
+to its [[The Deck#The five aisles|next rung]] — was the one thing the card did
+not tell you. So the aisle half now shows the aisle's own progress, the card
+half is labelled, and neither is a pip:
+
+```
+BLADES 5/8                              HELD 0/2
+```
+
+Both halves shrink together (6px down to 4.6px) if a five-card hand leaves the
+card too narrow, rather than letting the right one slide off the edge
+unnoticed. `HELD` is dimmed when you hold none of it, so a card you have never
+taken does not compete with the aisle count for attention.
+
+> [!note] The pips are gone, and so is the reason they were confusing
+> They also used to animate a "preview" pip for the rank you were about to buy,
+> which in a still frame is simply a filled pip — so a card you owned none of
+> looked owned. Numbers are unambiguous at 6px in a way two adjacent ladders
+> never were.
+
+## THE ORDER strip
+
+Five chips under the hand, one per aisle, each filling toward that aisle's next
+rung with **three pips for the three rungs** — the same shape the HUD corner
+uses, so the ladder is countable rather than inferred.
+
+> [!warning] It used to claim an aisle was finished at 8
+> The headline read *"4 cards earns its perk, 8 masters it"* and the chip
+> printed `MAX` at eight. That copy was written when there were two rungs and
+> never updated when a third arrived, so the strip told you an aisle was done
+> while a whole rung sat above it — and the deck screen agreed, showing an
+> aisle at 11 of 12 as MASTERED with nothing left to say.
+>
+> Everything that draws progress now walks `AISLE_RUNGS` instead of hardcoding
+> which two of the three it knows about, and the headline states the **cadence**
+> rather than listing numbers: *"it pays you again every 4 cards, three
+> times."* True, and it stays true if the numbers move.
+
+The bar also fills **from the last rung to the next**, not from zero. Filling
+from zero meant an aisle at 9 of 12 showed a three-quarters-full bar that had
+not moved since 8 — progress you were not making.
+
+## The run clock
+
+`runClock()` renders `S.runT` as `MM:SS`, rolling to `H:MM:SS` only once there
+is an hour to show — a leading `0:` on every run of a game whose floors take
+four minutes is two characters of nothing. Seconds are zero-padded so the
+string never changes width mid-wave and jitters the right edge of the HUD.
+
+It sits **under the score** in the top-right, dimmer than it: the other number
+that only ever counts up, but something you check between waves rather than
+play toward. The combo drops a line below rather than sharing the row, because
+a combo is loud and brief and would fight a clock that is always there.
+
+The final time appears on both terminal screens — on
+[[#The win screen|the win screen]] it is the one number you can try to beat.
+
+> [!warning] `update()` runs in every mode; the guard is what makes it play-only
+> `S.runT += rdt` first went at the top of `update()`, which is called every
+> frame regardless of `S.mode`. The mode guard sits forty lines further down.
+> So the run timer kept ticking through the pause screen, THE DECK and every
+> level-up hand — measured at **15.06 s after 10 s of play and 5 s on a menu**.
+>
+> Moved below the guard it measures time actually spent in the building, which
+> is the only version of a run timer worth reading. Verified frozen across all
+> eight non-play modes. It also stops on the winning hit rather than when the
+> win screen appears, because the 3.4 s the finale takes to fall over is not
+> time you spent clearing the game. Same class of mistake as
+> [[Bugs Found#14. A menu inside the first 2.2 seconds killed the floor permanently|the wall-clock wave timer]].
+
+## The death screen
+
+Title, how far you got, the score, one row of numbers — coins, cards, vault,
+kills, **time** — and then RETRY.
+
+> [!note] It used to hand you a paragraph before it let you at the button
+> Two more lines sat between the stats and the buttons: a run of *"guns 3/13 ·
+> cards 14 · level 9 · best 41200 · EVO 2/10 — next 600 coins"*, and the
+> nearest unsigned contract with its progress. Both were written to give you a
+> reason to press RETRY and both did the opposite — you have just died, and the
+> screen answered with reading.
+>
+> The information was real but the moment is wrong for it: EVO and the contract
+> ladder both live on screens you go to deliberately, and the wallet numbers
+> are on the HUD every second of the next run anyway.
+>
+> Removing them also retired a line that had gone stale — *"every contract
+> signed. there is still no bottom."* was written for the endless descent, and
+> [[Floors|the descent has had a bottom]] since `9551e17`.
 
 ## The deck screen
 

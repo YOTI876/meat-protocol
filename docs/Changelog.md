@@ -374,6 +374,89 @@ pillars floors]], and
 [[Bugs Found#18. `drawDeck` threw the instant the deck screen opened|a dangling
 reference that broke the deck screen]].
 
+## `0210224` — Rebuild Damjan, and a rung every four cards
+
+**[[Rendering#He was rebuilt from the silhouette in|Damjan was a mascot]].** His
+head was **22 of his 32 rows** — two thirds of the whole sprite — sitting
+straight on a flat green rectangle with no neck, no shoulders and no arms,
+wearing a knotted bandana with a tail. Head to 14 rows, a neck, a real shoulder
+line, arms separated from the torso by a one-pixel shadow gap, a bone-white
+butcher's apron as the one big shape, and hair with actual direction and two
+tones instead of a flat brown dome.
+
+The headband went with the rest of it: `r`/`R`/`w` are a **neckerchief** now,
+so all six [[Cosmetics]] still repaint. They lost the word BAND from their
+names, kept their ids, and the two that repaint the coat now repaint the apron
+as well.
+
+> [!note] The moustache
+> A 4px nose base stacked over a 6px mouth reads as a moustache at sixteen
+> pixels tall. Two rules out of it, both general:
+> [[Bugs Found#21. A moustache, from two bars of similar width|never stack bars
+> of similar width, and a mouth is a short line]].
+
+**[[The Deck#The five aisles|THE ORDER is 4 / 8 / 12]]** — a rung every four
+cards, three times. It was 4 / 8 / 14, and 14 is unlearnable: not a multiple of
+anything, no sensible bar to draw toward it. Every surface states the cadence
+now instead of listing numbers, which also retired a strip that
+[[Rendering#THE ORDER strip|claimed an aisle was finished at 8]] while a whole
+rung sat above it.
+
+**[[Rendering#The foot: two numbers, and it must be obvious which is which|The
+card foot]]** was the aisle's name next to pips that counted the *card's*
+ranks — two scopes touching, one of them labelled. Two labelled numbers now.
+
+**[[Weapons#GOD FINGER does not reload|GOD FINGER never reloads]]**, and
+**[[The Deck#The two legendary cards|THE OTHER HAND is LEGENDARY-only]]** —
+measured 121 appearances over 4,000 hands, all 121 at LEGENDARY.
+
+Fixed on the way:
+[[Bugs Found#19. The pistol opened every run on 14 rounds in a 12-round magazine|every
+run opened on 14 rounds in a 12-round magazine]].
+
+## `1541835` — Ten floor surfaces, an 8× faster bake, and a run clock
+
+**The [[Rendering#It used to be one enormous pixel loop, and that was the lag|floor
+bake was the lag]].** Reported as *"it lags rarely sometimes"*, and profiling
+first ruled out everything else: steady play is **1.3ms a frame at the enemy
+cap** against a 16.7ms budget, the heap is flat at 5–7MB, the sprite cache
+creates 29 canvases for a whole run, and enemy cost scales linearly.
+
+`buildRoom()` resolved every device pixel of the arena in JS at a flat ~32
+nanoseconds each — 4.75 million of them on floor 9 — then drew grout with
+19,000 `fillRect`s and spills with 55,000 more. Now it bakes an **atlas of 12
+tile variants** once, bakes the grout into them, pre-renders six spill blobs,
+and blits.
+
+| | before | after |
+|---|---|---|
+| worst floor | 234 ms | **31 ms** |
+| whole run | 1,791 ms | **220 ms** |
+| dropped frames | 107 | **13** |
+
+**8.1×**, measured old against new on the same machine with the GPU pipeline
+drained and the drain's overhead subtracted — raw timings under-report a bake,
+because `drawImage` calls queue and land on whatever later call forces a flush.
+
+**[[Floors#Surfaces|Ten surfaces]].** The palettes already differed; the
+pattern did not, so every room was the same tile grid with the lights changed.
+Glazed tile, a grate, riveted tread plate, staggered quarry tile, cracked ice,
+poured sludge, floorboards, crusted salt, supermarket lino, and a stained drain
+slab — plus room-scale drainage channels and a sump that a repeating tile
+cannot express.
+
+**[[Rendering#The run clock|A run clock]]**, `MM:SS` under the score, on both
+terminal screens. It counts below the mode guard in `update()`, which is the
+load-bearing detail —
+[[Bugs Found#20. The run clock ran while you were reading a menu|above it, the
+clock ran while you were on menus]].
+
+**[[Rendering#The death screen|The death screen says less]].** Two lines went
+from between the stats and the buttons; you have just died and the screen was
+answering with a paragraph. That also retired *"every contract signed. there is
+still no bottom."*, written for a descent that has had a bottom since
+`9551e17`.
+
 ## Related
 - [[Bugs Found]] — the defects behind each fix above, and two still open
 - [[Tuning Values]] — where the numbers stand today
