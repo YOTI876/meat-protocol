@@ -272,8 +272,7 @@ that defines "in play".
 ## 21. A moustache, from two bars of similar width
 
 **Found:** reported on sight — *"he looks so weird now with his mustache"* —
-after the [[Rendering#He was rebuilt from the silhouette in|character
-rebuild]].
+after the [[Rendering#What he is|character rebuild]].
 
 Not a code defect; an art one, and worth recording because the rule
 generalises. The face put a **4px dark nose base** on row 11 and a **6px dark

@@ -174,51 +174,96 @@ longer the worst bake.
 The player is deliberately the one thing in the game that stays natural — no
 exaggerated face, no horror styling. What happens to him is physical.
 
-### He was rebuilt from the silhouette in
+### What he is
 
-The old figure was a mascot. His head was **22 of his 32 rows** — two thirds of
-the whole sprite — sitting straight on a flat green rectangle with no neck, no
-shoulders and no arms, wearing a knotted bandana with a tail. At a glance that
-is a bobblehead in a headband, and no amount of face detail fixes a proportion
-problem.
+A butcher. That is the whole brief, and it took several passes to get back to
+it.
 
 | | |
 |---|---|
-| **proportion** | head 22 rows → **14**, ~44% of him instead of 69%. Does more than everything else combined. |
-| **a neck** | he has one. It is what lets the head read as attached rather than balanced. |
-| **shoulders** | a real shoulder line sloping out from the neck, with arms separated from the torso by a one-pixel shadow gap so the limb does not merge into the body at distance. Gloves on the forearms. |
-| **one big shape** | a bone-white butcher's apron, bib to hem, against a dark coat. A silhouette this small cannot carry texture; it can carry one strong value contrast. Stained asymmetrically with dried blood, because he works here. |
-| **hair** | direction (strands falling from a part and sweeping right), two tones with the highlight pooling top-left under the same strip light as everything else, a flat crown instead of a circle, a fringe that dips into the forehead instead of ruling a line across it, and sideburns carrying the mass down past the temple. |
+| **the head** | hair, a brow, one eye, a nose, a mouth, three days of stubble — and a bandage over the other eye. 14 of his 32 rows, ~44% of him. |
+| **the body** | crimson work shirt, bone-white apron on two straps over it, a belt, dark trousers. Two bare hands, and they are both his. |
+| **no hardware** | nothing bolted to him, nothing driven through him. |
+| **hair** | direction rather than a dome: the lighter brown crowds the upper-left and thins out down-right, so the mass takes the same failing strip light as everything else. Ragged fringe — a clean arc reads as a helmet. |
 
 The reference is not any one game — it is the discipline the good top-down
 pixel work shares: commit to a shape, let value do the work, and spend detail
 only where the eye already goes.
 
-> [!warning] The moustache, and the rule that came out of it
-> The first pass put a **4px dark nose base** on row 11 and a **6px dark
-> mouth** on row 12, directly beneath it. Two solid horizontal bars, stacked,
-> immediately under the nose — at sixteen pixels tall the eye does not resolve
-> that as "nose, then mouth", it resolves it as a moustache. And once you have
-> seen it you cannot unsee it.
->
-> Two rules, and they are general at this density:
-> - **never stack bars of similar width.** Make them differ enough to read as
->   separate features — the nose base is 2px now, the mouth 4px.
-> - **a mouth is a short line.** Anything approaching the width of the jaw
->   stops being a mouth.
+With no hardware breaking the outline, **both reads have to come from value**:
+the apron is the one big pale mass, so he is dark-light-dark top to bottom and
+never a single blob, and the bandage is a pale wedge on a dark head. That is a
+harder silhouette to carry than one with a shape sticking out of it. If he ever
+starts vanishing in a crowded room, the fix is pushing the apron brighter — not
+putting hardware back.
 
-The `r`/`R`/`w` palette keys that were the headband are a **neckerchief** at
-his throat now, so every [[Cosmetics]] repaint still lands.
+### The three wrong turns, so they are not taken again
+
+> [!warning] 1. A full head wrap
+> An earlier design bandaged the entire head. It solved a real problem — a face
+> at sixteen pixels is brutally hard — by deleting the one part of a character
+> people actually look for. **A pale oval with two slits in it is an oval.**
+> Half a bandage keeps the idea and gets the face back; a whole one is a blank.
+
+> [!warning] 2. Red only at the edges
+> The apron used to fill the entire torso, with the shirt showing as a thin
+> strip down each outside edge. **Red framing a pale front is a cape**, not a
+> shirt. The chest has to be shirt edge-to-edge for several rows before the
+> apron is allowed to start, with the straps crossing it — two straps meeting
+> the bib at its own edges are what turn a border back into a chest.
+
+> [!warning] 3. A rail through the shoulder and a hook for a hand
+> Read as a **cyborg**, which is a different game. Hardware attached to a person
+> reads as equipment however bloody you draw it. What is left is a man, and the
+> horror is what is *on* him rather than what has replaced him.
+
+<a id="the-moustache"></a>
+
+### The moustache, and the rule that came out of it
+
+One pass put a **4px dark nose base** directly above a **6px dark mouth**. Two
+solid horizontal bars, stacked, immediately under the nose — at sixteen pixels
+tall the eye does not resolve that as "nose, then mouth", it resolves it as a
+moustache. And once you have seen it you cannot unsee it.
+
+Three rules, and they are general at this density:
+
+- **never stack bars of similar width.** A nose is 2px and a mouth is 4px.
+- **a mouth is a short line.** Anything approaching the width of the jaw stops
+  being a mouth.
+- **never let them touch.** The row between the nose and the mouth is left
+  empty on purpose; without that gap the two fuse into a single dark bar and
+  you are back to a moustache.
+
+> [!note] Stamps have to be cut to the silhouette
+> `SPR.body` is `shade(up2(DAM_BODY))` with hand-drawn patches stamped on top,
+> and a stamp that runs the full 32 columns will paint straight over the
+> keyline. The head tapers — its crown rows are only ten sub-pixels wide — so
+> every row of `DAM_FACE` is cut to that row's own interior. Getting this wrong
+> leaves the skull edgeless and it is not obvious until you look at the grid.
+
+The `r`/`R`/`w` palette keys are the **work shirt**, the largest coloured area
+on him, so every [[Cosmetics]] repaint still lands. The bandage keeps the
+neutral ramp (`7`/`9`) so nothing repaints it.
 
 ### Damage on Damjan
 
 `hurtStage()` returns 0–3 from his health fraction (thresholds .72 / .46 /
 .22), and `bodySprite()` / `legSprite()` swap in progressively wrecked
-versions. Retargeted with the rebuild, and they now read off the **apron** — on
-the old dark-green jacket every wound was dark-on-dark and the whole system was
-invisible until stage 3. Order of destruction: the apron gets wet, then it
-tears and the sleeve opens on the arm inside it, then the apron is mostly gone
-and so is some of him.
+versions. They read off the **apron** — on a dark garment every wound is
+dark-on-dark and the whole system stays invisible until stage 3. Order of
+destruction: a cut on the brow, then a sleeve torn off and a hole punched in
+the apron, then the apron opened right up and the bandage off what it was
+covering.
+
+The face keeps its own thread, and all of it stays **left of the eye** until
+the last stage: a hurt player still needs to be able to find his own face.
+
+> [!note] The tears have to be re-aimed whenever the torso moves
+> The patches address absolute sub-pixel columns. When the apron moved down two
+> rows to make room for the shirt, every tear stayed where it was and started
+> landing on his sleeves — a hole in an apron where there was no apron. Nothing
+> errors; it just looks wrong.
 
 `shred()` throws two kinds of debris on every hit — **cloth rags** and
 **meat gibs**. Rags get drag, gravity and spin, render as flat rotating

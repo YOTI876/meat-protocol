@@ -6446,9 +6446,9 @@ function drawPlayer(p) {
   ctx.restore();
 
   /* LIVING FLAME burns where the cloth actually is. The body sprite spans
-     y-13 to y+3 and the neckerchief sits on its rows 14-16 of 32, which lands
-     at about y-6 — the fire used to be emitted at y-13, the top of his skull,
-     because that is where the headband was. */
+     y-13 to y+3 and the work shirt's collar sits on its rows 14-16 of 32,
+     which lands at about y-6. The fire used to come off y-13, the top of his
+     skull, because back then `r`/`R`/`w` painted a headband. */
   const cos = cosDef(equippedCos());
   if (cos.fx === 'fire' && Math.random() < 0.9)
     part(px + rnd(-4, 4), py - 6 + bob, pick(['#ff8a20', '#ffd05a', '#ff3b1e']), 1, 22, 0.4);

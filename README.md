@@ -1,7 +1,8 @@
 # MEAT PROTOCOL
 
-Top-down pixel-art horror wave shooter. You are Damjan. You have a headband, a
-pistol that was in the drawer, and a shopping problem.
+Top-down pixel-art horror wave shooter. You are Damjan. You have a butcher's
+apron, a bandage over one eye, a pistol that was in the drawer, and a shopping
+problem.
 
 Ten waves a floor, two elites and a two-phase boss on the way through, PACI at
 half time and again at the end.
@@ -232,9 +233,10 @@ Coins come in **30% slower** than they used to, which is what makes THE FISH a
 decision rather than a milestone you walk past.
 
 **Cosmetics**: GOLD (1000), TOXIC (2500), VOID (5000), BONE MASK (9000),
-LIVING FLAME (15000, and the cloth is actually on fire). They repaint the
-neckerchief at his throat — and the ones that touch the coat take the apron
-with them.
+LIVING FLAME (15000, and the shirt is actually on fire). They repaint his
+**work shirt** — and the ones that go far from crimson take the apron with
+them, or he ends up a bone-white rectangle on a green man. Nothing repaints
+the bandage.
 
 ## EVOLVE
 

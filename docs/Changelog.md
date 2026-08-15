@@ -376,7 +376,7 @@ reference that broke the deck screen]].
 
 ## `0210224` — Rebuild Damjan, and a rung every four cards
 
-**[[Rendering#He was rebuilt from the silhouette in|Damjan was a mascot]].** His
+**[[Rendering#What he is|Damjan was a mascot]].** His
 head was **22 of his 32 rows** — two thirds of the whole sprite — sitting
 straight on a flat green rectangle with no neck, no shoulders and no arms,
 wearing a knotted bandana with a tail. Head to 14 rows, a neck, a real shoulder
@@ -456,6 +456,35 @@ from between the stats and the buttons; you have just died and the screen was
 answering with a paragraph. That also retired *"every contract signed. there is
 still no bottom."*, written for a descent that has had a bottom since
 `9551e17`.
+
+## `ef87bcd` — Give Damjan a face, a shirt, and no hardware
+Three passes on the character, each fixing something the last one broke. All
+of it is recorded in [[Rendering#What he is|Rendering]], because each one is a
+general lesson about drawing at this density and not a fact about this sprite.
+
+**The head was a ball.** A full bandage solved a real problem — a face at
+sixteen pixels is brutally hard — by deleting the one part of a character
+people actually look for. *A pale oval with two slits in it is an oval.* The
+bandage covers **one eye** now, and the other half of him is hair, a brow, an
+eye, a nose, a mouth and three days of stubble.
+
+**The red read as a cape.** The apron filled the entire torso with the shirt
+showing only as a thin strip down each outside edge, and red framing a pale
+front is a cape silhouette. The chest is shirt edge-to-edge for six rows before
+the apron starts, with the straps crossing it and meeting the bib at its own
+edges.
+
+**The rail and hook read as a cyborg.** Hardware attached to a person reads as
+equipment however bloody you draw it. Both gone; he has two hands. What is left
+is a man, and the horror is what is *on* him rather than what has replaced him
+— which costs him the thing that broke his outline, so both reads now come from
+value alone.
+
+Also: the damage tears were re-aimed after the apron moved, having started to
+land on his sleeves; [[Cosmetics#Three rules the set is built on|BONE MASK]]
+now bleaches a real face into a skull, which it could not do when there was no
+face; and LIVING FLAME stopped referring to a kerchief he had not worn for two
+designs. **The four-frame walk cycle was never touched.**
 
 ## Related
 - [[Bugs Found]] — the defects behind each fix above, and two still open
