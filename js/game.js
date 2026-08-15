@@ -5803,14 +5803,6 @@ function drawWorld() {
       : d.kind === 'frenzy' ? SPR.frenzy : d.kind === 'siphon' ? SPR.siphon
       : d.kind === 'magnet' ? SPR.magnet : d.kind === 'bounty' ? SPR.bounty : SPR.nova;
     const sc = d.kind === 'god' ? 1.6 : d.kind === 'card' ? 1.1 : 1;
-    const col = d.kind === 'god' ? '#ff2b2b'
-      : d.kind === 'coin' ? '#f5c518' : d.kind === 'card' ? '#c0202a'
-      : d.kind === 'shield' ? '#7fd0ff' : d.kind === 'nova' ? '#ffb03a'
-      : d.kind === 'frenzy' ? '#ff8a20' : d.kind === 'siphon' ? '#c02a3a'
-      : d.kind === 'magnet' ? '#9fe08a' : d.kind === 'bounty' ? '#f5c518'
-      : d.kind === 'med' ? '#ff6b6b' : d.kind === 'nade' ? '#7aa35e' : '#f2d14a';
-    const rare = d.kind === 'god' || d.kind === 'card' || d.kind === 'nova' || d.kind === 'shield'
-      || d.kind === 'frenzy' || d.kind === 'siphon' || d.kind === 'magnet' || d.kind === 'bounty';
     const fade = d.life < 4 && Math.sin(S.t * 18) > 0 ? 0.35 : 1;
 
     // the shadow shrinks as it rises, which is the whole reason it is there
@@ -5818,23 +5810,19 @@ function drawWorld() {
     ctx.fillStyle = '#000';
     ctx.beginPath(); ctx.ellipse(d.x, d.y + 7, 5.5 * sc - by * 0.4, 2.2 * sc, 0, 0, TAU); ctx.fill();
 
-    ctx.save(); ctx.globalCompositeOperation = 'lighter';
-    ctx.globalAlpha = fade * (0.13 + Math.sin(S.t * 4 + d.bob) * 0.05);
-    ctx.fillStyle = col;
-    ctx.beginPath(); ctx.arc(d.x, d.y + 4, 13 * sc, 0, TAU); ctx.fill();
-    if (rare) {
-      // two counter-rotating hairline rings — cheap, and it reads instantly
-      for (let k = 0; k < 2; k++) {
-        const a0 = S.t * (k ? -1.3 : 1.9) + d.bob;
-        ctx.globalAlpha = fade * (0.5 - k * 0.2);
-        ctx.strokeStyle = col; ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.ellipse(d.x, d.y + 4, 9 * sc + k * 3, (3 + k) * sc, a0, 0, TAU);
-        ctx.stroke();
-      }
-      if (Math.random() < 0.25) part(d.x + rnd(-6, 6), d.y + 4, col, 1, 16, 0.6);
-    }
-    ctx.restore(); ctx.globalAlpha = 1;
+    /* NO HALO. Every drop used to sit inside a 13px additive disc of its own
+       colour, and the rare ones carried two counter-rotating rings and a
+       sparkle on top of that. It was a lot of light for a thing that is ten
+       pixels wide: the glow was bigger than the item, so what you actually
+       read across a room was a coloured blob, and the sprite — which is the
+       part that tells you WHICH pickup it is — was the thing you could see
+       least. The item is now the whole of it.
+
+       The shadow stays: it is dark, not light, and it is what puts the pickup
+       on the floor instead of floating in front of it. The lightmap still
+       opens a hole around every drop (see drawLight), so they are lit on a
+       dark floor without anything being drawn on top of them. */
+    ctx.globalAlpha = 1;
     drawSpr(ctx, spr, d.x, d.y + by, sc, false, fade);
   }
 
@@ -7189,7 +7177,17 @@ function drawLight() {
     blob(mx, my, 80, 0.9);
   }
   for (const g2 of S.nades) if (g2.fuse < 0.45) blob(g2.x, g2.y, 30, 0.6);
-  for (const d of S.drops) if (d.kind === 'item' || d.kind === 'god' || d.kind === 'card') blob(d.x, d.y, 46, 0.9);
+  /* EVERY drop opens a hole now, not just the three big ones. The additive
+     halo that used to be drawn on top of each pickup was also the only reason
+     the small ones were findable on THE DARK ROOM and THE BLACKOUT; taking it
+     away without this would have hidden them completely on the two floors
+     where you most need to find a medkit. The lightmap lights the item itself
+     rather than painting a disc over it, which is the difference between
+     seeing a pickup and seeing a glow. */
+  for (const d of S.drops) {
+    const big = d.kind === 'item' || d.kind === 'god' || d.kind === 'card';
+    blob(d.x, d.y, big ? 46 : 24, big ? 0.9 : 0.62);
+  }
   for (const sh of S.shops) if (!sh.bought) blob(sh.x, sh.y - 12, 52, 0.85);
   if (S.paci) blob(S.paci.x, S.paci.y, 120, 0.95);
   if (S.tomce) blob(S.tomce.x, S.tomce.y, 34 + S.tomce.near * 40, 0.35 + S.tomce.near * 0.5);
