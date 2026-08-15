@@ -873,6 +873,7 @@ function freshState() {
     apex: false, mini: null,
     score: 0, combo: 1, comboT: 0, kills: 0, streak: 0,
     flash: 0, flashCol: '#fff', hitstop: 0, slow: 0, redness: 0, modT: 0,
+    burstT: -1, burstN: 0,      // per-frame death-burst budget, see deathBurst
     jump: 0, jumpSpr: null, muzzle: null, beamHit: null,
     msg: '', msgT: 0, sub: '', banner: null, prompt: null,
     fade: 0, fadeDir: 0, pending: null, cosReturn: 'title',
@@ -2665,6 +2666,25 @@ function drawParticles() {
 /* The thing you actually see when something dies: a white pop, a meat cloud,
    a shockwave, sparks and a few rising embers. */
 function deathBurst(e, ang) {
+  /* THE ACTUAL CAUSE OF THE STUTTER ON A PIERCING SHOT.
+
+     One death is about 65 particles. That is fine, and it is what makes a kill
+     feel like one. But a round that punches through eight things fires eight
+     of these on the SAME FRAME — 520 objects created at once, then updated and
+     drawn every frame until they expire. Nothing was ever wrong with any
+     single burst; there was simply no ceiling on how many could land together.
+
+     So bursts get cheaper the more of them share a frame. The first is full
+     price, the second about 60%, and it tails off to a fifth. A single kill is
+     completely unchanged — which matters, because that is the one you look at
+     — and a pile of eight still throws plenty, it just stops throwing eight
+     times as much. `S.t` only advances between frames, so comparing against it
+     is what makes this per-frame rather than per-kill. */
+  if (S.burstT !== S.t) { S.burstT = S.t; S.burstN = 0; }
+  const k = Math.max(0.2, 1 / (1 + S.burstN * 0.7));
+  S.burstN++;
+  const q = (c) => Math.max(1, Math.round(c * k));
+
   const big = !!e.boss, n = big ? 3 : 1;
   /* The white pop is what sells the frame the thing stops existing on: a
      one-frame additive disc at the body's own size, before any of the debris.
@@ -2674,29 +2694,46 @@ function deathBurst(e, ang) {
                 s: (e.r || 6) * (big ? 2.4 : 1.5), glow: 1 });
   ring(e.x, e.y, big ? 74 : 22, '#ffffff', 0.16, 2);
   ring(e.x, e.y, big ? 58 : 17, '#c02028', 0.30, 1);
-  gib(e.x, e.y, e.gib, big ? 70 : 12);
-  blood(e.x, e.y + 4, big ? 26 : 11);
-  part(e.x, e.y, e.gib, 14 * n, 165, 0.55, 2);          // meat cloud
-  part(e.x, e.y, '#8a1018', 12 * n, 120, 0.65, 2);
+  gib(e.x, e.y, e.gib, q(big ? 70 : 12));
+  blood(e.x, e.y + 4, q(big ? 26 : 11));
+  part(e.x, e.y, e.gib, q(14 * n), 165, 0.55, 2);          // meat cloud
+  part(e.x, e.y, '#8a1018', q(12 * n), 120, 0.65, 2);
   // struck sparks rather than dots, so the burst has a shape and a direction
-  sparks(e.x, e.y, rnd(0, TAU), '#ffd9a0', 8 * n, 250, 0.30, Math.PI);
+  sparks(e.x, e.y, rnd(0, TAU), '#ffd9a0', q(8 * n), 250, 0.30, Math.PI);
   if (ang !== undefined) {
-    spray(e.x, e.y, ang, e.gib, 14 * n, 210, 0.6, 0.85);
-    sparks(e.x, e.y, ang, '#ffe3b0', 6 * n, 300, 0.26, 0.6);
+    spray(e.x, e.y, ang, e.gib, q(14 * n), 210, 0.6, 0.85);
+    sparks(e.x, e.y, ang, '#ffe3b0', q(6 * n), 300, 0.26, 0.6);
   }
   // embers that drift upward and fade
-  for (let i = 0; i < 5 * n; i++) {
+  for (let i = 0, ne = q(5 * n); i < ne; i++) {
     S.part.push({ x: e.x + rnd(-5, 5), y: e.y + rnd(-5, 5), vx: rnd(-16, 16), vy: rnd(-52, -20),
       col: pick(['#ff6a4a', '#ffb46a', '#ffe3a8']), life: rnd(0.5, 1.1), max: 1.1, s: 1 });
   }
   if (big) { S.flash = Math.max(S.flash, 0.7); S.flashCol = '#ff2b2b'; }
 }
 function float(x, y, text, col, big) { S.floats.push({ x, y, text, col, life: big ? 1.1 : 0.7, big, vy: big ? -30 : -16, sc: big ? 1.6 : 1 }); }
+/* ============================================================
+   SCREEN MOTION — OFF.
+
+   Both of these are now no-ops, and they are kept as functions rather than
+   deleted because they are called from about forty places: every kill, every
+   explosion, every phase break, every door. Gutting them here turns all of it
+   off in one line and leaves each call site readable as "this was a big
+   moment", which is worth keeping if it is ever wanted back.
+
+   `shake` moved the camera; `punch` pulsed its zoom. Neither cost anything to
+   run — a shake is one translate — so neither was the source of the stutter on
+   a bullet that kills several things at once. That is the death burst, and it
+   is capped in deathBurst() instead. This is off because it was asked for, not
+   because it was slow.
+   ============================================================ */
+const SCREEN_MOTION = 0;
 function shake(a) {
+  if (!SCREEN_MOTION) return;
   const c = S.cam;
   if (a > c.sh) { c.sh = a; c.seed = Math.random() * 100; }   // new impulse, new direction
 }
-function punch(a) { S.cam.punch = Math.max(S.cam.punch, a); }
+function punch(a) { if (SCREEN_MOTION) S.cam.punch = Math.max(S.cam.punch, a); }
 function msg(m, sub, t) { S.msg = m; S.sub = sub || ''; S.msgT = t || 2.2; }
 
 /* ---------- collision ---------- */
