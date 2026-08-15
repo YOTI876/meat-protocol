@@ -5,7 +5,7 @@ tags: [reference, loop]
 
 # How a run goes
 
-Ten waves per floor, **ten floors**, and then it is over. Clear wave 10, spend
+Five waves per floor, **ten floors**, and then it is over. Clear wave 5, spend
 your money, and the north door opens onto the next floor — stronger, but you
 keep everything. The tenth floor has no door.
 
@@ -13,14 +13,14 @@ keep everything. The tenth floor has no door.
 flowchart LR
   T[Title] --> F1[Floor 1: waves 1-10]
   F1 -->|wave 5 clear| S1[PACI's shop]
-  S1 --> F1b[Floor 1: waves 6-10]
-  F1b -->|wave 10 boss, 2 phases| S[PACI's shop]
+  S1 --> F1b[Floor 1: waves 4-5]
+  F1b -->|wave 5 boss, 2 phases| S[PACI's shop]
   S -->|door north| F2[Floor 2]
   F2 --> F3[Floors 3-4]
-  F3 -->|wave 10| A[Floor 5: APEX]
+  F3 -->|wave 5| A[Floor 5: APEX]
   A --> F6[Floors 6-9]
   F6 --> F10[Floor 10: THE KILLING FLOOR]
-  F10 -->|wave 10| P[THE MEAT PROTOCOL: 3 phases]
+  F10 -->|wave 5| P[THE MEAT PROTOCOL: 3 phases]
   P --> W[Win screen]
   F1 -.death.-> D[Dead screen]
   F10 -.death.-> D
@@ -57,7 +57,7 @@ floor's whole reward for being the worst one to walk through.
 
 **PACI keeps wave hours, not boss hours** — `SHOP_WAVES = [5, 10]`. The
 half-time shop is the one that changes how you fight the back half of a floor;
-the wave-10 one is where you spend the floor's takings before descending.
+the wave-5 one is where you spend the floor's takings before descending.
 
 Somewhere in a corner, on about **60% of floors**, [[Augments|TOMCE]] is
 standing with three trades. He is never in the corner the
@@ -69,13 +69,13 @@ standing with three trades. He is never in the corner the
 2. Enemies trickle in from cracks in the floor rather than appearing instantly
    — each crack telegraphs for 0.75s before the enemy resolves.
 3. Clearing the queue **and** every enemy triggers wave-clear:
-   - `+12hp` (or `+30hp` on wave 10)
+   - `+24hp` (or `+30hp` on wave 5)
    - `+1` frag grenade, plus one per MUNITIONS rank (capped at 9)
    - a score bonus of `100 * wave * (floor + 1)`
    - one parting drop, ammo 78% of the time
    - **the floor vacuums**: every loose pickup drags itself to you over ~2.6
      seconds — see [[Pickups#Wave-end collection]]
-4. On wave 10, the door lights up red and pulses; walking into it starts
+4. On wave 5, the door lights up red and pulses; walking into it starts
    [[#Floor transition]].
 
 Between waves there is a 3-second pause. If a shop is owed, it takes that slot
@@ -102,7 +102,7 @@ the opening beat rather than consuming it — see
 
 ## Winning
 
-Kill [[Bosses#THE MEAT PROTOCOL|THE MEAT PROTOCOL]] on floor 10 wave 10 and the
+Kill [[Bosses#THE MEAT PROTOCOL|THE MEAT PROTOCOL]] on floor 10 wave 5 and the
 run **ends**. The kill clears the room — bullets, hazards, cracks, the deferred
 effect queue, and anything still breathing — banks the score, and counts down
 3.4 seconds into the [[Rendering#The win screen|win screen]].

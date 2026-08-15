@@ -4,7 +4,7 @@ Top-down pixel-art horror wave shooter. You are Damjan. You have a butcher's
 apron, a bandage over one eye, a pistol that was in the drawer, and a shopping
 problem.
 
-Ten waves a floor, two elites and a two-phase boss on the way through, PACI at
+Five waves a floor, two elites and a two-phase boss on the way through, PACI at
 half time and again at the end.
 
 **Ten floors, and then it ends.** Every one has its own look, its own props and
@@ -39,9 +39,9 @@ no dependencies — but fonts in `fonts/` won't load that way.
 
 ## How a run goes
 
-Ten waves per floor. **Elites** on waves 4 and 8, the **floor boss** on wave
-10. On floor 5 that boss comes up as an **APEX** instead, at 2.6× health and
-1.45× damage — there's exactly one a run.
+Five waves per floor. **Elites** on waves 2 and 4, the **floor boss** on wave
+5, and PACI after 3 and 5. On floor 5 that boss comes up as an **APEX**
+instead, at 2.6× health and 1.45× damage — there's exactly one a run.
 
 **Every floor boss has two phases.** At half health it breaks: rears up, throws
 the room off itself, and comes back faster, angrier, and doing something else

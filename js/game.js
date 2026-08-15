@@ -7520,9 +7520,15 @@ function drawHUD() {
   } else {
     txt(S.waveState === 'idle' ? 'PREPARING' : 'WAVE ' + S.wave + '/' + WAVES, W / 2, 22,
         S.wave === BOSS_WAVE ? '#ff3b46' : miniWaves().indexOf(S.wave) >= 0 ? '#ff8a3a' : '#c0ac96', 'center');
-    for (let i = 1; i <= 10; i++) {
+    /* One tick per wave. Widened with the move to five: at the old 4px-on-6
+       the row was half as long as the label above it and read as a stray
+       underline rather than as a progress bar. Sized from WAVES so the bar
+       keeps its width whatever the number is. */
+    const tw = Math.max(4, Math.round(58 / WAVES) - 3), tg = tw + 3;
+    const tx0 = W / 2 - (WAVES * tg - 3) / 2;
+    for (let i = 1; i <= WAVES; i++) {
       ctx.fillStyle = i < S.wave ? '#8a2a2e' : i === S.wave ? '#ff3b46' : 'rgba(255,255,255,0.12)';
-      ctx.fillRect(W / 2 - 30 + (i - 1) * 6, 26, 4, 2);
+      ctx.fillRect(tx0 + (i - 1) * tg, 26, tw, 2);
     }
   }
 

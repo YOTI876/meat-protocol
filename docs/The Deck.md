@@ -17,7 +17,7 @@ out in:
 |---|---|---|
 | **a level** | a hand of cards | THE MENU |
 | **an elite** (waves 4, 8) | a hand of cards | THE MENU |
-| **a floor boss** (wave 10) | a hand of cards, at better odds | THE MENU |
+| **a floor boss** (wave 5) | a hand of cards, at better odds | THE MENU |
 | **TOMCE** | one of three trades | [[Augments]] |
 
 Press **B** any time to read what you're holding — that screen is called

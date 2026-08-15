@@ -486,6 +486,92 @@ now bleaches a real face into a skull, which it could not do when there was no
 face; and LIVING FLAME stopped referring to a kerchief he had not worn for two
 designs. **The four-frame walk cycle was never touched.**
 
+## `5d7f2e7` — Damjan holds the gun
+The arms came off the sprite. A drawn arm hangs where it was drawn, so a baked
+sleeve left the gun floating in front of a man standing to attention; they are
+struck every frame from a shoulder joint to wherever his hands are, so they
+track the aim, the reload dip, the mag change and the recoil for nothing.
+
+They are **plotted as pixels, not stroked**. The first pass used canvas strokes,
+which was wrong twice: a stroke is anti-aliased and lands wherever the maths
+puts it, so it read as rubber tubing on pixel art — and a round cap fat enough
+to be a shoulder buried the gun. Measured, **48% of the weapon was covered at
+the worst angle**. Now: pixel limb a third the width, and the forearm goes
+*under* the gun with only the HAND over it, because a forearm runs the length of
+a barrel. Worst case **18%**, average 12%, and every forward hand still touches
+gun pixels at every angle.
+
+## `5492ac7` — Ease the middle floors
+Difficulty was a straight line, and a line is cruellest early: floor 3 arrived
+at 3.5× health in one 56% step, landing where the player's own power stalls.
+Replaced with a gentle quadratic — **floor 10 is deliberately unchanged** at
+12.3× / 7.5×, and the middle drops ~18% at floor 3 tapering to nothing by 10.
+THE MEAT LOOP's grip eased 0.30 → 0.12: at 0.30 the floor was not asking you to
+plan your stops, it was refusing the input.
+
+## `79c4e0f` — Deep floors get their own enemies and loot
+[[Enemies]] stopped growing after floor 3 and the drop table was identical on
+floor 1 and floor 10. Three new enemies gated on **floor** — TROLLEY (4, plated
+front, 22% damage head-on), SPITTER (6, will not close, leads your velocity),
+SHEPHERD (8, never touches you, buffs everything near it) — each closing a way
+of playing that had stopped costing anything. Four new drops at floors 4/5/6/8,
+none of them a bigger version of something you had.
+
+> [!warning] The band that ate the other bands
+> The first version put the new drops **above** nova and shield in the `else if`
+> chain, which gives the earlier test the whole overlap. Nova went to **zero**
+> and shield from 3.5% to 0.4%. Found by sampling the live table rather than
+> reading the code. The band is carved out of **coin** and sits below them now.
+
+## `2a65698` — Screen motion off, and the real stutter fixed
+`shake()` and `punch()` are no-ops behind one flag. **But shake was never the
+lag** — a shake is one translate. The stutter on a piercing shot was the death
+burst: one kill is ~65 particles, and eight kills on the same frame fired eight
+full bursts, 520 objects at once. Bursts now get cheaper the more of them share
+a frame. A single kill is byte-identical; eight go 520 → **241**.
+
+## `3ff3cca` `c5234f4` — Five waves a floor
+A floor is five waves, not ten: fight, ELITE, fight + PACI, ELITE, BOSS + PACI.
+Nothing is hard-coded to five — everything goes through a `WAVES` constant and
+anything phrased as a fraction of a floor is `S.wave / WAVES`.
+
+Every per-wave coefficient doubled so the value at the **end** of a floor is
+unchanged while the climb is twice as steep. Every wave gate halved — the mix
+opened bloaters at `n >= 6`, which can never fire on a five-wave floor, so
+floor 1 would have had none at all. Counts retuned against measured old totals:
+a consistent **70–74%** per floor, 6,306 bodies a run against 8,829.
+
+**So rewards are up 1.4×**, and this is the part that would have been missed: a
+floor is 29% fewer bodies but `diff()` is keyed to the floor, not the wave, so
+floor 5 is exactly as hard as it was. Leaving per-kill values alone would have
+meant arriving with 71% of the levels, cards and coins — a harder game, not a
+shorter one.
+
+> [!bug] Three hard-coded tens survived the first sweep
+> The door opened on `S.wave >= 10`, so **the floor never ended**; the HUD read
+> `n/10`; and the progress row drew **ten ticks**. The door one is the worst,
+> because I called it verified — my check went through the boss wave, where
+> PACI's shop opens a door of its own, and I confirmed the symptom I wanted to
+> see instead of the mechanism.
+
+## `cad2d97` `007710a` — Every boss gets its own body
+Ten bosses shared **two** sprite banks and told themselves apart with a colour
+wash. A tint is not a design: at twenty-six pixels across, colour is the first
+thing a dark room takes away. All ten are now authored from their own
+silhouette, and none carries a tint — see [[Bosses#The look of them]].
+
+[[Bosses#THE MEAT PROTOCOL|The finale]] is **three creatures**: one sprite bank
+per phase, swapped by `enterPhase`, at 32 pixels wide against the roster's 26.
+CLOSED, then OPEN, then APPETITE — and the last is the *smallest by mass*,
+which is what makes it read as escalation rather than as something running out.
+
+## `754a366` — The halo came off the pickups
+Every drop sat inside a 13px additive disc of its own colour. The glow was
+bigger than the item, so what you read across a room was a coloured blob and
+the sprite was the thing you could see least. Gone — and every drop now opens a
+**lightmap** hole instead, because that halo was also the only reason a medkit
+was findable on THE DARK ROOM and THE BLACKOUT.
+
 ## Related
 - [[Bugs Found]] — the defects behind each fix above, and two still open
 - [[Tuning Values]] — where the numbers stand today

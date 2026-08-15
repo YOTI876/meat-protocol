@@ -11,7 +11,7 @@ runtime. Ten waves a floor, two elites and a two-phase boss on the way through,
 PACI at half time and again at the end.
 
 **Ten floors, and then it ends.** Each one has its own palette, layout, props,
-walls and rule; the boss roster is shuffled per run; and floor 10 wave 10 is a
+walls and rule; the boss roster is shuffled per run; and floor 10 wave 5 is a
 three-phase fight you can actually beat.
 
 > [!info] Live

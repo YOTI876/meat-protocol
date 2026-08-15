@@ -35,7 +35,7 @@ triggers it:
 ## 3. GOROMANIA
 
 Not a location — a **behaviour**. Shoot the north door **30 times while it is
-still shut** (before wave 10 opens it). Every 10th hit prints "it is
+still shut** (before the last wave opens it). Every 10th hit prints "it is
 listening." At 30 hits (`triggerGoromania()`):
 
 - +1 card, +4000 score

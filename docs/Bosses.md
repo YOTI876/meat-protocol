@@ -6,11 +6,11 @@ tags: [reference, systems]
 # Bosses, elites, the apex and the finale
 
 Bosses used to land on five of the ten waves, which made them furniture. A
-floor now has **one** floor boss, on wave 10, with two **elites** on the way
+floor now has **one** floor boss, on wave 5, with two **elites** on the way
 there — three on [[Floors|THE LAST AISLE]] — and on floor 5 the boss comes up
 as an **APEX** instead.
 
-Floor 10's wave 10 is not a roster boss at all. It is [[#THE MEAT PROTOCOL|the
+Floor 10's wave 5 is not a roster boss at all. It is [[#THE MEAT PROTOCOL|the
 finale]], and it is the end of the game.
 
 | wave | what |
@@ -86,6 +86,39 @@ into. No two share a pair.
 | 7 | **SUNDAY ROAST** | `charge` | `spiral` | 4 (bloater + crawler + shrieker) / 5.8s | *IT HAS BEEN IN THERE SINCE SUNDAY* |
 | 8 | **THE NIGHT SHELF** | `mines` | `curtain` | 5 (stalker×2 + husk) / 6.2s | *IT ONLY RESTOCKS AFTER CLOSING* |
 | 9 | **THE BEST BEFORE** | `brood` | `sweep` | 5 (bloater + cyst + husk) / 5.0s | *THE DATE PASSED AND IT KEPT GOING* |
+
+## The look of them
+
+All ten used to share **two** sprite banks and tell themselves apart with a
+colour wash. A tint is not a design — it says "this is the green one", and at
+twenty-six pixels across, colour is the first thing a dark room takes away from
+you. Every one is now authored from its own **silhouette**, so it can be named
+from the outline before any hue arrives, and **not one carries a tint**.
+
+| boss | the shape |
+|---|---|
+| **THE BUTCHER** | a hooked slab with the head sunk into the shoulders |
+| **MOTHER OF MELONS** | a many-eyed sac that splits down its whole height |
+| **THE PITCHER** | a glass vessel — shoulders, belly, foot — with a face suspended *in* the liquid rather than on it |
+| **THE HOGFATHER** | ears out at the top corners and two tusks that leave the outline; the only thing with anything pointing **up** out of it |
+| **THE COURIER** | no legs. A visored torso over one spoked wheel — the only circular lower half in the game |
+| **THE FISHWIFE** | nearly all mouth, and the only figure that tapers to a point then flares into a fluke; everything else gets wider on the way down |
+| **THE TRIMMINGS** | **no symmetry anywhere.** Every other figure is mirrored down its middle; a heap has no middle, and the lean is the identity |
+| **SUNDAY ROAST** | a spit straight through and out both sides — the only horizontal line in the roster — trussed into segments, charred on top |
+| **THE NIGHT SHELF** | hard right angles and shelf lines where everything else is organic. There is still stock on it. Some of it is looking back |
+| **THE BEST BEFORE** | bottom-heavy and slumped: a teardrop the wrong way up, the only one that looks like it is losing to gravity |
+
+> [!note] The test that matters is the silhouette, not the palette
+> Two bosses the same shape are the same boss whatever you paint on them. Every
+> creature bank in the game is checked for a unique outline, and the check is
+> what caught the last duplicates.
+
+> [!note] `H` was never in the finale's palette
+> The finale's horns were plotted with `H`, which its own palette never
+> declared — so they fell through to the **global** one, where `H` is hair
+> brown. A demon lord in a crown of hair is not the note. It is declared as
+> bone now. Worth remembering: an undeclared key does not fail loudly, it
+> silently inherits.
 
 ## Patterns
 
@@ -211,7 +244,7 @@ N bars is just N times the health.
 
 ## THE MEAT PROTOCOL
 
-Floor 10, wave 10. Not in the roster, never shuffled, **4200 base HP**, and the
+Floor 10, wave 5. Not in the roster, never shuffled, **4200 base HP**, and the
 only thing in the game with three phases. It does not reuse a roster pattern
 for any of them.
 
@@ -299,7 +332,7 @@ hp = bossBudget(floor) * ELITE_SHARE * flavour * powerMul()
 It used to be `speciesHP * (5 + floor*1.6)`, which was quietly broken: the
 species table spans **26 (CRAWLER) to 170 (CYST)**, a 6.5× swing, and the depth
 term multiplied straight through it. On any floor whose elite slots landed on
-HUSK/CYST, the **wave-8 elite outlasted the wave-10 boss** — 1.93× on floor 6
+HUSK/CYST, the **second elite outlasted the floor boss** — 1.93× on floor 6
 in the original build, 9.71× once the build multiplier landed on top.
 
 Species should decide how a thing *fights*, not how big its bar is. `flavour`
@@ -330,7 +363,7 @@ a committed build in a way that "holds four items" never quite was.
 
 > [!note] Deliberately not applied to floor bosses
 > They already have a floor HP band and a [[#Phases|phase break]] doing that
-> job. Stacking a build multiplier on top of both would make wave 10 the only
+> job. Stacking a build multiplier on top of both would make the boss wave the only
 > wave that matters.
 
 > [!warning] The elite summon still has no ceiling
@@ -343,7 +376,7 @@ a committed build in a way that "holds four items" never quite was.
 ## APEX
 
 **Floor 5** — and floor 5 only, now that the run is ten floors and the tenth
-belongs to [[#THE MEAT PROTOCOL|the finale]]. The wave-10 boss arrives as an
+belongs to [[#THE MEAT PROTOCOL|the finale]]. The floor boss arrives as an
 APEX: same kit, same roster slot, everything else turned up.
 
 | | floor boss | APEX |
@@ -404,7 +437,7 @@ if (pat !== 'p3' && b.spawnT <= 0 && S.en.length < addCap) { ... }   // gate
 const cnt = Math.min(addN + floor/2, addCap - S.en.length);          // clamp
 ```
 
-This is what keeps a summoning boss on top of a wave-10 spawn queue from
+This is what keeps a summoning boss on top of a boss-wave spawn queue from
 turning into an avalanche.
 
 ## PACI keeps wave hours
