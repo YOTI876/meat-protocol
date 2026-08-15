@@ -1627,13 +1627,33 @@ function checkContracts() {
    Elites need no term here: powerMul() already counts the guns in your hands
    and the cards in your deck, so an evolved roster prices them up on its own.
    See spawnMini. */
+/* DIFFICULTY, and the shape of it matters more than the size.
+
+   This used to be a straight line: +125% hp and +72% damage per floor. A line
+   is the wrong curve here, because a line is at its CRUELLEST early. Floor 3
+   arrived at 3.5x health and 2.4x damage, which is a 56% and 42% step up from
+   floor 2 in one go, and it landed exactly where the player's own power stalls
+   — the first two floors you are still picking up guns and the first cards,
+   and after that the curve keeps climbing while your kit does not.
+
+   So it is a gentle quadratic instead. The linear term is cut by a third and
+   the difference put into a squared term that stays near nothing until it is
+   deep enough to matter. The TOP END IS DELIBERATELY UNCHANGED — floor 10 is
+   still 12.3x health and 7.5x damage, because the killing floor was not the
+   complaint. What moves is the middle:
+
+     floor      3      4      5      6      7      8
+     hp    was 3.50   4.75   6.00   7.25   8.50   9.75
+           now 2.88   3.96   5.13   6.40   7.77   9.24
+     dmg   was 2.44   3.16   3.88   4.60   5.32   6.04
+           now 2.07   2.68   3.35   4.08   4.87   5.72 */
 function diff() {
-  const ev = S.evo | 0;
+  const ev = S.evo | 0, r = S.room;
   return {
-    hp: (1 + S.room * 1.25) * (1 + ev * 0.46),
-    dmg: (1 + S.room * 0.72) * (1 + ev * 0.30),
-    spd: (1 + S.room * 0.11) * (1 + ev * 0.06),
-    score: (1 + S.room * 0.7) * (1 + ev * 0.5)
+    hp: (1 + r * 0.85 + r * r * 0.045) * (1 + ev * 0.46),
+    dmg: (1 + r * 0.48 + r * r * 0.0266) * (1 + ev * 0.30),
+    spd: (1 + r * 0.11) * (1 + ev * 0.06),
+    score: (1 + r * 0.7) * (1 + ev * 0.5)
   };
 }
 function curW() { return WEP[S.p.owned[S.p.wi]]; }
@@ -4090,8 +4110,15 @@ function update(rdt) {
      0.30 is a floor that keeps your momentum for you whether or not you wanted
      it kept. It does not slow you down; it makes stopping a thing you have to
      plan, which turns every corridor into a commitment. The dash is unaffected
-     on purpose: it is the one move that still does exactly what you told it. */
-  const grip = (isTwist('slick') && p.dash <= 0) ? 0.30 : 0.0009;
+     on purpose: it is the one move that still does exactly what you told it.
+
+     Eased 0.30 -> 0.12. At 0.30 the floor was not asking you to plan, it was
+     refusing to take the input at all — roughly a fifth of the correction per
+     frame that instant control gives you, which on the floor that also steps
+     the difficulty up read as the game taking the controller off you. At 0.12
+     you still slide and stopping is still something you commit to, but a
+     correction lands in about half the distance. */
+  const grip = (isTwist('slick') && p.dash <= 0) ? 0.12 : 0.0009;
   p.vx = lerp(p.vx, ix * spd, 1 - Math.pow(grip, dt));
   p.vy = lerp(p.vy, iy * spd, 1 - Math.pow(grip, dt));
   p.x += p.vx * dt; p.y += p.vy * dt;
