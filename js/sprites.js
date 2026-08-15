@@ -1245,6 +1245,185 @@ SPR.anim = {};
     { y: -6.5, sep: 6.0 }, { ss: 2 });
 }
 
+/* ============================================================
+   THE REST OF THE ROSTER
+
+   Ten bosses used to share two sprite banks and tell themselves apart with a
+   colour wash. A tint is not a design — it says "this is the green one", and
+   at twenty-six pixels across, colour is the first thing a dark room takes
+   away from you. Every one of these is authored from its own SILHOUETTE, so
+   you can name it from the shape alone before a single pixel of hue arrives.
+
+   Same recipe as BOSS A and B: a palette, a value ramp for shade(), a 26-wide
+   body mass at 1x, a face stamped at 2x, two walk tails and one special frame
+   for whatever the thing does when it stops walking.
+   ============================================================ */
+
+/* ---------- THE PITCHER 26x24 — a glass vessel full of somebody ----------
+   It came through the wall, and it is still carrying what it was carrying.
+   The silhouette is a jug: shoulders, a belly, a foot. The face is not ON it,
+   it is IN it — suspended in the red, looking out through the glass. */
+{
+  const pal = { L: '#eaf6ff', g: '#a9c9de', G: '#5f7b8f', D: '#33424e', k: '#141a20', x: '#ff3b3b',
+                r: '#d4232c', R: '#7c1219', e: '#ff5b5b', b: '#6a5a4e', B: '#3d3229',
+                '9': '#ffffff', X: '#ffcf6a', ',': '#1d262e', ';': '#dff2ff', '!': '#f4eede' };
+  const map = { L: ['9', 'g'], g: ['L', 'G'], G: ['g', 'D'], D: ['G', 'k'], k: ['D', 'k'],
+                r: ['e', 'R'], R: ['r', 'D'], b: ['b', 'B'], B: ['b', 'B'] };
+  /* Drowned. The eyes and the grin sit under the surface, so they get the
+     liquid's own dark rather than a keyline of their own. */
+  const face = { x: 0, y: 10, rows: [
+    '            ,DkkkkD,            ,DkkkkD,            ',
+    '            DkxXXxkD            DkxXXxkD            ',
+    '            Dk;XX;kD            Dk;XX;kD            ',
+    '            ,DkkkkD,            ,DkkkkD,            ',
+    '                                                    ',
+    '              ,DkkkkkkkkkkkkkkkkkkkkD,              ',
+    '              Dk!k!k!k!k!k!k!k!k!k!kkD              ',
+    '              ,DkkkkkkkkkkkkkkkkkkkkD,              '
+  ] };
+  const t = t1 => shade(up2(t1), map);
+  const body = [
+    '.....oooooooooooooooo.....',
+    '....oLLggggggggggggLLo....',
+    '...oLggggggggggggggggLo...',
+    '..oLggggggggggggggggggLo..',
+    '..oLbbrrrrrrrrrrrrrrbbLo..',   // rubble on the shoulders, and the fill line
+    '..oLgrrrrrrrrrrrrrrrrgLo..',
+    '..oLgrrrrrrrrrrrrrrrrgLo..',
+    '..oLgrrrrrrrrrrrrrrrrgLo..',
+    '..oLggrrrrrrrrrrrrrrggLo..',
+    '..oLggggggggggggggggggLo..'
+  ];
+  SPR.anim.pitcher = BANK(pal, CREATURE(map, body, face), [
+    t(['..oLggggggggggggggggggLo..', '..oLggggggggggggggggggLo..', '..oLggggggggggggggggggLo..',
+       '..oLggggggggggggggggggLo..', '..oLggggggggggggggggggLo..', '...oLggggggggggggggggLo...',
+       '...oLggggggggggggggggLo...', '....oLggggggggggggggLo....', '....oLggggggggggggggLo....',
+       '.....oGGGGo......oGGGGo...', '.....oGGo........oGGo.....', '.....oGGo........oGGo.....',
+       '.....oooo........oooo.....', '..........................']),
+    t(['..oLggggggggggggggggggLo..', '..oLggggggggggggggggggLo..', '..oLggggggggggggggggggLo..',
+       '..oLggggggggggggggggggLo..', '..oLggggggggggggggggggLo..', '...oLggggggggggggggggLo...',
+       '...oLggggggggggggggggLo...', '....oLggggggggggggggLo....', '....oLggggggggggggggLo....',
+       '....oGGGGo........oGGGGo..', '....oGGo............oGGo..', '....oGGo............oGGo..',
+       '....oooo............oooo..', '..........................'])
+  ], // the blink: the glass goes bright at the rim a frame before it is elsewhere
+    t(['..oLggggggggggggggggggLo..', '..oL9gggggggggggggggg9Lo..', '..oL9gggggggggggggggg9Lo..',
+       '..oLggggggggggggggggggLo..', '..oL9gggggggggggggggg9Lo..', '..oL9gggggggggggggggg9Lo..',
+       '...oLggggggggggggggggLo...', '...oLggggggggggggggggLo...', '...oLggggggggggggggggLo...',
+       '..oGGGGo..........oGGGGo..', '..oGGo..............oGGo..', '..oGGo..............oGGo..',
+       '..oooo..............oooo..', '..........................']),
+    { y: -5.5, sep: 5.0 }, { ss: 2 });
+}
+
+/* ---------- THE HOGFATHER 26x24 — a head that outgrew its body ----------
+   Ears out at the top corners and two tusks that leave the outline entirely,
+   which is the whole silhouette: nothing else in the roster has anything
+   pointing UP out of it. He is carrying something. He will put it down. */
+{
+  const pal = { L: '#f0b6b6', p: '#d08a8e', P: '#9a5257', D: '#5e2b30', k: '#1e0e11', x: '#ff3b3b',
+                u: '#ded8c6', U: '#a9a291', y: '#f2d14a', Y: '#b2911f',
+                '9': '#ffd9d9', X: '#ffcf6a', ',': '#2a1216', ';': '#ffe8e8', '!': '#f4eede' };
+  const map = { L: ['9', 'p'], p: ['L', 'P'], P: ['p', 'D'], D: ['P', 'k'], k: ['D', 'k'],
+                u: ['u', 'U'], U: ['u', 'U'], y: ['y', 'Y'], Y: ['y', 'Y'] };
+  /* Small eyes set deep and far apart, and a brass ring through the snout —
+     the one bright warm thing on him, and it sits dead centre. */
+  const face = { x: 0, y: 8, rows: [
+    '        ,DkkkkD,              ,DkkkkD,              ',
+    '        DkxXXxkD              DkxXXxkD              ',
+    '        ,DkkkkD,              ,DkkkkD,              ',
+    '                                                    ',
+    '                    ,DkkkkkkkkD,                    ',
+    '                    DkkyyyyyykkD                    ',
+    '                    Dky,,,,,,ykD                    ',
+    '                    DkkyyyyyykkD                    ',
+    '                    ,DkkkkkkkkD,                    '
+  ] };
+  const t = t1 => shade(up2(t1), map);
+  const body = [
+    '..oPo..oooooooooooo..oPo..',
+    '..oPo.oLLppppppppLLo.oPo..',
+    '..ooo.oLppppppppppLo.ooo..',
+    '..oLppppppppppppppppppLo..',
+    '..oLppxppppppppppppxppLo..',
+    '..oLppppppppppppppppppLo..',
+    '..oLppkkkkkkkkkkkkkkppLo..',
+    '..oLpkkuu!!!!!!!!uukkpLo..',   // the snout, and what is in it
+    '..oLppkkuu!!!!!!uukkppLo..',
+    '..oLppppppppppppppppppLo..'
+  ];
+  SPR.anim.hogfather = BANK(pal, CREATURE(map, body, face), [
+    t(['uu..oLppppppppppppppLo..uu', '.uu.oLppppppppppppppLo.uu.', '..uuoLppppppppppppppLouu..',
+       '....oLppppppppppppppLo....', '....oLppppppppppppppLo....', '....oLppppppppppppppLo....',
+       '.....oLppppppppppppLo.....', '.....oLppppppppppppLo.....', '.....oLppppppppppppLo.....',
+       '.....oPPPo......oPPPo.....', '.....oPPo........oPPo.....', '.....oPPo........oPPo.....',
+       '.....oooo........oooo.....', '..........................']),
+    t(['uu..oLppppppppppppppLo..uu', '.uu.oLppppppppppppppLo.uu.', '..uuoLppppppppppppppLouu..',
+       '....oLppppppppppppppLo....', '....oLppppppppppppppLo....', '....oLppppppppppppppLo....',
+       '.....oLppppppppppppLo.....', '.....oLppppppppppppLo.....', '.....oLppppppppppppLo.....',
+       '....oPPPo..........oPPPo..', '....oPPo............oPPo..', '....oPPo............oPPo..',
+       '....oooo............oooo..', '..........................'])
+  ], // he puts it down: braced, both feet planted, tusks forward
+    t(['uu..oLppppppppppppppLo..uu', 'uuu.oLppppppppppppppLo.uuu', 'uuuuoLppppppppppppppLouuuu',
+       '.uu.oLppppppppppppppLo.uu.', '....oLppppppppppppppLo....', '....oLppppppppppppppLo....',
+       '....oLppppppppppppppLo....', '....oLppppppppppppppLo....', '...oLpppppppppppppppppLo..',
+       '...oPPPPo........oPPPPo...', '...oPPo..............oPPo.', '...oPPo..............oPPo.',
+       '...oooo..............oooo.', '..........................']),
+    { y: -6.5, sep: 5.5 }, { ss: 2 });
+}
+
+/* ---------- THE COURIER 26x24 — it does not have legs ----------
+   A narrow visored torso over one big spoked wheel. It is the only thing in
+   the game whose lower half is a circle, which is why it reads instantly at
+   any size and why it is the one you can identify while it is still circling
+   the far side of the room. */
+{
+  const pal = { L: '#a8d8ff', c: '#5aa8dc', C: '#2c6088', D: '#173044', k: '#0b1620', x: '#ff3b3b',
+                T: '#c8ccd4', G: '#31363d', y: '#f2d14a',
+                '9': '#e0f4ff', X: '#ffcf6a', ',': '#101f2b', ';': '#eaffff', '!': '#f4eede' };
+  const map = { L: ['9', 'c'], c: ['L', 'C'], C: ['c', 'D'], D: ['C', 'k'], k: ['D', 'k'],
+                T: ['T', 'G'], G: ['T', 'G'] };
+  /* No eyes — a visor. One unbroken lit slit, which is more unsettling at this
+     size than any number of sockets because you cannot tell where it is
+     looking, only that it is. */
+  const face = { x: 0, y: 8, rows: [
+    '                    ,DkkkkkkkkD,                    ',
+    '                  ,DkkkkkkkkkkkkkkD,                ',
+    '                  DkxXXXXXXXXXXXXxkD                ',
+    '                  Dk;XXXXXXXXXXXX;kD                ',
+    '                  ,DkkkkkkkkkkkkkkD,                '
+  ] };
+  const t = t1 => shade(up2(t1), map);
+  const body = [
+    '........oooooooooo........',
+    '.......oLLccccccLLo.......',
+    '......oLccccccccccLo......',
+    '.....oLccccccccccccLo.....',
+    '.....oLkkkkkkkkkkkkLo.....',
+    '.....oLkkkkkkkkkkkkLo.....',
+    '.....oLkkkkkkkkkkkkLo.....',
+    '....oLccccccccccccccLo....',
+    '....oLccccTTTTTTccccLo....',   // the strap
+    '....oLccccccccccccccLo....'
+  ];
+  SPR.anim.courier = BANK(pal, CREATURE(map, body, face), [
+    t(['....oLccccccccccccccLo....', '....oLccccccccccccccLo....', '.....oLccccccccccccLo.....',
+       '.....oLccccccccccccLo.....', '....oooTTTTTTTTTTTTooo....', '....oTTGGGGGGGGGGGGTTo....',
+       '....oTGGGkkkkkkkkGGGTo....', '....oTGGkkkkkkkkkkGGTo....', '....oTGGkkkkkkkkkkGGTo....',
+       '....oTGGGkkkkkkkkGGGTo....', '....oTTGGGGGGGGGGGGTTo....', '....oooTTTTTTTTTTTTooo....',
+       '......oooooooooooooo......', '..........................']),
+    t(['....oLccccccccccccccLo....', '....oLccccccccccccccLo....', '.....oLccccccccccccLo.....',
+       '.....oLccccccccccccLo.....', '....oooTTTTTTTTTTTTooo....', '....oTTGGGGGGGGGGGGTTo....',
+       '....oTGGkGGGGGGGGkGGTo....', '....oTGGGkkkkkkkkGGGTo....', '....oTGGGkkkkkkkkGGGTo....',
+       '....oTGGkGGGGGGGGkGGTo....', '....oTTGGGGGGGGGGGGTTo....', '....oooTTTTTTTTTTTTooo....',
+       '......oooooooooooooo......', '..........................'])
+  ], // it plants: the wheel locks and the rim lights
+    t(['....oLccccccccccccccLo....', '....oLccccccccccccccLo....', '.....oLccccccccccccLo.....',
+       '.....oLccccccccccccLo.....', '....ooo999999999999ooo....', '....o99GGGGGGGGGGGG99o....',
+       '....o9GGkkkkkkkkkkGG9o....', '....o9GkkkkkkkkkkkkG9o....', '....o9GkkkkkkkkkkkkG9o....',
+       '....o9GGkkkkkkkkkkGG9o....', '....o99GGGGGGGGGGGG99o....', '....ooo999999999999ooo....',
+       '......oooooooooooooo......', '..........................']),
+    { y: -5.0, sep: 0 }, { ss: 2 });
+}
+
 /* Back-compat aliases: the title screen and the jumpscare want one still frame. */
 SPR.crawler  = SPR.anim.crawler.walk[0];
 SPR.shrieker = SPR.anim.shrieker.walk[0];
