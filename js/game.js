@@ -6417,6 +6417,175 @@ function legSprite(i, stage) {
   return (c.pal.n || c.pal.t) ? variant(base, c.id, c.pal) : base;
 }
 
+/* ============================================================
+   THE ARMS
+
+   They are not in the sprite, and that is the whole point. A drawn arm hangs
+   wherever it was drawn, so a baked sleeve leaves the gun floating in front of
+   a man standing to attention — he never looks like he is holding it. These
+   are struck every frame from a shoulder joint out to wherever his hands
+   actually are, which gets them tracking the aim, the reload dip, the mag
+   change and the recoil kick for nothing extra.
+
+   ARM_SH is the joint in game pixels from his centre, read off the sprite: the
+   widest shirt row is the deltoid line at y-5 and it ends at x±7, so the joint
+   sits just inside that. `DAM_BODY` has no sleeves below that row.
+   ============================================================ */
+const ARM_SH_X = 5.2, ARM_SH_Y = -4.6;
+
+/* Cosmetics have to repaint the arms too, or GOLD stops at his shoulders.
+   Both tones of each material, because a limb gets form-shaded like the rest
+   of him rather than being one flat colour. */
+function armCols() {
+  const c = cosDef(equippedCos()).pal;
+  return { cloth: c.r || PAL.r, clothDark: c.R || PAL.R,
+           skin: c.s || PAL.s, skinDark: c.S || PAL.S, line: PAL.o };
+}
+
+/* One limb, shoulder to hand.
+
+   The elbow is the midpoint pushed AWAY from his centre. A straight arm reads
+   as a stick, one joint is all this many pixels can show, and bowing outward
+   is the only rule that works for every aim direction — bend it along a fixed
+   perpendicular instead and the elbow inverts through the body whenever he
+   aims across himself.
+
+   It is PLOTTED as pixels, not stroked as a line. A canvas stroke is
+   anti-aliased and lands wherever the maths puts it, which in a game where
+   every other edge is hard reads as a rubber tube laid over pixel art — and a
+   round cap fat enough to look like a shoulder is fat enough to swallow the
+   gun, which is why the gun kept disappearing at some angles. So this walks
+   the curve and stamps a cross-section onto the same half-pixel grid the
+   sprites are snapped to: outline, cloth, outline.
+
+   WHICH TONE a cloth pixel gets is decided by which way that side of the limb
+   turns, against the same top-left strip light `shade()` uses on the sprite —
+   so a raised arm is lit along its top edge exactly like the shoulder it comes
+   out of, and the limb has form instead of being one flat bar.
+
+   The limb thins and then vanishes as the arm folds, leaving just the hand.
+   Aiming up and across genuinely does put a hand back at its own shoulder and
+   that is not a bug to design out.
+
+   Cells go into one map keyed by grid position — so a later pixel overwrites
+   an earlier one instead of blending — and come out grouped by colour, three
+   or four fills for a whole arm rather than a rect at a time. */
+function armCells(a, cols, bare, k, gx0, gy0, part) {
+  k = k || 1; gx0 = gx0 || 0; gy0 = gy0 || 0;       // the title screen draws him big
+  const cell = k / SUBPIX;
+  const grid = new Map();
+  const put = (x, y, c) =>
+    grid.set(Math.round((x - gx0) / cell) + ',' + Math.round((y - gy0) / cell), c);
+
+  const dxh = a.hx - a.ax, dyh = a.hy - a.ay;
+  const L = Math.hypot(dxh, dyh) / k;
+  const W = L < 1.6 ? -1 : L < 3.2 ? 0 : 1;         // half-width of cloth, sub-pixels
+
+  if (W >= 0 && part !== 'hand') {
+    const mx = (a.ax + a.hx) / 2, my = (a.ay + a.hy) / 2;
+    let ex = mx - a.cx, ey = my - a.cy;
+    const el = Math.hypot(ex, ey);
+    if (el < 0.4) { const d = L * k || 1; ex = -dyh / d; ey = dxh / d; }
+    else { ex /= el; ey /= el; }
+    ex = mx + ex * 1.6 * k; ey = my + ey * 1.6 * k;             // the elbow
+
+    const steps = Math.ceil(Math.hypot(dxh, dyh) / (cell * 0.5)) + 6;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps, it = 1 - t;
+      const x = it * it * a.ax + 2 * it * t * ex + t * t * a.hx;
+      const y = it * it * a.ay + 2 * it * t * ey + t * t * a.hy;
+      let nx = -(2 * it * (ey - a.ay) + 2 * t * (a.hy - ey));    // the curve's normal
+      let ny = (2 * it * (ex - a.ax) + 2 * t * (a.hx - ex));
+      const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
+      for (let j = -W - 1; j <= W + 1; j++) {
+        const lit = (nx + ny) * j < 0;              // does this side face top-left
+        put(x + nx * j * cell, y + ny * j * cell,
+            Math.abs(j) > W ? cols.line
+              : bare ? (lit ? cols.skin : cols.skinDark)
+                     : (lit ? cols.cloth : cols.clothDark));
+      }
+    }
+  }
+
+  /* The hand. Five sub-pixels across, and small on purpose — the gun is twelve
+     sub-pixels tall, so a hand any bigger stops reading as gripping it and
+     starts reading as hiding it. */
+  if (part !== 'limb')
+    for (let jy = -2; jy <= 2; jy++) for (let jx = -2; jx <= 2; jx++) {
+      const d = Math.hypot(jx, jy);
+      if (d > 2.35) continue;
+      put(a.hx + jx * cell, a.hy + jy * cell,
+          d > 1.5 ? cols.line : (jx + jy < 0 ? cols.skin : cols.skinDark));
+    }
+
+  return grid;
+}
+
+/* Fill the cells, grouped by colour — three or four fills for a whole arm
+   rather than a rect at a time. */
+function plotArm(a, cols, bare, alpha, k, gx0, gy0, part) {
+  k = k || 1; gx0 = gx0 || 0; gy0 = gy0 || 0;
+  const cell = k / SUBPIX;
+  const byCol = new Map();
+  for (const e of armCells(a, cols, bare, k, gx0, gy0, part)) {
+    let arr = byCol.get(e[1]); if (!arr) byCol.set(e[1], arr = []);
+    arr.push(e[0]);
+  }
+  ctx.save();
+  if (alpha !== 1) ctx.globalAlpha = alpha;
+  for (const e of byCol) {
+    ctx.fillStyle = e[0]; ctx.beginPath();
+    for (const key of e[1]) {
+      const c = key.indexOf(',');
+      ctx.rect(gx0 + +key.slice(0, c) * cell, gy0 + +key.slice(c + 1) * cell, cell, cell);
+    }
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/* Shoulders, hands, and which arm his chest is in front of.
+
+   Both hands go on the gun, one behind the other along it and offset to the
+   side it is mirrored to. Neither sits at the grip proper: the gun pivots on
+   his centre, so a hand there ends up at his sternum and the arm to the nearer
+   shoulder collapses to a two-pixel nub with a round cap on it — a blob, not a
+   limb. Pushing both hands out along the barrel keeps every arm long enough to
+   read at every angle, and a hand four pixels up a sixteen-pixel gun is still
+   plainly on the gun.
+
+   Which shoulder takes the forward hand is tied to `flipY` — the same flag the
+   gun sprite already mirrors on — and NOT to which shoulder is nearer. Nearer
+   is the obvious rule and it chatters: around straight-down the two shoulders
+   are within a hair of each other and the arms swap back and forth three times
+   across a three-degree band. Keying off `flipY` swaps them exactly once per
+   boundary, at the same instant the gun flips, so one deliberate change of
+   grip reads instead of two glitches.
+
+   DEPTH is per-arm and physical: top-down, higher on screen is further away,
+   so an arm reaching to a hand above its own shoulder is reaching away from
+   the camera and his torso is in front of it. The ordering therefore flips
+   exactly when an arm passes horizontal — the moment when almost none of it is
+   covered either way, so the swap cannot be seen. Ranking the two arms against
+   each other instead pops in the middle of a sweep. */
+function armRig(px, py, bob, lean, gx, gy, gunAng, flipY, gunLen, magPt) {
+  const cl = Math.cos(lean), sl = Math.sin(lean), by = -5 + bob;
+  const cx = px - by * sl, cy = py + by * cl;
+  const joint = side => {
+    const sx = ARM_SH_X * side, sy = ARM_SH_Y + bob;
+    return { x: px + sx * cl - sy * sl, y: py + sx * sl + sy * cl, side };
+  };
+  const c = Math.cos(gunAng), s = Math.sin(gunAng), n = flipY ? -1 : 1;
+  const on = (d, o) => ({ x: gx + c * d - s * o * n, y: gy + s * d + c * o * n });
+  const rear = on(4.2, 1.3);
+  const fore = magPt || on(clamp(gunLen * 0.5, 7.5, 11), 0.2);
+
+  const J = [joint(-1), joint(1)], lf = flipY;
+  const mk = (j, h) => ({ ax: j.x, ay: j.y, hx: h.x, hy: h.y, side: j.side,
+                          cx, cy, behind: h.y < j.y });
+  return [mk(lf ? J[0] : J[1], fore), mk(lf ? J[1] : J[0], rear)];
+}
+
 function drawPlayer(p) {
   const w = curW();
   const bob = Math.sin(p.walkT * Math.PI) * 1.4;
@@ -6432,6 +6601,43 @@ function drawPlayer(p) {
 
   const tint = p.hurtFlash > 0 ? 'rgba(255,60,60,0.7)' : (S.god ? godTint(0.35, 3) : null);
   const alpha = p.iframe > 0 && Math.sin(S.t * 40) > 0 ? 0.55 : 1;
+
+  /* The gun's transform is worked out BEFORE anything is drawn, because the
+     hands have to reach it and the torso has to be drawn between the arms. */
+  const shx = px, shy = py - 1 + bob;
+  const flipY = Math.cos(p.ang) < 0;
+  const prog = p.reT > 0 ? 1 - p.reT / p.reMax : 0;
+  let gunAng = p.ang, back = 0;
+  if (p.reT > 0) {
+    const tilt = Math.sin(prog * Math.PI) * 1.05;     // dips down and comes back
+    gunAng += (flipY ? -tilt : tilt);
+    back = Math.sin(prog * Math.PI) * 3.2;
+  }
+  const gx = shx - Math.cos(p.ang) * back, gy = shy - Math.sin(p.ang) * back;
+
+  /* Where the new magazine is, if one is on its way in. The forward hand goes
+     with it — a reload where the gun moves and the hands do not reads as the
+     gun malfunctioning rather than as him reloading it. */
+  let magPt = null;
+  if (p.reT > 0 && prog > 0.5 && prog < 0.92) {
+    const k = clamp((prog - 0.5) / 0.32, 0, 1);
+    const mAng = gunAng + Math.PI / 2 * (flipY ? -1 : 1);
+    const off = (1 - k) * 9;
+    magPt = { x: gx + Math.cos(mAng) * off + Math.cos(gunAng) * 2,
+              y: gy + Math.sin(mAng) * off + Math.sin(gunAng) * 2 };
+  }
+
+  const arms = armRig(px, py, bob, lean, gx, gy, gunAng, flipY, w.spr.w / w.spr.ss, magPt);
+  const cols = armCols(), hstage = hurtStage();
+  const bareArm = a => hstage >= 2 && a.side < 0;     // the shoulder the tear is on
+
+  /* Layering, and it is the whole trick. An arm reaching away goes under the
+     torso entirely. An arm reaching toward the camera has its LIMB under the
+     gun and only its HAND over it — a forearm runs the length of a barrel, so
+     drawing the whole arm on top buries half the weapon, which is exactly what
+     it looked like. The hand alone is five sub-pixels: enough to read as a
+     grip, small enough to leave the gun legible. */
+  for (const a of arms) if (a.behind) plotArm(a, cols, bareArm(a), alpha);
 
   ctx.save();
   ctx.translate(px, py);
@@ -6453,28 +6659,13 @@ function drawPlayer(p) {
   if (cos.fx === 'fire' && Math.random() < 0.9)
     part(px + rnd(-4, 4), py - 6 + bob, pick(['#ff8a20', '#ffd05a', '#ff3b1e']), 1, 22, 0.4);
 
-  /* ---- the rifle, with the reload animation ---- */
-  const shx = px, shy = py - 1 + bob;
-  const flipY = Math.cos(p.ang) < 0;
-  let gunAng = p.ang, back = 0;
-  if (p.reT > 0) {
-    const prog = 1 - p.reT / p.reMax;
-    const tilt = Math.sin(prog * Math.PI) * 1.05;     // dips down and comes back
-    gunAng += (flipY ? -tilt : tilt);
-    back = Math.sin(prog * Math.PI) * 3.2;
-  }
-  const gx = shx - Math.cos(p.ang) * back, gy = shy - Math.sin(p.ang) * back;
+  /* ---- the forearms, then the gun, then the hands on top of it ---- */
+  for (const a of arms) if (!a.behind) plotArm(a, cols, bareArm(a), alpha, 1, 0, 0, 'limb');
   drawSprRot(ctx, w.spr, gx, gy, gunAng, 1, 2 - p.kick * 0.4, 3, flipY, S.god ? godTint(0.5, 4) : null);
+  if (magPt) drawSpr(ctx, SPR.mag, magPt.x, magPt.y, 1);
+  for (const a of arms) if (!a.behind) plotArm(a, cols, bareArm(a), alpha, 1, 0, 0, 'hand');
 
-  // new magazine sliding home
   if (p.reT > 0) {
-    const prog = 1 - p.reT / p.reMax;
-    if (prog > 0.5 && prog < 0.92) {
-      const k = clamp((prog - 0.5) / 0.32, 0, 1);
-      const mAng = gunAng + Math.PI / 2 * (flipY ? -1 : 1);
-      const off = (1 - k) * 9;
-      drawSpr(ctx, SPR.mag, gx + Math.cos(mAng) * off + Math.cos(gunAng) * 2, gy + Math.sin(mAng) * off + Math.sin(gunAng) * 2, 1);
-    }
     // reload ring
     ctx.save();
     ctx.strokeStyle = 'rgba(200,160,74,0.75)'; ctx.lineWidth = 1;
@@ -7371,10 +7562,23 @@ function drawTitle() {
     if (missing.length) console.info('[MEAT] typeface not found in fonts/: ' + missing.join(', ') + ' — using the embedded fallback.');
   }
 
-  // the title screen shows him before any of it happened
-  drawSpr(ctx, bodySprite(0), W / 2, 104, 2.2);
-  drawSpr(ctx, legSprite(0, 0), W / 2, 127.1, 2.2);   // 2.2 * (16/2 + 5/2) below the body centre
-  drawSprRot(ctx, SPR.pistol, W / 2 + 4, 112, 0.15, 2, 2, 3, false);
+  /* The title screen shows him before any of it happened — and it has to run
+     the same arm rig, or he stands there with no arms and a floating pistol.
+     K is the scale the sprite is drawn at; his centre is 5 body-pixels below
+     the body's own centre, which is the origin `armRig` measures from. */
+  const K = 2.2, TX = W / 2, TY = 104 + 5 * K;
+  const tArms = armRig(0, 0, 0, 0, 0, -1, 0.15, false, SPR.pistol.w / SPR.pistol.ss, null);
+  const tCols = armCols();
+  const tPlot = (a, part) => plotArm({ ax: TX + a.ax * K, ay: TY + a.ay * K,
+                                       hx: TX + a.hx * K, hy: TY + a.hy * K,
+                                       cx: TX + a.cx * K, cy: TY + a.cy * K },
+                                     tCols, false, 1, K, TX, TY, part);
+  for (const a of tArms) if (a.behind) tPlot(a);
+  drawSpr(ctx, bodySprite(0), W / 2, 104, K);
+  drawSpr(ctx, legSprite(0, 0), W / 2, 127.1, K);     // 2.2 * (16/2 + 5/2) below the body centre
+  for (const a of tArms) if (!a.behind) tPlot(a, 'limb');
+  drawSprRot(ctx, SPR.pistol, TX, TY - 1 * K, 0.15, K, 2, 3, false);
+  for (const a of tArms) if (!a.behind) tPlot(a, 'hand');
   if (cosDef(equippedCos()).fx === 'fire' && Math.random() < 0.8)
     part(W / 2 + rnd(-10, 10), 88, pick(['#ff8a20', '#ffd05a']), 1, 30, 0.5);
   drawParticles();
@@ -8456,6 +8660,7 @@ window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantGod, breakSe
                 ROOMS, FLOORS, isLastFloor, twist, isTwist, rollRoster, updateTwist,
                 BOSS_FINAL, BOSS_HP, FINAL_HP, bossBudget, enterPhase, mortarAt, updateHaz, drawWin,
                 magCap, fireNova, SHOP_WAVES, diff, killEnemy, damageEnemy,
-                angerPaci, hurtStage, bodySprite, legSprite, shred, hurtPlayer, RS, quitToTitle };
+                angerPaci, hurtStage, bodySprite, legSprite, shred, hurtPlayer, RS, quitToTitle,
+                armRig, armCells, armCols, ARM_SH_X, ARM_SH_Y };
 
 })();

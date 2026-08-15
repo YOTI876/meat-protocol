@@ -225,7 +225,13 @@ const DAM_MAP = { s: ['s', 'S'], S: ['s', 'S'], r: ['r', 'R'], R: ['r', 'R'],
 /* The 16x16 silhouette and its masses — SHAPE only, EPX-doubled and
    form-shaded before anything is stamped on it. The figure is symmetric here
    on purpose; everything that makes him specific is stamped at 2x, where it
-   can be aimed at a particular pixel. */
+   can be aimed at a particular pixel.
+
+   NO ARMS BELOW ROW 9, AND THAT IS DELIBERATE. A drawn arm hangs wherever it
+   was drawn, so a baked sleeve leaves the gun floating in front of a man
+   standing to attention. `drawArm()` in game.js strikes them per frame from
+   the deltoid line out to wherever his hands actually are. Put sleeves back on
+   rows 10-14 and you get three arms. */
 const DAM_BODY = [
   '.....oooooo.....',   //  0  hair
   '...oohhhhhhoo...',   //  1
@@ -236,12 +242,12 @@ const DAM_BODY = [
   '...osssssssso...',   //  6  jaw
   '....orrrrrro....',   //  7  collar
   '..orrrrrrrrrro..',   //  8  shoulders — SHIRT, edge to edge
-  '.orrrrrrrrrrrro.',   //  9  chest — still shirt. the apron does not start yet
-  '.orr,ruuuur,rro.',   // 10  the bib, and the arms breaking off on a shadow gap
-  '.orr,uuuuuu,rro.',   // 11
-  '.or,uuuuuuuu,ro.',   // 12  apron at its widest
-  '.or,bbbbbbbb,ro.',   // 13  belt
-  '.orsuuuuuuuusro.',   // 14  two hands, and they are both his
+  '.orrrrrrrrrrrro.',   //  9  the deltoid line. THE ARMS LEAVE FROM HERE
+  '..or,uuuuuu,ro..',   // 10  the bib. torso only below this — see the note
+  '..or,uuuuuu,ro..',   // 11
+  '..o,uuuuuuuu,o..',   // 12  apron at its widest
+  '..o,bbbbbbbb,o..',   // 13  belt
+  '..o,uuuuuuuu,o..',   // 14
   '..oNNNNNNNNNNo..'    // 15  coat hem
 ];
 
@@ -302,8 +308,8 @@ const DAM_WEAR = [
   '                                ',   // 25
   '              gggg              ',   // 26  belt buckle
   '              gGGg              ',   // 27
-  '     ssS      #  ##      ssS    ',   // 28  both hands, bare, and both his
-  '     sSS         #       sSS    '    // 29
+  '              #  ##             ',   // 28  the hands are drawn, not baked
+  '                 #              '    // 29
 ];
 SPR.body = SPRITE(
   [[0, 2, DAM_FACE], [0, 16, DAM_WEAR]]
@@ -348,10 +354,10 @@ const DAM_HURT = [
     '       %                        ',
     '      %%                        '
   ]], [0, 17, [
-    '   ,oo,                         ',   // 17  the sleeve torn off at the shoulder
-    '  ,osSo,      %%                ',   // 18
-    '  ,oSSo,     %%%%               ',   // 19
-    '   ,oo,       %%                ',   // 20
+    '     ,oo,                       ',   // 17  a bite out of the shoulder
+    '    ,osSo,    %%                ',   // 18
+    '    ,oSSo,   %%%%               ',   // 19
+    '     ,oo,     %%                ',   // 20
     '          ,ouuo,    %%          ',   // 21  and a hole punched in the apron
     '          ou..uo   %%%%         ',   // 22
     '           ,oo,     %%          ',   // 23
@@ -373,10 +379,10 @@ const DAM_HURT = [
     '       %          %%%%%%%       ',   // 10
     '      %%           %%%%%        '    // 11
   ]], [0, 17, [
-    '  ,o..o,                        ',   // 17  the sleeve is gone, and the arm with it
-    '  o~%so,       &&               ',   // 18
-    '  o~%SSo      &%%&              ',   // 19
-    '   oo~%o      %%%%              ',   // 20
+    '    ,o..o,                      ',   // 17  the shoulder is opened right up
+    '    o~%so,     &&               ',   // 18
+    '    o~%SSo    &%%&              ',   // 19
+    '     oo~%o    %%%%              ',   // 20
     '          ,ouuuuo,              ',   // 21  and the apron is opened right up
     '          ou.....uo             ',   // 22
     '          o.......o             ',   // 23
