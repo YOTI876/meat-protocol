@@ -572,24 +572,34 @@ const BUYABLE = ['scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot',
 
 /* ---- COSMETICS. bought from the vault, kept forever. ----
 
-   These all used to be called BANDs because they repainted a headband. The
-   headband is gone — `r`/`R`/`w` are the NECKERCHIEF at his throat now — so
-   the word went with it. The ids are untouched, so every save keeps whatever
-   it had unlocked and equipped.
+   Repointed for the third Damjan. `r`/`R`/`w` were a headband, then a
+   neckerchief; they are the WORK SHIRT now — the largest coloured area on him
+   after the apron, and what CRIMSON always meant. `u`/`U` is the apron, which
+   the darker sets take with them: it is the biggest single surface on him, and
+   leaving it bone-white under VOID would put a floodlit rectangle in the
+   middle of a cosmetic whose whole idea is that he stopped casting a shadow.
 
-   The ones that repaint the coat also repaint the APRON (`u`/`U`). It is the
-   biggest single surface on him; leaving it bone-white under VOID would put a
-   floodlit rectangle in the middle of a cosmetic whose entire idea is that he
-   stopped casting a shadow. */
+   `j`/`J` (jacket) and `h`/`H` (hair) are gone from the sprite entirely, so
+   the overrides that named them went too — a palette key nothing draws is a
+   line of config that silently does nothing.
+
+   NOTHING here touches the head wrap (`9`/`7`) or the rail (`g`/`G`). That is
+   deliberate and it is the rule the whole set is built on: **the parts of him
+   that are not his do not get to be a colour he chose.** A gold rail would
+   read as equipment. It is not equipment.
+
+   Ids are untouched, so every save keeps what it had unlocked and equipped. */
 const COSMETICS = [
   { id: 'crimson', name: 'CRIMSON',      price: 0,     pal: {},                                                                                    tag: 'the one he showed up in' },
   { id: 'gold',    name: 'GOLD',         price: 1000,  pal: { r: '#f0c243', R: '#a37c12', w: '#fff3c0' },                                           tag: 'earned, technically' },
-  { id: 'toxic',   name: 'TOXIC',        price: 2500,  pal: { r: '#8ef04a', R: '#3f8a1e', w: '#e8ffcc', j: '#2a4a2a', J: '#16301a', u: '#cfe8b4', U: '#93ad7c' }, tag: 'do not lick' },
-  { id: 'void',    name: 'VOID',         price: 5000,  pal: { r: '#2a1030', R: '#140618', w: '#a05cff', j: '#2a1c3a', J: '#180f24', h: '#120a18', H: '#1e1226', u: '#4a3a5e', U: '#2c2138' }, tag: 'he stopped casting a shadow' },
-  /* BONE MASK turns his face bone-white, and the apron already was — so the
-     apron goes butcher's-slate here or his head disappears into his chest. */
-  { id: 'bone',    name: 'BONE MASK',    price: 9000,  pal: { s: '#e8e2d0', S: '#b0a894', m: '#0a0508', e: '#0a0508', p: '#c02020', r: '#5a5248', R: '#332f2a', u: '#6b6560', U: '#454140' }, tag: 'nobody asked where the face went' },
-  { id: 'flame',   name: 'LIVING FLAME', price: 15000, pal: { r: '#ff8a20', R: '#c02a00', w: '#ffe08a' }, fx: 'fire',                               tag: 'the kerchief is on fire. it is fine.' }
+  { id: 'toxic',   name: 'TOXIC',        price: 2500,  pal: { r: '#8ef04a', R: '#3f8a1e', w: '#e8ffcc', u: '#cfe8b4', U: '#93ad7c' },               tag: 'do not lick' },
+  { id: 'void',    name: 'VOID',         price: 5000,  pal: { r: '#2a1030', R: '#140618', w: '#a05cff', u: '#4a3a5e', U: '#2c2138' },               tag: 'he stopped casting a shadow' },
+  /* BONE MASK bleaches every scrap of skin he has left — the face and the one
+     bare hand — and darkens the shirt and apron so a white head does not swim
+     into a white chest. The pupil goes red, because a skull with a brown eye
+     in it is a man in makeup and a skull with a red one is not. */
+  { id: 'bone',    name: 'BONE MASK',    price: 9000,  pal: { s: '#e8e2d0', S: '#b0a894', p: '#c02020', r: '#5a5248', R: '#332f2a', u: '#6b6560', U: '#454140' }, tag: 'nobody asked where the face went' },
+  { id: 'flame',   name: 'LIVING FLAME', price: 15000, pal: { r: '#ff8a20', R: '#c02a00', w: '#ffe08a' }, fx: 'fire',                               tag: 'the shirt is on fire. he has not mentioned it.' }
 ];
 
 /* ============================================================
