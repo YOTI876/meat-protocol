@@ -300,7 +300,27 @@ const ETYPE = {
   husk:     { bank: SPR.anim.bloater,  hp: 62,  spd: 36, dmg: 22, r: 8, score: 30, gib: '#b8b0a0', name: 'HUSK',
               tint: 'rgba(216,210,196,0.45)', scale: 0.85, split: 2 },
   cyst:     { bank: SPR.anim.bloater,  hp: 170, spd: 0,  dmg: 18, r: 10, score: 55, gib: '#8fae4a', name: 'CYST',
-              tint: 'rgba(150,210,70,0.42)', scale: 1.12, nest: 1 }
+              tint: 'rgba(150,210,70,0.42)', scale: 1.12, nest: 1 },
+  /* ---- THE DEEP ROSTER ----
+     Everything above is unlocked by floor 3, so floors 4 to 10 used to show
+     you nothing you had not already learned to kill. These three arrive later
+     and each one closes a way of playing that had stopped costing anything.
+
+     TROLLEY  answers standing still. Its front is plated: shoot it head-on and
+              you do a fraction of the damage. You have to get around it, which
+              means giving up the corner you were holding.
+     SPITTER  answers kiting. It does not close — it hangs back and drops
+              hazard on where you are going, so running a circle forever now
+              runs you through your own future.
+     SHEPHERD answers ignoring the chaff. It never touches you. It stands at
+              the back making everything near it faster and tougher, and the
+              wave you were comfortably out-damaging stops being one. */
+  trolley:  { bank: SPR.anim.trolley,  hp: 210, spd: 30, dmg: 30, r: 9, score: 60, gib: '#8a9098', name: 'TROLLEY',
+              floor: 3, armour: 0.22, armArc: 1.15 },
+  spitter:  { bank: SPR.anim.spitter,  hp: 70,  spd: 30, dmg: 20, r: 7, score: 65, gib: '#7f9c58', name: 'SPITTER',
+              floor: 5, standoff: 150, lob: 2.6 },
+  shepherd: { bank: SPR.anim.shepherd, hp: 130, spd: 40, dmg: 16, r: 7, score: 90, gib: '#9a7fd8', name: 'SHEPHERD',
+              floor: 7, standoff: 210, aura: 118 }
 };
 const CONTACT_CD = 0.74;   // still a shorter fuse than the 0.78 it used to be
 /* Every coin that reaches your pocket goes through this, from any source —
@@ -2359,7 +2379,7 @@ function makePlayer() {
     nades: 3, nadeCd: 0,
     dash: 0, dashCd: 0, iframe: 0, walkT: 0, stepPhase: 0, flip: false,
     hurtFlash: 0, kick: 0,
-    glockT: 0, glockSide: 1, ramHit: [], tempShield: 0
+    glockT: 0, glockSide: 1, ramHit: [], tempShield: 0, frenzyT: 0, siphonT: 0
   };
 }
 
@@ -2375,6 +2395,8 @@ function spawnEnemy(type, x, y) {
     hp, max: hp,
     tint: d.tint || null, scale: d.scale || 1,
     split: d.split | 0, nest: d.nest | 0, hatchT: rnd(1.5, 2.5),
+    armour: d.armour || 0, armArc: d.armArc || 0, standoff: d.standoff || 0,
+    lob: d.lob || 0, lobT: rnd(1.2, 2.6), aura: d.aura || 0, buffed: 0,
     spd: d.spd * D.spd * rnd(0.9, 1.12), base: d.spd * D.spd,
     mark: 0, slowT: 0, slowAmt: 0,
     dmg: d.dmg * D.dmg * (1 + S.wave * 0.03),
@@ -2754,7 +2776,8 @@ function fire() {
 function emit(w) {
   const p = S.p, st = ST();
   const spin = w.spin ? p.spin : 1;
-  p.fireT = (w.spin ? lerp(0.16, w.rate, p.spin) : w.rate) * st.rateMul;
+  // FRENZY cuts the gap between shots by a third for as long as it lasts
+  p.fireT = (w.spin ? lerp(0.16, w.rate, p.spin) : w.rate) * st.rateMul * (p.frenzyT > 0 ? 0.66 : 1);
   if (!S.god && !w.noReload) p.mags[w.id]--;
 
   const base = (w.spread + p.recoil * 0.05) * (S.god ? 0.4 : 1);
@@ -3000,6 +3023,23 @@ function damageEnemy(e, dmg, fromBullet, ang, noRoll, forceCrit) {
   if (e.dead) return 0;
   const st = ST();
   let crit = false;
+  /* PLATED FRONT. The TROLLEY faces where it is going, so anything arriving
+     inside `armArc` radians of its heading hits the plate and mostly does not
+     count. It is not a damage sponge — from behind it takes everything — it is
+     a reason to stop holding the corner you were holding. `ang` is the
+     direction the hit is TRAVELLING, so a shot landing on the front of a
+     rightward-moving trolley arrives pointing left: the test is against the
+     reverse of its heading. */
+  if (e.armour > 0 && ang !== undefined) {
+    const h = Math.atan2(e.vy, e.vx);
+    let da = Math.abs(((ang - h - Math.PI) % TAU + TAU + Math.PI) % TAU - Math.PI);
+    if (da < e.armArc) {
+      dmg *= e.armour;
+      if (fromBullet && Math.random() < 0.5) {
+        part(e.x + Math.cos(ang + Math.PI) * e.r, e.y + Math.sin(ang + Math.PI) * e.r, '#c8ccd4', 2, 60, 0.25);
+      }
+    }
+  }
   if (!noRoll) {
     if (e.mark > 0) dmg *= MARK_MUL;
     if (st.tender > 0 && impaired(e)) dmg *= 1 + st.tender;
@@ -3007,6 +3047,14 @@ function damageEnemy(e, dmg, fromBullet, ang, noRoll, forceCrit) {
     if (forceCrit || (st.crit > 0 && Math.random() < st.crit)) { dmg *= st.critMul; crit = true; }
   }
   e.hp -= dmg;
+  /* SIPHON. 4% of what you deal comes back, capped per hit so a beam weapon
+     cannot heal you to full off one bloater — it rewards keeping the trigger
+     down in a crowd, which is exactly when you were going to lose health. */
+  if (S.p.siphonT > 0 && dmg > 0) {
+    const before = S.p.hp;
+    S.p.hp = Math.min(ST().maxhp, S.p.hp + Math.min(dmg * 0.04, 2.2));
+    if (S.p.hp > before && Math.random() < 0.25) part(S.p.x, S.p.y - 6, '#ff5b5b', 1, 30, 0.35);
+  }
   e.hit = crit ? 0.16 : 0.09;
   e.sq = Math.min(1, e.sq + dmg * 0.012);
   blood(e.x, e.y + 4, crit ? 9 : 5, 'rgba(90,10,16,0.4)');
@@ -3214,6 +3262,23 @@ function killEnemy(e, ang) {
     if (r < 0.008) dropPickup(e.x, e.y, 'card');        // cards: genuinely rare
     else if (r < 0.021) dropPickup(e.x, e.y, 'nova');   // the rarer of the two new ones
     else if (r < 0.056) dropPickup(e.x, e.y, 'shield');
+    /* ---- WHAT THE DEEP FLOORS DROP ----
+       The table used to be identical on floor 1 and floor 10: heal, shield,
+       ammo, coin, frag. Everything you could find you had already found in the
+       first five minutes, so going deeper stopped paying in anything but
+       numbers. These four unlock with depth, and none is a bigger version of
+       something you already had — each changes what you can DO for a few
+       seconds rather than topping a bar back up.
+
+       THE BAND IS CARVED OUT OF COIN, and it sits BELOW card/nova/shield on
+       purpose. Put above them and it swallows them: the first version of this
+       took nova from 1.3% to zero and shield from 3.5% to 0.4%, because an
+       `else if` chain gives the earlier test the whole overlap. Coin is the
+       widest band at 19% and the one that can afford to lose five points. */
+    else if (S.room >= 7 && r < 0.070) dropPickup(e.x, e.y, 'bounty');
+    else if (S.room >= 5 && r < 0.082) dropPickup(e.x, e.y, 'siphon');
+    else if (S.room >= 3 && r < 0.096) dropPickup(e.x, e.y, 'frenzy');
+    else if (S.room >= 4 && r < 0.106) dropPickup(e.x, e.y, 'magnet');
     // 16% -> 19%. PACI turns up twice a floor now and the second visit has to
     // be able to buy something, or it is just a corridor with a man in it.
     else if (r < 0.246) dropPickup(e.x, e.y, 'coin');
@@ -3762,6 +3827,15 @@ function startWave(n) {
     // the two teachers arrive once the basics are learned
     if (n >= 5 || S.room >= 1) pool.push(['husk', 1 + n * 0.3 + S.room]);
     if (n >= 7 || S.room >= 2) pool.push(['cyst', 0.5 + n * 0.15 + S.room * 0.5]);
+    /* THE DEEP ROSTER. Gated on FLOOR only, never on wave, so each one is a
+       thing the floor introduces rather than a thing that turns up late in
+       every fight — you meet it, it is new, and it is new for a whole floor.
+       Weights stay low: these are the ones you plan around, and three of them
+       in a crowd is a puzzle, ten is a wall. */
+    for (const k of ['trolley', 'spitter', 'shepherd']) {
+      const f = ETYPE[k].floor;
+      if (S.room >= f) pool.push([k, 0.8 + (S.room - f) * 0.55 + n * 0.12]);
+    }
     let total = 0;
     for (const c of pool) total += c[1];
     for (let i = 0; i < count; i++) {
@@ -4146,6 +4220,8 @@ function update(rdt) {
   p.iframe = Math.max(0, p.iframe - dt);
   p.hurtFlash = Math.max(0, p.hurtFlash - dt);
   p.tempShield = Math.max(0, p.tempShield - dt);
+  p.frenzyT = Math.max(0, p.frenzyT - dt);
+  p.siphonT = Math.max(0, p.siphonT - dt);
   S.vacuum = Math.max(0, S.vacuum - dt);
 
   if (st.shieldMax > 0 && p.shield < st.shieldMax) {
@@ -4526,6 +4602,37 @@ function update(rdt) {
         part(p.x, p.y, '#c6e8ff', 22, 130, 0.6);
         A.bigpickup();
       }
+      /* ---- the deep drops ----
+         Timed, loud, and short. A buff you have to spend before it runs out is
+         a decision; a buff you carry is just a bigger number. */
+      else if (d.kind === 'frenzy') {
+        p.frenzyT = Math.max(p.frenzyT, 7);
+        float(p.x, p.y - 18, 'FRENZY', '#ffb03a', true);
+        ring(p.x, p.y, 30, '#ffb03a', 0.4, 2); part(p.x, p.y, '#ffd28a', 20, 130, 0.6);
+        A.bigpickup();
+      }
+      else if (d.kind === 'siphon') {
+        p.siphonT = Math.max(p.siphonT, 8);
+        float(p.x, p.y - 18, 'SIPHON', '#c02a3a', true);
+        ring(p.x, p.y, 30, '#c02a3a', 0.4, 2); part(p.x, p.y, '#ff5b5b', 20, 130, 0.6);
+        A.bigpickup();
+      }
+      else if (d.kind === 'magnet') {
+        /* Not a buff — a sweep. Everything loose on the floor comes in at
+           once, which is why it is worth walking to rather than worth saving. */
+        let n = 0;
+        for (const o of S.drops) if (o !== d) { o.pull = 1; n++; }
+        float(p.x, p.y - 18, 'SWEEP x' + n, '#9fe08a', true);
+        ring(p.x, p.y, 44, '#9fe08a', 0.5, 2);
+        A.bigpickup();
+      }
+      else if (d.kind === 'bounty') {
+        const got = 40 + S.room * 12;
+        S.coins += got; S.vault += got;
+        float(p.x, p.y - 18, '+' + got, '#f5c518', true);
+        ring(p.x, p.y, 36, '#f5c518', 0.45, 2); part(p.x, p.y, '#ffe27a', 26, 150, 0.7);
+        A.coin(); A.bigpickup();
+      }
       else if (d.kind === 'nova') fireNova(p.x, p.y);
       else if (d.kind === 'card') {
         S.cards++;
@@ -4669,6 +4776,33 @@ function updateEnemy(e, dt) {
       part(e.x, e.y, '#cfc7b0', 14, 100, 0.4);
       A.screech();
     }
+  } else if (e.type === 'spitter') {
+    /* It does not want to reach you. Inside its standoff it backs away, and it
+       drops hazard on WHERE YOU ARE GOING rather than where you are — leading
+       your own velocity, so a clean circle runs you straight through it. That
+       is the whole point of the thing: kiting stops being free. */
+    e.lobT -= dt;
+    if (e.lobT < 0.5) e.poseT = Math.max(e.poseT, 0.12);
+    if (e.lobT <= 0) {
+      e.lobT = e.lob * rnd(0.85, 1.2);
+      e.poseT = 0.34;
+      const lead = 0.55;
+      mortarAt(clamp(S.p.x + S.p.vx * lead, 12, S.aw - 12),
+               clamp(S.p.y + S.p.vy * lead, 12, S.ah - 12),
+               26, e.dmg * 0.9, 1.15, '#b6cf8c');
+      part(e.x, e.y - 4, '#dcf0b4', 8, 70, 0.4);
+      A.screech();
+    }
+  } else if (e.aura > 0) {
+    /* It never touches you. It stands off and makes everything near it faster
+       and tougher, and marks who it is holding with a tether so the buff is
+       something you can SEE and therefore something you can answer. */
+    for (const o of S.en) {
+      if (o === e || o.boss || o.dead) continue;
+      if (Math.hypot(o.x - e.x, o.y - e.y) < e.aura) o.buffed = Math.max(o.buffed, 0.25);
+    }
+    if (Math.random() < dt * 3) part(e.x + rnd(-6, 6), e.y - 8, '#cbb6ff', 1, 26, 0.5);
+    e.poseT = Math.max(e.poseT, 0.1);
   } else if (e.type === 'crawler') {
     if (Math.random() < dt * 0.5 && d < 120) { e.vx += tx * 90; e.vy += ty * 90; e.poseT = 0.22; }
   } else if (e.type === 'bloater') {
@@ -4697,9 +4831,22 @@ function updateEnemy(e, dt) {
 
   const wob = Math.sin(e.wob) * 0.28;
   const ca = Math.cos(wob), sa = Math.sin(wob);
-  const rx = tx * ca - ty * sa, ry = tx * sa + ty * ca;
-  e.vx = lerp(e.vx, rx * e.spd, 1 - Math.pow(0.02, dt));
-  e.vy = lerp(e.vy, ry * e.spd, 1 - Math.pow(0.02, dt));
+  let rx = tx * ca - ty * sa, ry = tx * sa + ty * ca;
+  /* STANDOFF. The two that do their work at range walk AWAY once you are
+     inside their band, and sidle when you are at it — so closing the distance
+     is the counter to both of them, which is the opposite of the counter to
+     everything else in the room. */
+  if (e.standoff > 0) {
+    if (d < e.standoff * 0.8) { rx = -rx; ry = -ry; }
+    else if (d < e.standoff) { const t2 = rx; rx = -ry; ry = t2; }
+  }
+  /* The SHEPHERD's blessing. Held for a quarter second at a time and refreshed
+     every frame it is in range, so it lapses on its own the moment the
+     shepherd dies — the buff is never something you have to clean up. */
+  const buff = e.buffed > 0 ? 1.35 : 1;
+  if (e.buffed > 0) e.buffed -= dt;
+  e.vx = lerp(e.vx, rx * e.spd * buff, 1 - Math.pow(0.02, dt));
+  e.vy = lerp(e.vy, ry * e.spd * buff, 1 - Math.pow(0.02, dt));
   e.x += e.vx * dt; e.y += e.vy * dt;
   e.flip = e.vx < 0;
   collideWalls(e);
@@ -5652,13 +5799,18 @@ function drawWorld() {
     const by = Math.sin(d.bob) * 2;
     const spr = d.kind === 'ammo' ? SPR.ammo : d.kind === 'med' ? SPR.medkit : d.kind === 'god' ? SPR.eye
       : d.kind === 'coin' ? SPR.coin : d.kind === 'card' ? SPR.card : d.kind === 'nade' ? SPR.grenade
-      : d.kind === 'shield' ? SPR.shield : SPR.nova;
+      : d.kind === 'shield' ? SPR.shield
+      : d.kind === 'frenzy' ? SPR.frenzy : d.kind === 'siphon' ? SPR.siphon
+      : d.kind === 'magnet' ? SPR.magnet : d.kind === 'bounty' ? SPR.bounty : SPR.nova;
     const sc = d.kind === 'god' ? 1.6 : d.kind === 'card' ? 1.1 : 1;
     const col = d.kind === 'god' ? '#ff2b2b'
       : d.kind === 'coin' ? '#f5c518' : d.kind === 'card' ? '#c0202a'
       : d.kind === 'shield' ? '#7fd0ff' : d.kind === 'nova' ? '#ffb03a'
+      : d.kind === 'frenzy' ? '#ff8a20' : d.kind === 'siphon' ? '#c02a3a'
+      : d.kind === 'magnet' ? '#9fe08a' : d.kind === 'bounty' ? '#f5c518'
       : d.kind === 'med' ? '#ff6b6b' : d.kind === 'nade' ? '#7aa35e' : '#f2d14a';
-    const rare = d.kind === 'god' || d.kind === 'card' || d.kind === 'nova' || d.kind === 'shield';
+    const rare = d.kind === 'god' || d.kind === 'card' || d.kind === 'nova' || d.kind === 'shield'
+      || d.kind === 'frenzy' || d.kind === 'siphon' || d.kind === 'magnet' || d.kind === 'bounty';
     const fade = d.life < 4 && Math.sin(S.t * 18) > 0 ? 0.35 : 1;
 
     // the shadow shrinks as it rises, which is the whole reason it is there
@@ -7406,6 +7558,8 @@ function drawMinimap() {
     if (d.kind === 'god') continue;
     const c = d.kind === 'coin' ? '#f5c518' : d.kind === 'card' ? '#e04a54'
       : d.kind === 'med' ? '#ff6b6b' : d.kind === 'ammo' ? '#f2d14a'
+      : d.kind === 'frenzy' ? '#ff8a20' : d.kind === 'siphon' ? '#c02a3a'
+      : d.kind === 'magnet' ? '#9fe08a' : d.kind === 'bounty' ? '#f5c518'
       : d.kind === 'nade' ? '#7aa35e' : d.kind === 'shield' ? '#7fd0ff'
       : d.kind === 'nova' ? '#ffb03a' : '#ffffff';
     // the rare ones pulse, so a card on the far side of the arena gets noticed

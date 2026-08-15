@@ -666,6 +666,62 @@ SPR.shield = SPRITE([
   '....oo....'
 ], { b: '#3f92d6', w: '#c6e8ff' });
 
+/* ---- the four the deep floors drop ----
+   Each is a different SHAPE, not the same badge in four colours: a chevron
+   going up, a drop falling, a horseshoe, and a stack. At ten pixels across,
+   shape is all you get. */
+SPR.frenzy = SPRITE([          // stacked chevrons — everything, faster
+  '....oo....',
+  '...owwo...',
+  '..owwwwo..',
+  '.owwaawwo.',
+  'oww.oo.wwo',
+  'ow.o..o.wo',
+  '..owwwwo..',
+  '.owwaawwo.',
+  'oww.oo.wwo',
+  '.o.o..o.o.'
+], { w: '#ffd28a', a: '#ff8a20' });
+
+SPR.siphon = SPRITE([          // a drop, falling, with the light on its shoulder
+  '....oo....',
+  '....oo....',
+  '...owwo...',
+  '..owwwwo..',
+  '.owwrrrwo.',
+  'owwrrrrrwo',
+  'owrrrrrrro',
+  'owrrrrrrro',
+  '.orrrrrro.',
+  '..oooooo..'
+], { w: '#ff9aa2', r: '#c02a3a' });
+
+SPR.magnet = SPRITE([          // a horseshoe, poles down
+  '..oo..oo..',
+  '.ommo.ommo',
+  'ommmo.ommm',
+  'omm.o.o.mm',
+  'omm.o.o.mm',
+  'omm.o.o.mm',
+  'ommmoommmo',
+  '.ommmmmmo.',
+  '..oMMMMo..',
+  '...oooo...'
+], { m: '#9fe08a', M: '#4f8f3a' });
+
+SPR.bounty = SPRITE([          // a stack, not a single coin
+  '..oooooo..',
+  '.oyyyyyyo.',
+  'oyyYYYYyyo',
+  '.oyyyyyyo.',
+  '..oooooo..',
+  '.oyyyyyyo.',
+  'oyyYYYYyyo',
+  '.oyyyyyyo.',
+  '..oooooo..',
+  '...oooo...'
+], { y: '#f5c518', Y: '#b2911f' });
+
 SPR.nova = SPRITE([
   '....xx....',
   '..x.xx.x..',
@@ -1133,6 +1189,126 @@ SPR.anim = {};
   ], // swollen, about to burst forward
     t(['ovvuvvuvvuuvvuvvuvvo', 'ovvvvvvvvvvvvvvvvvvo', 'ovvuuuuuuuuuuuuuuvvo', 'ovvvvvvvvvvvvvvvvvvo', 'oVvvvvvvvvvvvvvvvVo.', '.oVVvvvvvvvvvvvvVVo.', '..oVVo........oVVo..', '..ooo..........ooo..']),
     { y: -4.5, sep: 3.5 }, { ss: 2 });
+}
+
+/* ============================================================
+   THE DEEP ROSTER
+
+   Everything above is unlocked by floor 3, which meant floors 4 to 10 never
+   showed you anything you had not already learned to kill. These three arrive
+   later, and each answers a way of playing that had stopped costing you
+   anything: standing still, kiting forever, and ignoring the weak ones.
+   ============================================================ */
+
+/* ---------- THE TROLLEY 16x14 — armour with something behind it ----------
+   A squat steel front on wheels, and the only enemy WIDER than it is tall.
+   That is the read: a wall coming at you. The eyes sit behind the grille, so
+   the one soft thing on it is the one thing you cannot shoot from the front. */
+{
+  const pal = { T: '#c8ccd4', G: '#6b7079', E: '#3a3e45', k: '#15181c', x: '#ff5252',
+                '9': '#f0f4fa', X: '#ffe6d2', ',': '#22262b', ';': '#ffd6cc', '!': '#9aa2ae' };
+  const map = { T: ['9', 'G'], G: ['T', 'E'], E: ['G', 'k'], k: ['E', 'k'] };
+  const face = { x: 0, y: 8, rows: [
+    '      ,EkkkkE,        ,EkkkkE,  ',
+    '      EkxXXxkE        EkxXXxkE  ',
+    '      ,EkkkkE,        ,EkkkkE,  '
+  ] };
+  const t = t1 => shade(up2(t1), map);
+  const body = [
+    '....oooooooo....',
+    '..ooTTTTTTTToo..',
+    '.oTTGGGGGGGGTTo.',
+    '.oTG!k!k!k!kGTo.',
+    '.oTG!k!k!k!kGTo.',
+    '.oTG!k!k!k!kGTo.',
+    '.oTTGGGGGGGGTTo.',
+    '.ooTTTTTTTTTToo.',
+    '..oooooooooooo..'
+  ];
+  SPR.anim.trolley = BANK(pal, CREATURE(map, body, face), [
+    t(['.oTTTTTTTTTTTTo.', '.oGGGGGGGGGGGGo.', '.oGo.oGGGGo.oGo.', '.ooo..oooo..ooo.', '................']),
+    t(['.oTTTTTTTTTTTTo.', '.oGGGGGGGGGGGGo.', 'oGo..oGGGGo..oGo', 'ooo...oooo...ooo', '................'])
+  ], // braced, and the plate catches what little light there is
+    t(['.oTTTTTTTTTTTTo.', '.o999999999999o.', '.oGo..oGGGGo.oGo', '.ooo..oooo...ooo', '................']),
+    { y: -2.0, sep: 3.4 }, { ss: 2 });
+}
+
+/* ---------- THE SPITTER 16x14 — it does not want to reach you ----------
+   Top-heavy: a swollen sac over a short body, opening UPWARD, because what it
+   throws goes over things. Nothing else has that proportion, so you can pick
+   out the one in the crowd that is out-ranging you. */
+{
+  const pal = { L: '#b6cf8c', v: '#7f9c58', V: '#4a5f32', D: '#2b3a1c', k: '#141c0e', x: '#ff5252',
+                '9': '#dcf0b4', X: '#ffe27a', ',': '#1a2412', ';': '#f4ffdc', '!': '#e8ffb0' };
+  const map = { L: ['9', 'v'], v: ['L', 'V'], V: ['v', 'D'], D: ['V', 'k'], k: ['D', 'k'] };
+  /* The funnel is a mouth that opens upward, and it is always a little open —
+     which is the tell that it is loaded. */
+  const face = { x: 0, y: 4, rows: [
+    '      ,DkkkkkkkkkkkkD,          ',
+    '      Dk!!kkkkkkkk!!kD          ',
+    '      Dkk!!kkkkkk!!kkD          ',
+    '      ,Dkk!!kkkk!!kkD,          ',
+    '        ,DkkkkkkkkD,            ',
+    '                                ',
+    '     ,DkkD,          ,DkkD,     ',
+    '     DkxXxkD        DkxXxkD     ',
+    '     ,DkkD,          ,DkkD,     '
+  ] };
+  const t = t1 => shade(up2(t1), map);
+  const body = [
+    '......oooo......',
+    '....ooLLLLoo....',
+    '...oLvvvvvvLo...',
+    '..oLvvvvvvvvLo..',
+    '..oLvvvvvvvvLo..',
+    '..oLvvvvvvvvLo..',
+    '.oLvvvvvvvvvvLo.',
+    '.oLvvvvvvvvvvLo.',
+    '.oLvvvvvvvvvvLo.'
+  ];
+  SPR.anim.spitter = BANK(pal, CREATURE(map, body, face), [
+    t(['.oLvvvvvvvvvvLo.', '..oLvvvvvvvvLo..', '..oVVo....oVVo..', '..oVo......oVo..', '..ooo......ooo..']),
+    t(['.oLvvvvvvvvvvLo.', '..oLvvvvvvvvLo..', '.oVVo......oVVo.', '.oVo........oVo.', '.ooo........ooo.'])
+  ], // it rears back to lob, and the sac goes bright
+    t(['.oL99vvvvvv99Lo.', '..oL99vvvv99Lo..', '..oVVo....oVVo..', '.oVo........oVo.', '.ooo........ooo.']),
+    { y: 0.5, sep: 3.0 }, { ss: 2 });
+}
+
+/* ---------- THE SHEPHERD 16x14 — it never touches you ----------
+   Thin, upright, wearing a crown of spikes that breaks the outline at the top
+   corners: the only silhouette in the game with anything above its own head.
+   It makes everything around it worse. */
+{
+  const pal = { L: '#cbb6ff', c: '#9a7fd8', C: '#5c4590', D: '#33224f', k: '#150d22', x: '#ff5252',
+                '9': '#e8dcff', X: '#ffe27a', ',': '#1d1330', ';': '#f6efff', '!': '#c8a8ff' };
+  const map = { L: ['9', 'c'], c: ['L', 'C'], C: ['c', 'D'], D: ['C', 'k'], k: ['D', 'k'] };
+  const face = { x: 0, y: 7, rows: [
+    '        ,DkkD,    ,DkkD,        ',
+    '        DkxXkD    DkxXkD        ',
+    '        ,DkkD,    ,DkkD,        ',
+    '                                ',
+    '         ,DkkkkkkkkkkD,         ',
+    '         Dkk!!!!!!!!kkD         ',
+    '         ,DkkkkkkkkkkD,         '
+  ] };
+  const t = t1 => shade(up2(t1), map);
+  const body = [
+    '..o..oooooo..o..',
+    '..oo.oLLLLo.oo..',
+    '...ooLccccLoo...',
+    '....oLccccLo....',
+    '....oLccccLo....',
+    '....oLccccLo....',
+    '...oLccccccLo...',
+    '...oLccccccLo...',
+    '...oLccccccLo...'
+  ];
+  SPR.anim.shepherd = BANK(pal, CREATURE(map, body, face), [
+    t(['...oLccccccLo...', '...oLccccccLo...', '...oCCo..oCCo...', '...oCo....oCo...', '...ooo....ooo...']),
+    t(['...oLccccccLo...', '...oLccccccLo...', '..oCCo....oCCo..', '..oCo......oCo..', '..ooo......ooo..'])
+  ], // it raises the crown and the room gets worse
+    t(['...oL999999Lo...', '...oL999999Lo...', '..oCCo....oCCo..', '..oCo......oCo..', '..ooo......ooo..']),
+    { y: -1.5, sep: 2.2 }, { ss: 2 });
 }
 
 /* ---------- BOSS A 26x24 — hulking, apron, sunken head ----------
