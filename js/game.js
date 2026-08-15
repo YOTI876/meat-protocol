@@ -279,8 +279,10 @@ function curRoom() { return S.inShop ? SHOP_ROOM : roomDef(S.room); }
    The old rule was one back room per three boss-class kills, which worked out
    to exactly one shop a floor, always after the wave-10 boss — so every gun
    purchase happened on the way out of a floor and you spent the whole floor
-   holding money you could not put down. Twice a floor, on the fives, means the
-   half-time shop actually changes how you fight waves 6-10. */
+   holding money you could not put down. Twice a floor means the half-time shop
+   actually changes how you fight the back half of one — it is waves 3 and 5
+   now that the floor is five long, so PACI still lands at the midpoint and
+   again on the way out. */
 /* ============================================================
    FIVE WAVES A FLOOR, not ten.
 
@@ -3967,9 +3969,9 @@ function updateWaves(dt) {
       persist();
       // PACI keeps to the fives now — see SHOP_WAVES.
       if (shopDueAfter(S.wave)) S.shopDue = true;
-      if (S.wave >= 10 && isLastFloor(S.room)) {
+      if (S.wave >= WAVES && isLastFloor(S.room)) {
         // there is no eleventh floor and therefore no door. see the win path.
-      } else if (S.wave >= 10) {
+      } else if (S.wave >= WAVES) {
         S.door.open = true;
         msg('THE DOOR IS OPEN', 'go north. it is worse down there.', 4);
         A.doorOpen();
@@ -7505,7 +7507,7 @@ function drawHUD() {
     txt('SPEND SOMETHING', W / 2, 22, '#c8a8e0', 'center');
     txt('leave through the door at the bottom', W / 2, 32, 'rgba(160,130,190,0.75)', 'center', 7);
   } else {
-    txt(S.waveState === 'idle' ? 'PREPARING' : 'WAVE ' + S.wave + '/10', W / 2, 22,
+    txt(S.waveState === 'idle' ? 'PREPARING' : 'WAVE ' + S.wave + '/' + WAVES, W / 2, 22,
         S.wave === BOSS_WAVE ? '#ff3b46' : miniWaves().indexOf(S.wave) >= 0 ? '#ff8a3a' : '#c0ac96', 'center');
     for (let i = 1; i <= 10; i++) {
       ctx.fillStyle = i < S.wave ? '#8a2a2e' : i === S.wave ? '#ff3b46' : 'rgba(255,255,255,0.12)';
