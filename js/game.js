@@ -427,11 +427,11 @@ const BOSSES = [
   { key: 'pitcher', name: 'THE PITCHER',      bank: SPR.anim.pitcher, tint: null,                   bulk: 0.94, spd: 46, r: 15, item: 'coolade', pat: 'blink',   pat2: 'curtain', addT: 7.0, addN: 3, adds: ['stalker', 'crawler'],            cry: 'IT CAME THROUGH THE WALL',            cry2: 'IT IS NOT BOTHERING WITH WALLS NOW' },
   { key: 'hog',     name: 'THE HOGFATHER',    bank: SPR.anim.hogfather, tint: null,                 bulk: 1.12, spd: 32, r: 15, item: 'glock',   pat: 'mortar',  pat2: 'burst',   addT: 6.0, addN: 4, adds: ['crawler', 'shrieker', 'bloater'], cry: 'HE IS CARRYING SOMETHING',            cry2: 'HE PUT IT DOWN. IT IS FOR YOU.' },
   { key: 'courier', name: 'THE COURIER',      bank: SPR.anim.courier, tint: null,                   bulk: 0.92, spd: 62, r: 15, item: 'bike',    pat: 'circle',  pat2: 'mines',   addT: 6.8, addN: 4, adds: ['stalker', 'stalker', 'crawler'],  cry: 'IT HAS BEEN CIRCLING FOR HOURS',      cry2: 'THE ROUND IS OVER. DELIVERY.' },
-  { key: 'fishwife',name: 'THE FISHWIFE',     bank: SPR.anim.bossB, tint: 'rgba(90,220,210,0.5)',   bulk: 1.00, spd: 38, r: 15, item: 'coolade', pat: 'sweep',   pat2: 'blink',   addT: 5.4, addN: 4, adds: ['shrieker', 'crawler', 'husk'],    cry: 'SHE HAS BEEN ON ICE SINCE FRIDAY',    cry2: 'SHE HAS THAWED ALL THE WAY THROUGH' },
-  { key: 'trim',    name: 'THE TRIMMINGS',    bank: SPR.anim.bossA, tint: 'rgba(200,150,160,0.5)',  bulk: 1.08, spd: 30, r: 15, item: 'melon',   pat: 'spawner', pat2: 'rush',    addT: 3.6, addN: 5, adds: ['crawler', 'husk', 'husk'],        cry: 'IT IS EVERY PART THEY DID NOT SELL',  cry2: 'ALL OF IT AT ONCE, THEN' },
-  { key: 'roast',   name: 'SUNDAY ROAST',     bank: SPR.anim.bossB, tint: 'rgba(255,150,50,0.55)',  bulk: 1.04, spd: 34, r: 15, item: 'banana',  pat: 'charge',  pat2: 'spiral',  addT: 5.8, addN: 4, adds: ['bloater', 'crawler', 'shrieker'], cry: 'IT HAS BEEN IN THERE SINCE SUNDAY',   cry2: 'IT IS DONE. IT IS VERY DONE.' },
-  { key: 'shelf',   name: 'THE NIGHT SHELF',  bank: SPR.anim.bossA, tint: 'rgba(70,90,200,0.55)',   bulk: 0.96, spd: 54, r: 15, item: 'glock',   pat: 'mines',   pat2: 'curtain', addT: 6.2, addN: 5, adds: ['stalker', 'stalker', 'husk'],     cry: 'IT ONLY RESTOCKS AFTER CLOSING',      cry2: 'IT IS PUTTING YOU OUT ON THE FRONT' },
-  { key: 'bestby',  name: 'THE BEST BEFORE',  bank: SPR.anim.bossB, tint: 'rgba(150,230,60,0.55)',  bulk: 1.02, spd: 44, r: 15, item: 'bike',    pat: 'brood',   pat2: 'sweep',   addT: 5.0, addN: 5, adds: ['bloater', 'cyst', 'husk'],        cry: 'THE DATE PASSED AND IT KEPT GOING',   cry2: 'THERE IS NO DATE LEFT TO PASS' }
+  { key: 'fishwife',name: 'THE FISHWIFE',     bank: SPR.anim.fishwife, tint: null,                  bulk: 1.00, spd: 38, r: 15, item: 'coolade', pat: 'sweep',   pat2: 'blink',   addT: 5.4, addN: 4, adds: ['shrieker', 'crawler', 'husk'],    cry: 'SHE HAS BEEN ON ICE SINCE FRIDAY',    cry2: 'SHE HAS THAWED ALL THE WAY THROUGH' },
+  { key: 'trim',    name: 'THE TRIMMINGS',    bank: SPR.anim.trimmings, tint: null,                 bulk: 1.08, spd: 30, r: 15, item: 'melon',   pat: 'spawner', pat2: 'rush',    addT: 3.6, addN: 5, adds: ['crawler', 'husk', 'husk'],        cry: 'IT IS EVERY PART THEY DID NOT SELL',  cry2: 'ALL OF IT AT ONCE, THEN' },
+  { key: 'roast',   name: 'SUNDAY ROAST',     bank: SPR.anim.roast, tint: null,                     bulk: 1.04, spd: 34, r: 15, item: 'banana',  pat: 'charge',  pat2: 'spiral',  addT: 5.8, addN: 4, adds: ['bloater', 'crawler', 'shrieker'], cry: 'IT HAS BEEN IN THERE SINCE SUNDAY',   cry2: 'IT IS DONE. IT IS VERY DONE.' },
+  { key: 'shelf',   name: 'THE NIGHT SHELF',  bank: SPR.anim.shelf, tint: null,                     bulk: 0.96, spd: 54, r: 15, item: 'glock',   pat: 'mines',   pat2: 'curtain', addT: 6.2, addN: 5, adds: ['stalker', 'stalker', 'husk'],     cry: 'IT ONLY RESTOCKS AFTER CLOSING',      cry2: 'IT IS PUTTING YOU OUT ON THE FRONT' },
+  { key: 'bestby',  name: 'THE BEST BEFORE',  bank: SPR.anim.bestby, tint: null,                    bulk: 1.02, spd: 44, r: 15, item: 'bike',    pat: 'brood',   pat2: 'sweep',   addT: 5.0, addN: 5, adds: ['bloater', 'cyst', 'husk'],        cry: 'THE DATE PASSED AND IT KEPT GOING',   cry2: 'THERE IS NO DATE LEFT TO PASS' }
 ];
 
 /* ---- THE FINAL BOSS ----
@@ -439,8 +439,12 @@ const BOSSES = [
    phases. Floor 10, wave 10. See enterPhase() and the `final` branches in
    updateBoss — it does not reuse a roster pattern for any of its three. */
 const BOSS_FINAL = {
-  key: 'protocol', name: 'THE MEAT PROTOCOL', bank: SPR.anim.bossB,
-  tint: 'rgba(255,40,50,0.42)', bulk: 1, spd: 44, r: 19, item: null,
+  key: 'protocol', name: 'THE MEAT PROTOCOL', bank: SPR.anim.protocol1,
+  /* ONE BANK PER PHASE. enterPhase swaps them, so the finale is three
+     creatures rather than one silhouette with its health bar in three
+     different colours. None of them carries a tint. */
+  banks: [SPR.anim.protocol1, SPR.anim.protocol2, SPR.anim.protocol3],
+  tint: null, bulk: 1, spd: 44, r: 19, item: null,
   final: 1, phases: 3,
   pat: 'p1', pat2: 'p2', pat3: 'p3',
   addT: 5.2, addN: 4, adds: ['crawler', 'husk', 'shrieker'],
@@ -4951,6 +4955,13 @@ function enterPhase(b) {
   b.ph++;
   const last = b.ph >= b.phases;
   b.phaseT = last ? 1.35 : 1.05;          // the rear-up, longer for a final form
+  /* THE BODY CHANGES WITH THE PHASE. drawEnemy reads `e.bank` live every
+     frame, so assigning it here IS the transformation - walk frames, the
+     wind-up pose and the eye positions all arrive with it. */
+  if (b.def && b.def.banks && b.def.banks[b.ph - 1]) {
+    b.bank = b.def.banks[b.ph - 1];
+    b.spr = b.bank.walk[0];
+  }
   b.phase = 'idle'; b.pt = 0.4;
   b.spd *= 1.24; b.base *= 1.24;
   b.dmg *= 1.16;

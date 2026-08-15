@@ -1600,6 +1600,455 @@ SPR.anim = {};
     { y: -5.0, sep: 0 }, { ss: 2 });
 }
 
+/* ---------- THE FISHWIFE 26x24 — on ice since Friday ----------
+   A head that is nearly all mouth, over a tail. The silhouette tapers to a
+   point and then flares into a fluke, which nothing else in the game does —
+   everything else gets wider on the way down. Ice still clinging to the fins. */
+{
+  const pal = { L: '#bff0ea', i: '#6fc4bc', I: '#d8f8ff', C: '#2f6f70', D: '#1b4245', k: '#0a1c20', x: '#ff5252',
+                '9': '#e8ffff', X: '#ffe27a', ',': '#12292c', ';': '#f4ffff', '!': '#f4eede' };
+  const map = { L: ['9', 'i'], i: ['L', 'C'], C: ['i', 'D'], D: ['C', 'k'], k: ['D', 'k'],
+                I: ['9', 'I'] };
+  /* Gill slits down both cheeks, and eyes that have gone milky. */
+  const face = { x: 0, y: 6, rows: [
+    '        ,DkkD,              ,DkkD,        ',
+    '        DkX;XkD            DkX;XkD        ',
+    '        ,DkkD,              ,DkkD,        ',
+    '                                          ',
+    '    ,Dk,  ,Dk,          ,kD,  ,kD,        ',
+    '    ,Dk,  ,Dk,          ,kD,  ,kD,        ',
+    '    ,Dk,  ,Dk,          ,kD,  ,kD,        '
+  ] };
+  const t = t1 => shade(up2(t1), map);
+  const body = [
+    '.......oooooooooooo.......',
+    '.....ooLLiiiiiiiiLLoo.....',
+    '...ooLiiiiiiiiiiiiiiLoo...',
+    '..oLiiiiiiiiiiiiiiiiiiLo..',
+    '..oLiixiiiiiiiiiiiixiiLo..',
+    '..oLiiiiiiiiiiiiiiiiiiLo..',
+    '..oLiikkkkkkkkkkkkkkiiLo..',
+    '..oLikk!!!!!!!!!!!!kkiLo..',
+    '..oLikk!!!!!!!!!!!!kkiLo..',
+    '..oLiikkkkkkkkkkkkkkiiLo..'
+  ];
+  SPR.anim.fishwife = BANK(pal, CREATURE(map, body, face), [
+    t(['..oLiiiiiiiiiiiiiiiiiiLo..', '...oLiiiiiiiiiiiiiiiiLo...', '....oLiiiiiiiiiiiiiiLo....',
+       '.....oLiiiiiiiiiiiiLo.....', '......oLiiiiiiiiiiLo......', '.......oLiiiiiiiiLo.......',
+       '........oLiiiiiiLo........', '.........oLiiiiLo.........', '..oo......oLiiLo......oo..',
+       '.oIIo......oLLo......oIIo.', '.oIIo.......oo.......oIIo.', '..oIIo..............oIIo..',
+       '...oIo..............oIo...', '....o................o....']),
+    t(['..oLiiiiiiiiiiiiiiiiiiLo..', '...oLiiiiiiiiiiiiiiiiLo...', '....oLiiiiiiiiiiiiiiLo....',
+       '.....oLiiiiiiiiiiiiLo.....', '......oLiiiiiiiiiiLo......', '.......oLiiiiiiiiLo.......',
+       '........oLiiiiiiLo........', '.........oLiiiiLo.........', '...oo.....oLiiLo.....oo...',
+       '..oIIo.....oLLo.....oIIo..', '..oIIo......oo......oIIo..', '...oIIo............oIIo...',
+       '....oIo............oIo....', '.....o..............o.....'])
+  ], // it thaws: the ice sheets off and the fluke spreads
+    t(['..oLiiiiiiiiiiiiiiiiiiLo..', '...oLiiiiiiiiiiiiiiiiLo...', '....oLiiiiiiiiiiiiiiLo....',
+       '.....oLiiiiiiiiiiiiLo.....', '......oLiiiiiiiiiiLo......', '.......oLiiiiiiiiLo.......',
+       '........oLiiiiiiLo........', '.........oLiiiiLo.........', 'oo........oLiiLo........oo',
+       'oIIIo......oLLo......oIIIo', 'oIIIo.......oo.......oIIIo', '.oIIIo..............oIIIo.',
+       '..oIIo..............oIIo..', '...oo................oo...']),
+    { y: -6.0, sep: 5.0 }, { ss: 2 });
+}
+
+/* ---------- THE TRIMMINGS 26x24 — every part they did not sell ----------
+   The only boss with NO symmetry anywhere in it. Everything else in the game is
+   mirrored down its middle; this is a heap, and a heap has no middle. Read it
+   by the lopsided outline — it leans, and the lean is the identity. */
+{
+  const pal = { L: '#e0a8b0', f: '#b87b86', F: '#8a4f5c', D: '#4e2630', k: '#1a0c12', x: '#ff5252',
+                u: '#ded8c6', U: '#a9a291', '9': '#f6d4d8', X: '#ffcf6a', ',': '#26121a', ';': '#ffd6dc', '!': '#f4eede' };
+  const map = { L: ['9', 'f'], f: ['L', 'F'], F: ['f', 'D'], D: ['F', 'k'], k: ['D', 'k'],
+                u: ['u', 'U'], U: ['u', 'U'] };
+  /* Eyes at different heights and different sizes, because nothing here grew
+     together — it was assembled out of leftovers. */
+  const face = { x: 0, y: 7, rows: [
+    '      ,DkkkkD,                            ',
+    '      DkxXXXxkD          ,DkD,            ',
+    '      Dk;XXX;kD          DkXkD            ',
+    '      ,DkkkkkD,          ,DkD,            ',
+    '                                          ',
+    '        ,DkkkkkkkkkkkkkkkkkkD,            ',
+    '        Dk!kk!k!kkk!k!kk!k!kkD            ',
+    '        ,DkkkkkkkkkkkkkkkkkD,             '
+  ] };
+  const t = t1 => shade(up2(t1), map);
+  const body = [
+    '....ooooooooooo...........',
+    '..ooLLfffffffffoo.........',
+    '.oLffffffffffffffoo.......',
+    '.oLfffffffffffffffLoo.....',
+    'oLffffffffffffffffffLo....',
+    'oLffffuuffffffffffffLo....',
+    'oLffuuuufffffffffffffLo...',
+    '.oLffuuffffffffffffffLo...',
+    '.oLffffffffffffffffffLo...',
+    '..oLffffffffffffffffLo....'
+  ];
+  SPR.anim.trimmings = BANK(pal, CREATURE(map, body, face), [
+    t(['..oLffffffffffffffffLo....', '..oLffffffffffffffffLo....', '.oLffffffffffffffffffLo...',
+       '.oLffffffffffffffffffLo...', '.oLfffffffffffffffffLo....', '..oLfffffffffffffffLo.....',
+       '..oLfffffffffffffLo.......', '...oLfffffffffffLo........', '...oFFo....oFFFo..........',
+       '...oFo......oFFo..........', '...oFo.......oFo..........', '..oFo........oFo..........',
+       '..ooo........ooo..........', '..........................']),
+    t(['..oLffffffffffffffffLo....', '..oLffffffffffffffffLo....', '.oLffffffffffffffffffLo...',
+       '.oLffffffffffffffffffLo...', '.oLfffffffffffffffffLo....', '..oLfffffffffffffffLo.....',
+       '..oLfffffffffffffLo.......', '...oLfffffffffffLo........', '..oFFo......oFFFo.........',
+       '..oFo........oFFo.........', '.oFo..........oFo.........', '.oFo..........oFo.........',
+       '.ooo..........ooo.........', '..........................'])
+  ], // it comes apart and puts itself back on
+    t(['..oLffffffffffffffffLo....', '.oLffffffffffffffffffLo...', 'oLffffffffffffffffffffLo..',
+       'oLffffffffffffffffffffLo..', 'oLfffffffffffffffffffLo...', '.oLfffffffffffffffffLo....',
+       '.oLfffffffffffffffLo......', '..oLfffffffffffffLo.......', '.oFFFo.....oFFFFo.........',
+       '.oFFo.......oFFFo.........', 'oFFo.........oFFo.........', 'oFo...........oFo.........',
+       'ooo...........ooo.........', '..........................']),
+    { y: -5.5, sep: 4.0 }, { ss: 2 });
+}
+
+/* ---------- SUNDAY ROAST 26x24 — it is done. it is very done. ----------
+   A trussed joint on a spit, and the SPIT is the read: a bar straight through
+   it and out both sides, the only horizontal line in the roster. Trussing
+   string cuts it into segments; the char is on top where the heat was. */
+{
+  const pal = { L: '#ffb066', o2: '#000', v: '#c2601f', V: '#7e3208', D: '#40190a', k: '#160806', x: '#ff9a3a',
+                T: '#9aa2ae', G: '#4a4f57', u: '#ffe6b0', '9': '#ffd9a0', X: '#ffe27a', ',': '#2a1108', ';': '#fff0d0', '!': '#f4eede' };
+  const map = { L: ['9', 'v'], v: ['L', 'V'], V: ['v', 'D'], D: ['V', 'k'], k: ['D', 'k'],
+                T: ['T', 'G'], G: ['T', 'G'] };
+  /* It has no face. It has a SPLIT, and the fire is inside it. */
+  const face = { x: 0, y: 9, rows: [
+    '          ,DkkkkkkkkkkkkkkkkD,            ',
+    '          Dkxx99xxxx99xxxx99kD            ',
+    '          DkxxxxxxxxxxxxxxxxkD            ',
+    '          ,DkkkkkkkkkkkkkkkkD,            '
+  ] };
+  const t = t1 => shade(up2(t1), map);
+  const body = [
+    '..........oooooo..........',
+    '.......oooLLvvLLooo.......',
+    '.....ooLvvvvvvvvvvLoo.....',
+    '...ooLvvvvvvvvvvvvvvLoo...',
+    'TTTTTvvvvvvvvvvvvvvvvTTTTT',   // the spit, straight through and out
+    '..oLvvvvvvvvvvvvvvvvvvLo..',
+    '..oLuuvvvvuuvvvvuuvvvvLo..',   // trussing
+    '..oLvvvvvvvvvvvvvvvvvvLo..',
+    '..oLvvvvvvvvvvvvvvvvvvLo..',
+    '..oLuuvvvvuuvvvvuuvvvvLo..'
+  ];
+  SPR.anim.roast = BANK(pal, CREATURE(map, body, face), [
+    t(['..oLvvvvvvvvvvvvvvvvvvLo..', '..oLvvvvvvvvvvvvvvvvvvLo..', '..oLuuvvvvuuvvvvuuvvvvLo..',
+       '...oLvvvvvvvvvvvvvvvvLo...', '...oLvvvvvvvvvvvvvvvvLo...', '....oLvvvvvvvvvvvvvvLo....',
+       '.....oLvvvvvvvvvvvvLo.....', '......oLVVVVVVVVVVLo......', '.....oVVVo......oVVVo.....',
+       '.....oVVo........oVVo.....', '.....oVVo........oVVo.....', '.....oooo........oooo.....',
+       '..........................', '..........................']),
+    t(['..oLvvvvvvvvvvvvvvvvvvLo..', '..oLvvvvvvvvvvvvvvvvvvLo..', '..oLuuvvvvuuvvvvuuvvvvLo..',
+       '...oLvvvvvvvvvvvvvvvvLo...', '...oLvvvvvvvvvvvvvvvvLo...', '....oLvvvvvvvvvvvvvvLo....',
+       '.....oLvvvvvvvvvvvvLo.....', '......oLVVVVVVVVVVLo......', '....oVVVo........oVVVo....',
+       '....oVVo..........oVVo....', '....oVVo..........oVVo....', '....oooo..........oooo....',
+       '..........................', '..........................'])
+  ], // it splits and the inside is still cooking
+    t(['..oL99vvvvvvvvvvvv99Lo....', '..oL9vvvvvvvvvvvvvv9Lo....', '..oLuu99vvuuvv99uuvvLo....',
+       '...oLvv99vvvvvv99vvLo.....', '...oLvvv9999999vvvvLo.....', '....oLvv999999vvvvLo......',
+       '.....oLvv9999vvvvLo.......', '......oLVV99VVVVLo........', '.....oVVVo......oVVVo.....',
+       '.....oVVo........oVVo.....', '.....oVVo........oVVo.....', '.....oooo........oooo.....',
+       '..........................', '..........................']),
+    { y: -5.0, sep: 0 }, { ss: 2 });
+}
+
+/* ---------- THE NIGHT SHELF 26x24 — it only restocks after closing ----------
+   A shelving unit that walks. Hard right angles and horizontal shelf lines in
+   a game where every other silhouette is organic — that alone names it across
+   a dark room. There is still stock on it. Some of the stock is looking back. */
+{
+  const pal = { L: '#9fb4e8', c: '#5c73b8', C: '#2e3d70', D: '#182140', k: '#080d1c', x: '#ff5252',
+                T: '#c8ccd4', G: '#4a4f57', y: '#c8a04a', u: '#ded8c6',
+                '9': '#dfe8ff', X: '#ffe27a', ',': '#101830', ';': '#f2f6ff', '!': '#f4eede' };
+  const map = { L: ['9', 'c'], c: ['L', 'C'], C: ['c', 'D'], D: ['C', 'k'], k: ['D', 'k'],
+                T: ['T', 'G'], G: ['T', 'G'], y: ['y', 'C'], u: ['u', 'C'] };
+  /* Eyes in the gaps between the stock, at shelf height, looking out. */
+  const face = { x: 0, y: 10, rows: [
+    '      ,DkD,      ,DkD,      ,DkD,         ',
+    '      DkXkD      DkXkD      DkXkD         ',
+    '      ,DkD,      ,DkD,      ,DkD,         '
+  ] };
+  const t = t1 => shade(up2(t1), map);
+  const body = [
+    'oooooooooooooooooooooooooo',
+    'oTTTTTTTTTTTTTTTTTTTTTTTTo',
+    'oTccccccccccccccccccccccTo',
+    'oTcyyccuuccyyccuuccyyccdTo',
+    'oTccccccccccccccccccccccTo',
+    'oTTTTTTTTTTTTTTTTTTTTTTTTo',
+    'oTccccccccccccccccccccccTo',
+    'oTcuuccyyccuuccyyccuuccyTo',
+    'oTccccccccccccccccccccccTo',
+    'oTTTTTTTTTTTTTTTTTTTTTTTTo'
+  ];
+  SPR.anim.shelf = BANK(pal, CREATURE(map, body, face), [
+    t(['oTccccccccccccccccccccccTo', 'oTcyyccuuccyyccuuccyyccuTo', 'oTccccccccccccccccccccccTo',
+       'oTTTTTTTTTTTTTTTTTTTTTTTTo', '.oCCCCCCCCCCCCCCCCCCCCCCo.', '..oCCCCCCCCCCCCCCCCCCCCo..',
+       '..oGGo................oGGo', '..oGGo................oGGo', '..oGo..................oGo',
+       '..ooo..................ooo', '..........................', '..........................',
+       '..........................', '..........................']),
+    t(['oTccccccccccccccccccccccTo', 'oTcyyccuuccyyccuuccyyccuTo', 'oTccccccccccccccccccccccTo',
+       'oTTTTTTTTTTTTTTTTTTTTTTTTo', '.oCCCCCCCCCCCCCCCCCCCCCCo.', '..oCCCCCCCCCCCCCCCCCCCCo..',
+       '.oGGo..................oGG', '.oGGo..................oGG', '.oGo....................oG',
+       '.ooo....................oo', '..........................', '..........................',
+       '..........................', '..........................'])
+  ], // it restocks: the shelves light and something is put out on the front
+    t(['oTccccccccccccccccccccccTo', 'oT9999999999999999999999To', 'oTccccccccccccccccccccccTo',
+       'oTTTTTTTTTTTTTTTTTTTTTTTTo', '.o9999999999999999999999o.', '..oCCCCCCCCCCCCCCCCCCCCo..',
+       '..oGGo................oGGo', '..oGGo................oGGo', '..oGGo................oGGo',
+       '..ooo..................ooo', '..........................', '..........................',
+       '..........................', '..........................']),
+    { y: -4.0, sep: 8.0 }, { ss: 2 });
+}
+
+/* ---------- THE BEST BEFORE 26x24 — the date passed and it kept going ----------
+   Bottom-heavy and sagging: the mass has slumped into the base and the top has
+   collapsed inward, so the outline is a teardrop the wrong way up. It is the
+   only silhouette in the game that looks like it is losing a fight with
+   gravity. Mould in rings, oldest at the outside. */
+{
+  const pal = { L: '#cfe07a', c: '#93ad4a', C: '#5a6f28', D: '#33401a', k: '#12180a', x: '#ff5252',
+                m: '#8c7fa8', M: '#4e4468', u: '#ded8c6',
+                '9': '#eaf6b0', X: '#ffe27a', ',': '#1c2410', ';': '#f6ffd0', '!': '#f4eede' };
+  const map = { L: ['9', 'c'], c: ['L', 'C'], C: ['c', 'D'], D: ['C', 'k'], k: ['D', 'k'],
+                m: ['m', 'M'], M: ['m', 'M'], u: ['u', 'C'] };
+  /* One eye has already gone. The mouth is a split that will not close. */
+  const face = { x: 0, y: 8, rows: [
+    '        ,DkkkD,         ,DkD,             ',
+    '        DkxXXkD         DkkkD             ',
+    '        ,DkkkD,         ,DkD,             ',
+    '                                          ',
+    '           ,DkkkkkkkkkkkkkkD,             ',
+    '           Dkk~~~~~~~~~~~~kkD             ',
+    '           ,DkkkkkkkkkkkkkkD,             '
+  ] };
+  const t = t1 => shade(up2(t1), map);
+  const body = [
+    '........oooooooooo........',
+    '......ooLLccccccLLoo......',
+    '.....oLccccccccccccLo.....',
+    '....oLcccmmccccmmcccLo....',
+    '...oLccmmmmccccmmmmccLo...',
+    '...oLcccmmccccccmmccccLo..',
+    '..oLcccccccccccccccccccLo.',
+    '..oLcccccccccccccccccccLo.',
+    '.oLccccccccccccccccccccccL',
+    '.oLccccccccccccccccccccccL'
+  ];
+  SPR.anim.bestby = BANK(pal, CREATURE(map, body, face), [
+    t(['oLccccccccccccccccccccccLo', 'oLccccccccccccccccccccccLo', 'oLccmmccccccccccccmmccccLo',
+       'oLcmmmmcccccccccccmmmmccLo', 'oLccmmcccccccccccccmmccccLo'.slice(0, 26), 'oLccccccccccccccccccccccLo',
+       'oLccccccccccccccccccccccLo', '.oLccccccccccccccccccccLo.', '.oCCCCCCCCCCCCCCCCCCCCCCo.',
+       '..oCCo..............oCCo..', '..oCo................oCo..', '..ooo................ooo..',
+       '..........................', '..........................']),
+    t(['oLccccccccccccccccccccccLo', 'oLccccccccccccccccccccccLo', 'oLccmmccccccccccccmmccccLo',
+       'oLcmmmmcccccccccccmmmmccLo'.slice(0, 26), 'oLccmmccccccccccccmmccccLo', 'oLccccccccccccccccccccccLo',
+       'oLccccccccccccccccccccccLo', '.oLccccccccccccccccccccLo.', '.oCCCCCCCCCCCCCCCCCCCCCCo.',
+       '.oCCo................oCCo.', '.oCo..................oCo.', '.ooo..................ooo.',
+       '..........................', '..........................'])
+  ], // it opens along every seam at once
+    t(['oLcc~~cccccccccccc~~ccccLo', 'oLc~~~~cccccccccc~~~~cccLo', 'oL~~~~~~cccccccc~~~~~~ccLo',
+       'oLc~~~~cccccccccc~~~~cccLo', 'oLcc~~cccccccccccc~~ccccLo', 'oLccccccccccccccccccccccLo',
+       'oLccccccccccccccccccccccLo', '.oLccccccccccccccccccccLo.', '.oCCCCCCCCCCCCCCCCCCCCCCo.',
+       '.oCCo................oCCo.', '.oCo..................oCo.', '.ooo..................ooo.',
+       '..........................', '..........................']),
+    { y: -5.0, sep: 4.5 }, { ss: 2 });
+}
+
+/* ============================================================
+   THE MEAT PROTOCOL — 32x28, and it changes body twice.
+
+   Everything else in the game is one bank. This is three, and `enterPhase`
+   swaps them, so the fight is not one silhouette with a health bar in three
+   colours — it is three creatures, and each one is a worse answer to the last.
+   It is also the biggest thing in the game: 32 wide against the roster's 26,
+   which is deliberate, because the finale should not fit in the space the
+   floor bosses fit in.
+
+   The read across the three:
+
+     I    CLOSED.   A robed column with a crown of horns. Hands hidden, face
+                    hidden, one seam down the front. It is the SHAPE of a
+                    thing in charge — vertical, symmetrical, still.
+     II   OPEN.     The seam has won. The robe is thrown back into two halves
+                    and what is inside is a ribcage with a furnace in it and
+                    arms it was not carrying before. Widest of the three.
+     III  APPETITE. The body is mostly gone. What is left is the crown, a maw
+                    that runs the full width, and the fire holding it up. It
+                    is the SMALLEST of the three by mass and the loudest by
+                    value, which is what makes the last phase read as
+                    escalation rather than as a boss that is running out.
+
+   The horns stay in all three, at the same place on the grid, so you never
+   lose track of which end is which while it is transforming.
+   ============================================================ */
+{
+  /* `H` is the horn. It has to be declared here or it falls through to the
+     global palette, where H is hair brown — which is what it was doing, and a
+     demon lord with a crown of hair is not the note. Bone, and it shades. */
+  const pal = { L: '#ff6a5a', v: '#c0202a', V: '#7a0d18', D: '#3d0710', k: '#140206', x: '#ff3b3b',
+                H: '#e2d6bc', h: '#8e8067', u: '#ded8c6', U: '#a9a291',
+                O: '#ff9a3a', Y: '#ffe27a', W: '#fff4d0',
+                '9': '#ff9a90', X: '#ffcf6a', ',': '#2a050c', ';': '#ffd6cc', '!': '#f4eede', '~': '#8a1018' };
+  const map = { L: ['9', 'v'], v: ['L', 'V'], V: ['v', 'D'], D: ['V', 'k'], k: ['D', 'k'],
+                H: ['H', 'h'], h: ['H', 'h'], u: ['u', 'U'], U: ['u', 'U'],
+                O: ['Y', 'v'], Y: ['W', 'O'], W: ['W', 'Y'] };
+  const t = t1 => shade(up2(t1), map);
+
+  /* ---- I. CLOSED ---- */
+  const face1 = { x: 0, y: 12, rows: [
+    '                    ,DkkkkkkkkkkkkD,                    ',
+    '                    DkxXXkkkkkkXXxkD                    ',
+    '                    Dk;XXkkkkkkXX;kD                    ',
+    '                    ,DkkkkkkkkkkkkD,                    ',
+    '                                                        ',
+    '                       ,DkkkkkkkkD,                     ',
+    '                       Dkkkkkkkkkk D                    ',
+    '                       ,DkkkkkkkkD,                     '
+  ] };
+  const body1 = [
+    '..o..........oooooo..........o..',
+    '..oo.......ooHHHHHHoo.......oo..',
+    '...oo....ooHHHHHHHHHHoo....oo...',
+    '....oo..oHHHHHHHHHHHHHHo..oo....',
+    '.....oooLLLLLLLLLLLLLLLLooo.....',
+    '.....oLvvvvvvvvvvvvvvvvvvLo.....',
+    '....oLvvvvvvvvvvvvvvvvvvvvLo....',
+    '....oLvvvvvvvvvvvvvvvvvvvvLo....',
+    '...oLvvvvvvvvvvvvvvvvvvvvvvLo...',
+    '...oLvvvvvvvvvvvvvvvvvvvvvvLo...',
+    '..oLvvvvvvvvvvvvvvvvvvvvvvvvLo..',
+    '..oLvvvvvvvvvvvvvvvvvvvvvvvvLo..'
+  ];
+  const tail1 = [
+    '..oLvvvvvvvvvvvvvvvvvvvvvvvvLo..',
+    '..oLvvvvvvvvvvvvvvvvvvvvvvvvLo..',
+    '..oLvvvvvvvvvvvvvvvvvvvvvvvvLo..',
+    '..oLvvvvvvvvvvvvVVvvvvvvvvvvLo..',
+    '..oLvvvvvvvvvvvvVVvvvvvvvvvvLo..',
+    '..oLvvvvvvvvvvvvVVvvvvvvvvvvLo..',
+    '..oLvvvvvvvvvvvvVVvvvvvvvvvvLo..',
+    '..oLvvvvvvvvvvvvVVvvvvvvvvvvLo..',
+    '..oLVVVVVVVVVVVVVVVVVVVVVVVVLo..',
+    '..oVVVVVVVVVVVVVVVVVVVVVVVVVVo..',
+    '.oVVVVVVVVVVVVVVVVVVVVVVVVVVVVo.',
+    '.oVVVVVVVVVVVVVVVVVVVVVVVVVVVVo.',
+    '.oDDDDDDDDDDDDDDDDDDDDDDDDDDDDo.',
+    '..oDDDDDDDDDDDDDDDDDDDDDDDDDDo..',
+    '...oooooooooooooooooooooooooo...',
+    '................................'
+  ];
+  const sway = (r, d) => r.map(s => d > 0 ? ('.'.repeat(d) + s).slice(0, 32) : (s + '.'.repeat(-d)).slice(-32));
+  SPR.anim.protocol1 = BANK(pal, CREATURE(map, body1, face1),
+    [t(tail1), t(sway(tail1, 1))],
+    t(tail1.map(s => s.replace(/VV/g, 'OO'))),   // the seam lights before it opens
+    { y: -8.0, sep: 6.0 }, { ss: 2 });
+
+  /* ---- II. OPEN ---- */
+  const face2 = { x: 0, y: 12, rows: [
+    '                ,DkkkkkkkkkkkkkkkkkkkkD,                ',
+    '                DkxXXkkxXXkkkkxXXkkXXxkD                ',
+    '                Dk;XXkk;XXkkkk;XXkk;X;kD                ',
+    '                ,DkkkkkkkkkkkkkkkkkkkkD,                ',
+    '                                                        ',
+    '              ,DkkkkkkkkkkkkkkkkkkkkkkkkD,              ',
+    '              Dk!k!k!k!k!k!k!k!k!k!k!k!kkD              ',
+    '              DkOOOOOOOOOOOOOOOOOOOOOOOOkD              ',
+    '              Dk!k!k!k!k!k!k!k!k!k!k!k!kkD              ',
+    '              ,DkkkkkkkkkkkkkkkkkkkkkkkkD,              '
+  ] };
+  const body2 = [
+    '..o..........oooooo..........o..',
+    '..oo.......ooHHHHHHoo.......oo..',
+    '...oo....ooHHHHHHHHHHoo....oo...',
+    '....oo..oHHHHHHHHHHHHHHo..oo....',
+    '..oooooLLLLLLLLLLLLLLLLLLoooooo.',
+    '.oLvvvvvvvvvvvvvvvvvvvvvvvvvvLo.',
+    'oLvvvvvvvvvvvvvvvvvvvvvvvvvvvvLo',
+    'oLvvvvvvvvvvvvvvvvvvvvvvvvvvvvLo',
+    'oLvvvvvvvvvvvvvvvvvvvvvvvvvvvvLo',
+    'oLvvvvvvvvvvvvvvvvvvvvvvvvvvvvLo',
+    'oLvvvvvvvvvvvvvvvvvvvvvvvvvvvvLo',
+    'oLvvvvvvvvvvvvvvvvvvvvvvvvvvvvLo'
+  ];
+  const tail2 = [
+    'oLvvvVVvvvvvvvvvvvvvvvvvvVVvvvLo',
+    'oLvvVVuuVVvvvvvvvvvvvvVVuuVVvvLo',
+    'oLvvVuOOuVVvvvvvvvvvvVVuOOuVvvLo',
+    'oLvvVuOOuVVvvvvvvvvvvVVuOOuVvvLo',
+    'oLvvVVuuVVvvvvvvvvvvvvVVuuVVvvLo',
+    'oLvvvVVvvvvvvvvvvvvvvvvvvVVvvvLo',
+    'oLvvvvvvvvvvvvvvvvvvvvvvvvvvvvLo',
+    '.oLvvvvvvvvvvvvvvvvvvvvvvvvvvLo.',
+    '.oVVVVVVVVVVVVVVVVVVVVVVVVVVVVo.',
+    '..oVVVVVVVVVVVVVVVVVVVVVVVVVVo..',
+    '..oVVVo................oVVVVVo..',
+    '..oVVo..................oVVVo...',
+    '..oDDo..................oDDDo...',
+    '..oooo..................ooooo...',
+    '................................',
+    '................................'
+  ];
+  SPR.anim.protocol2 = BANK(pal, CREATURE(map, body2, face2),
+    [t(tail2), t(sway(tail2, 1))],
+    t(tail2.map(s => s.replace(/OO/g, 'WW'))),
+    { y: -8.0, sep: 9.0 }, { ss: 2 });
+
+  /* ---- III. APPETITE ---- */
+  const face3 = { x: 0, y: 10, rows: [
+    '            ,DkkkkkkkkkkkkkkkkkkkkkkkkkkkkD,            ',
+    '            DkxXXkkkkxXXkkkkkkxXXkkkkXXxkkkD            ',
+    '            ,DkkkkkkkkkkkkkkkkkkkkkkkkkkkkD,            ',
+    '                                                        ',
+    '          ,DkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkD,          ',
+    '          Dk!kk!kk!kk!kk!kk!kk!kk!kk!kk!kk!kkD          ',
+    '          DkOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOkD          ',
+    '          DkOOWWWWOOOOWWWWOOOOWWWWOOOOWWOOOOkD          ',
+    '          DkOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOkD          ',
+    '          Dk!kk!kk!kk!kk!kk!kk!kk!kk!kk!kk!kkD          ',
+    '          ,DkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkD,          '
+  ] };
+  const body3 = [
+    'o.oo.......ooooooooo.......oo.o.',
+    'oo.ooo...ooHHHHHHHHHoo...ooo.oo.',
+    '.ooo.oo.oHHHHHHHHHHHHHo.oo.ooo..',
+    '..ooooooHHHHHHHHHHHHHHHooooooo..',
+    '...oooLLLLLLLLLLLLLLLLLLLLooo...',
+    '..oLvvvvvvvvvvvvvvvvvvvvvvvvLo..',
+    '.oLvvvvvvvvvvvvvvvvvvvvvvvvvvLo.',
+    '.oLvvvvvvvvvvvvvvvvvvvvvvvvvvLo.',
+    '.oLvvvvvvvvvvvvvvvvvvvvvvvvvvLo.',
+    '.oLvvvvvvvvvvvvvvvvvvvvvvvvvvLo.',
+    '.oLvvvvvvvvvvvvvvvvvvvvvvvvvvLo.',
+    '.oLvvvvvvvvvvvvvvvvvvvvvvvvvvLo.'
+  ];
+  const tail3 = [
+    '.oLvvvvvvvvvvvvvvvvvvvvvvvvvvLo.',
+    '..oLvvvvvvvvvvvvvvvvvvvvvvvvLo..',
+    '...oOOvvvvvvvvvvvvvvvvvvvvOOo...',
+    '....oOOOvvvvvvvvvvvvvvvvOOOo....',
+    '.....oOOOOvvvvvvvvvvvvOOOOo.....',
+    '......oOOOOOvvvvvvvvOOOOOo......',
+    '.......oOOOOOOOOOOOOOOOOo.......',
+    '........oOOOOOOOOOOOOOOo........',
+    '.........oOYYOOOOOOYYOo.........',
+    '..........oOYYWWWWYYOo..........',
+    '...........oOYWWWWYOo...........',
+    '............oOYWWYOo............',
+    '.............oOYYOo.............',
+    '..............oOOo..............',
+    '...............oo...............',
+    '................................'
+  ];
+  SPR.anim.protocol3 = BANK(pal, CREATURE(map, body3, face3),
+    [t(tail3), t(sway(tail3, 1))],
+    t(tail3.map(s => s.replace(/OO/g, 'WW'))),
+    { y: -9.0, sep: 12.0 }, { ss: 2 });
+}
+
 /* Back-compat aliases: the title screen and the jumpscare want one still frame. */
 SPR.crawler  = SPR.anim.crawler.walk[0];
 SPR.shrieker = SPR.anim.shrieker.walk[0];
