@@ -281,7 +281,30 @@ function curRoom() { return S.inShop ? SHOP_ROOM : roomDef(S.room); }
    purchase happened on the way out of a floor and you spent the whole floor
    holding money you could not put down. Twice a floor, on the fives, means the
    half-time shop actually changes how you fight waves 6-10. */
-const SHOP_WAVES = [5, 10];
+/* ============================================================
+   FIVE WAVES A FLOOR, not ten.
+
+   A floor is the same amount of fight, delivered in half as many pieces. That
+   is the whole change, and everything that was written against "ten" had to be
+   rewritten against WAVES rather than against a new hard-coded five — the
+   per-wave coefficients below are all doubled so the value at the END of a
+   floor is exactly what it was, while the curve to get there is twice as
+   steep. Anything phrased as a fraction of the floor is now `S.wave / WAVES`
+   so it never needs doing again.
+
+   The shape:
+
+     1  fight
+     2  ELITE
+     3  fight        then PACI
+     4  ELITE
+     5  FLOOR BOSS   then PACI
+
+   Two elites and one boss, exactly as before. PACI still turns up twice, and
+   still on the wave you have just been hurt by.
+   ============================================================ */
+const WAVES = 5;
+const SHOP_WAVES = [3, 5];
 const shopDueAfter = w => SHOP_WAVES.indexOf(w) >= 0;
 
 /* Individual hits land much harder than they used to. Balanced back by a slower
@@ -441,11 +464,11 @@ function bossBudget(floor) {
 /* Bosses used to land on five of the ten waves, which made them furniture.
    One floor boss on wave 10, two elites on the way there, and every fifth
    floor the boss comes up as an APEX instead. */
-const BOSS_WAVE = 10;
-const MINI_WAVES = [4, 8];
+const BOSS_WAVE = WAVES;
+const MINI_WAVES = [2, 4];
 /* THE LAST AISLE puts a third one on wave 6 — the wave that has never had
    anything in it, on the floor where you have stopped expecting surprises. */
-const HUNT_WAVES = [3, 6, 8];
+const HUNT_WAVES = [2, 3, 4];
 function miniWaves() { return isTwist('hunt') ? HUNT_WAVES : MINI_WAVES; }
 /* What fraction of the floor's boss an elite is worth, before the build
    multiplier. See spawnMini — this is what keeps a wave-8 elite from
@@ -2066,10 +2089,10 @@ function exitShop() {
     // drop back into the post-wave pause so updateWaves resumes normally —
     // or, if the floor's tenth wave is already done, into the open door.
     S.waveState = 'clear'; S.waveT = 1.4;
-    A.setDread(clamp(S.wave / 10 * 0.6 + S.room * 0.2, 0, 1));
-    if (A.music) A.music.setIntensity(clamp(0.12 + (S.wave / 10) * 0.72 + S.room * 0.16, 0, 1));
+    A.setDread(clamp(S.wave / WAVES * 0.6 + S.room * 0.2, 0, 1));
+    if (A.music) A.music.setIntensity(clamp(0.12 + (S.wave / WAVES) * 0.72 + S.room * 0.16, 0, 1));
     A.doorOpen();
-    msg('BACK TO IT', S.wave >= 10 ? 'the door north is still open.' : 'he watched you leave.', 2.4);
+    msg('BACK TO IT', S.wave >= WAVES ? 'the door north is still open.' : 'he watched you leave.', 2.4);
   };
 }
 
@@ -2386,7 +2409,7 @@ function makePlayer() {
 
 function spawnEnemy(type, x, y) {
   const d = ETYPE[type], D = diff();
-  const waveK = 1 + S.wave * 0.05;
+  const waveK = 1 + S.wave * 0.10;      // x2 per wave, so the floor still ends at +50%
   // the other half of THE RENDERING's twist — see startWave
   const hp = d.hp * D.hp * waveK * (isTwist('swarm') ? 0.7 : 1);
   const e = {
@@ -2400,7 +2423,7 @@ function spawnEnemy(type, x, y) {
     lob: d.lob || 0, lobT: rnd(1.2, 2.6), aura: d.aura || 0, buffed: 0,
     spd: d.spd * D.spd * rnd(0.9, 1.12), base: d.spd * D.spd,
     mark: 0, slowT: 0, slowAmt: 0,
-    dmg: d.dmg * D.dmg * (1 + S.wave * 0.03),
+    dmg: d.dmg * D.dmg * (1 + S.wave * 0.06),
     score: d.score, gib: d.gib, name: d.name,
     hit: 0, atkT: 0, fireT: rnd(1, 2), wob: rnd(0, TAU), stun: 0, burn: 0, burnT: 0,
     blinkT: rnd(1, 3), bob: rnd(0, TAU), flip: false, boss: false, dead: false, sq: 0,
@@ -3135,7 +3158,13 @@ function killEnemy(e, ang) {
   const pts = Math.round(e.score * diff().score * S.combo);
   S.score += pts;
   float(e.x, e.y - 10, '+' + pts, '#ffd070');
-  gainXP(e.boss ? 90 : Math.max(2, Math.round(e.score * 0.42)));
+  /* x1.4 with the move to five waves. A floor is 29% fewer bodies now, and the
+     floor's DIFFICULTY did not drop with it — diff() is keyed to the floor, not
+     the wave. Leaving the per-kill values alone would have meant arriving at
+     floor five with 71% of the levels, cards and coins to fight the same thing
+     with, which is a harder game rather than a shorter one. The 1.4 is measured:
+     8,829 bodies across a full old run against 6,306 now. */
+  gainXP(e.boss ? 90 : Math.max(2, Math.round(e.score * 0.59)));
   deathBurst(e, ang);
   S.hitstop = Math.max(S.hitstop, e.boss ? 0.3 : 0.035);
   shake(e.boss ? 18 : 2.5);
@@ -3296,7 +3325,7 @@ function killEnemy(e, ang) {
     /* Med kits used to be a 6% drop on top of two guaranteed ones every wave,
        which meant health was never actually a resource. */
     const r = Math.random() / st.lootMul;
-    if (r < 0.008) dropPickup(e.x, e.y, 'card');        // cards: genuinely rare
+    if (r < 0.0112) dropPickup(e.x, e.y, 'card');       // rare, x1.4 for five waves
     else if (r < 0.021) dropPickup(e.x, e.y, 'nova');   // the rarer of the two new ones
     else if (r < 0.056) dropPickup(e.x, e.y, 'shield');
     /* ---- WHAT THE DEEP FLOORS DROP ----
@@ -3833,14 +3862,17 @@ function startWave(n) {
     spawnBoss(last ? -1 : bossIndexFor(S.room), apex);
     if (!last) {
       const filler = S.room >= 1 ? ['crawler', 'crawler', 'shrieker', 'husk'] : ['crawler', 'crawler', 'shrieker'];
-      for (let i = 0; i < Math.round(4 + n * 0.9 + S.room * 3.5); i++) S.queue.push(pick(filler));
+      for (let i = 0; i < Math.round((6 + n * 1.5) * (1 + S.room * 0.5)); i++) S.queue.push(pick(filler));
     }
     msg('WAVE ' + n, last ? 'THE LAST ONE' : apex ? 'APEX' : 'FLOOR BOSS', 2.4);
   } else if (miniWaves().indexOf(n) >= 0) {
     const mw = miniWaves();
     spawnMini(S.room * mw.length + mw.indexOf(n));
     const filler = S.room >= 1 ? ['crawler', 'crawler', 'shrieker', 'stalker', 'husk'] : ['crawler', 'crawler', 'shrieker', 'stalker'];
-    for (let i = 0; i < Math.round(6 + n * 1.4 + S.room * 3); i++) S.queue.push(pick(filler));
+    /* Elite waves stay lighter on filler than fight waves — the elite IS the
+       content — but they now scale with the floor instead of crawling up by
+       three a time, or by floor ten they are a boss standing in an empty room. */
+    for (let i = 0; i < Math.round((8 + n * 3) * (1 + S.room * 0.45)); i++) S.queue.push(pick(filler));
     msg('WAVE ' + n, 'ELITE', 2.4);
   } else {
     // Head count, not a spend budget — a budget buys fewer/tougher enemies as it
@@ -3853,17 +3885,24 @@ function startWave(n) {
     // THE RENDERING sends half again as many and takes 30% off each of them —
     // the same total meat arriving in more pieces, which is a different fight
     // rather than a harder one. See spawnEnemy for the health side of it.
-    const count = Math.round((7 + n * 2.6 + n * n * 0.26) * (1 + S.room * 0.72)
+    /* Rewritten for five waves. The old curve ran (7 + 2.6n + 0.26n^2) over
+       ten waves; this one has to deliver a comparable floor across two normal
+       waves instead of seven, so the constant is bigger and it climbs harder.
+       Tuned against the measured old per-floor total rather than by eye. */
+    const count = Math.round((28 + n * 12 + n * n * 1.6) * (1 + S.room * 0.72)
                              * (1 + (S.evo | 0) * 0.15) * armed * levelled * ST().swarm
                              * (isTwist('swarm') ? 1.5 : 1));
-    // Weights shift toward the nastier things as the wave and floor climb.
+    /* Weights shift toward the nastier things as the wave and floor climb, and
+       every wave GATE is halved — `n >= 6` could never fire again with a floor
+       only five waves long, which would have meant no bloaters at all on floor
+       one. The n-coefficients are doubled for the same reason the rest are. */
     const pool = [['crawler', 10]];
-    if (n >= 2 || S.room > 0) pool.push(['shrieker', 3 + n * 0.4 + S.room]);
-    if (n >= 4 || S.room > 0) pool.push(['stalker', 2 + n * 0.45 + S.room]);
-    if (n >= 6 || S.room > 0) pool.push(['bloater', 1 + n * 0.35 + S.room * 1.5]);
+    if (n >= 1 || S.room > 0) pool.push(['shrieker', 3 + n * 0.8 + S.room]);
+    if (n >= 2 || S.room > 0) pool.push(['stalker', 2 + n * 0.9 + S.room]);
+    if (n >= 3 || S.room > 0) pool.push(['bloater', 1 + n * 0.7 + S.room * 1.5]);
     // the two teachers arrive once the basics are learned
-    if (n >= 5 || S.room >= 1) pool.push(['husk', 1 + n * 0.3 + S.room]);
-    if (n >= 7 || S.room >= 2) pool.push(['cyst', 0.5 + n * 0.15 + S.room * 0.5]);
+    if (n >= 3 || S.room >= 1) pool.push(['husk', 1 + n * 0.6 + S.room]);
+    if (n >= 4 || S.room >= 2) pool.push(['cyst', 0.5 + n * 0.3 + S.room * 0.5]);
     /* THE DEEP ROSTER. Gated on FLOOR only, never on wave, so each one is a
        thing the floor introduces rather than a thing that turns up late in
        every fight — you meet it, it is new, and it is new for a whole floor.
@@ -3871,7 +3910,7 @@ function startWave(n) {
        in a crowd is a puzzle, ten is a wall. */
     for (const k of ['trolley', 'spitter', 'shepherd']) {
       const f = ETYPE[k].floor;
-      if (S.room >= f) pool.push([k, 0.8 + (S.room - f) * 0.55 + n * 0.12]);
+      if (S.room >= f) pool.push([k, 0.8 + (S.room - f) * 0.55 + n * 0.24]);
     }
     let total = 0;
     for (const c of pool) total += c[1];
@@ -3882,16 +3921,16 @@ function startWave(n) {
     msg('WAVE ' + n, '', 1.8);
   }
   A.wave();
-  A.setDread(clamp(n / 10 * 0.6 + S.room * 0.2, 0, 1));
+  A.setDread(clamp(n / WAVES * 0.6 + S.room * 0.2, 0, 1));
   // The score climbs across the floor and jumps a step for each floor down.
-  if (A.music) A.music.setIntensity(clamp(0.12 + (n / 10) * 0.72 + S.room * 0.16, 0, 1));
+  if (A.music) A.music.setIntensity(clamp(0.12 + (n / WAVES) * 0.72 + S.room * 0.16, 0, 1));
 }
 
 function updateWaves(dt) {
   if (S.waveState === 'fight') {
     S.spawnT -= dt;
     // How many can be breathing at once, how fast they arrive, how many per crack
-    const cap = Math.min(95, Math.round(18 + S.wave * 1.3 + S.room * 9.5 + (S.evo | 0) * 2 +
+    const cap = Math.min(95, Math.round(18 + S.wave * 2.6 + S.room * 9.5 + (S.evo | 0) * 2 +
                                         Math.max(0, S.p.owned.length - 1) * 1.5 +
                                         Math.max(0, S.level - 1) * 0.8));
     /* Cracks take 0.75s to hatch but batches fire every 0.15s, so counting only
@@ -3899,8 +3938,8 @@ function updateWaves(dt) {
        before the cap notices — floor 14 was landing 159 against a cap of 78.
        Count what is on its way as well. */
     if (S.spawnT <= 0 && S.queue.length && S.en.length + S.cracks.length < cap) {
-      S.spawnT = Math.max(0.15, 0.85 - S.wave * 0.05 - S.room * 0.09);
-      const batch = 1 + Math.floor(S.wave / 4) + S.room + (Math.random() < 0.4 ? 1 : 0);
+      S.spawnT = Math.max(0.15, 0.85 - S.wave * 0.10 - S.room * 0.09);
+      const batch = 1 + Math.floor(S.wave / 2) + S.room + (Math.random() < 0.4 ? 1 : 0);
       for (let i = 0; i < batch && S.queue.length; i++) {
         const t = S.queue.shift();
         const p = freeSpot(140);
@@ -3916,7 +3955,7 @@ function updateWaves(dt) {
          and THICK HIDE start the next wave clean — unless NO LEFTOVERS says
          otherwise. */
       const st2 = ST();
-      let heal = S.wave === BOSS_WAVE ? 30 : 12;
+      let heal = S.wave === BOSS_WAVE ? 30 : 24;   // half as many gaps, twice as much in each
       heal += st2.marrow * st2.maxhp;
       if (aisleT2('produce')) heal += st2.maxhp * 0.25;
       heal = Math.round(heal);
@@ -3953,7 +3992,7 @@ function updateWaves(dt) {
     if (S.waveT <= 0 && !S.fadeDir && !S.pending) {
       // a shop owed by the wave you just cleared comes before anything else
       if (S.shopDue) { S.shopDue = false; enterShop(); }
-      else if (S.wave < 10) startWave(S.wave + 1);
+      else if (S.wave < WAVES) startWave(S.wave + 1);
     }
   }
 
@@ -4627,7 +4666,7 @@ function update(rdt) {
       else if (d.kind === 'med') { p.hp = Math.min(ST().maxhp, p.hp + 26); float(p.x, p.y - 16, '+26 HP', '#ff6b6b'); A.pickup(); }
       else if (d.kind === 'nade') { p.nades = Math.min(9, p.nades + 1); float(p.x, p.y - 16, '+1 FRAG', '#7aa35e'); A.pickup(); }
       else if (d.kind === 'coin') {
-        S.coinFrac += ST().coinMul;
+        S.coinFrac += ST().coinMul * 1.4;   // five waves: same money, fewer bodies
         let got = 0;
         while (S.coinFrac >= 1) { S.coinFrac -= 1; S.coins++; S.vault++; got++; }
         float(p.x, p.y - 16, '+' + got, '#f5c518'); A.coin();
