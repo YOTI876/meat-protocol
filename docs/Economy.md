@@ -128,15 +128,19 @@ from the first frame of every run forever.
 | 1–2 | COMMON | SCAR-L, MEAT SPLITTER |
 | 3–4 | UNCOMMON | THE PRICE GUN, THE STAPLER |
 | 5–6 | RARE | MICROWAVE, FREEZER BURN, THE HOG |
-| 7+ | EPIC | THE ROTISSERIE, GOD FINGER |
+| 7+ | EPIC | THE ROTISSERIE, THE DELI SLICER |
 
 > [!note] No LEGENDARY is on the ladder
 > `EVO_TIER` stops at EPIC, so no rung can ever offer
-> [[Weapons#The three LEGENDARIES|THE FISH, THE FLYKILLER or BLACK FRIDAY]].
-> All three are bought, and the tier is the only reason the coin economy has to
-> keep climbing past a few hundred — handing one out for evolving would retire
-> it. Verified across all ten rungs and every pool: no grade-4 gun is ever
-> offered.
+> [[Weapons#Every gun above RARE owns a verb|GOD FINGER, THE FISH, THE FLYKILLER
+> or BLACK FRIDAY]]. All four are bought, and the tier is the only reason the
+> coin economy has to keep climbing past a few hundred — handing one out for
+> evolving would retire it. Verified across all ten rungs and every pool: no
+> grade-4 gun is ever offered.
+>
+> This is what **THE DELI SLICER** is structurally for. Promoting GOD FINGER to
+> LEGENDARY took it off this ladder, and EPIC would otherwise have been a rung
+> holding a single gun — which is not a choice, it is a receipt.
 
 A tier holds two or three guns and a rung takes one, so the back half of a tier
 would otherwise be a screen with a single card on it, which is not a choice. If

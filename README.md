@@ -152,7 +152,7 @@ he nods, he was not going to insist.
 
 ## Guns
 
-Thirteen, bought from PACI, not found lying around. Walk onto a pedestal, press
+Fourteen, bought from PACI, not found lying around. Walk onto a pedestal, press
 **E**, pay. Coins are scarce and bosses are the reliable source.
 
 He will not carry everything from the start: the crate opens one rung a floor,
@@ -171,17 +171,20 @@ can skip five floors of progression.
 | FREEZER BURN | 95 | the cold aisle, weaponised |
 | THE HOG | 120 | minigun — spins up, slows you down, never stops |
 | **THE ROTISSERIE** | 165 | fires in a spinning circle. it does not care where you point it |
-| GOD FINGER | 190 | railgun, charges, pierces the entire room, **never reloads** |
+| **THE DELI SLICER** | 175 | throws its blade. it comes back through everything a second time |
+| **GOD FINGER** | **360** | railgun, charges, pierces the entire room, 210 a slug |
 | **THE FISH** | **500 coins** | a fish. it opens its mouth and a laser comes out, and the laser cycles colour |
 | **THE FLYKILLER** | **380** | the current chains through up to five more throats |
 | **BLACK FRIDAY** | **460** | a singularity. it drags the room into one place, then goes off there |
 
 THE ROTISSERIE isn't in the crate at all until its contract is signed.
 
-**The three LEGENDARIES each own a verb.** THE FISH *holds*, THE FLYKILLER
-*chains*, BLACK FRIDAY *gathers*. None of them is just the biggest number —
-GOD FINGER still beats both of the new ones against a single target. They are
-what you buy when the room stops being one thing at a time.
+**Every gun above RARE owns a verb.** THE DELI SLICER *returns*, GOD FINGER
+*punches through*, THE FISH *holds*, THE FLYKILLER *chains*, BLACK FRIDAY
+*gathers*. None of them is simply the biggest number in its column: measured
+against one target GOD FINGER does 270 damage a second and THE FLYKILLER does
+126, but into a queue of five that becomes 1350 against 423. They are what you
+buy when the room stops being one thing at a time.
 
 **THE FISH is the long game.** 500 coins, floor 5 at the earliest, and coins
 come in at about one per eight kills — you will spend most of a run deciding

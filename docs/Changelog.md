@@ -240,7 +240,7 @@ abandoned run can no longer leave an orphaned timer pointing at the new one.
 Full write-up:
 [[Bugs Found#14. A menu inside the first 2.2 seconds killed the floor permanently|Bugs Found #14]].
 
-**Two more [[Weapons#The three LEGENDARIES|LEGENDARIES]].** A LEGENDARY has to
+**Two more [[Weapons#Every gun above RARE owns a verb|LEGENDARIES]].** A LEGENDARY has to
 do something the rack cannot already do or it is an EPIC that costs more, so
 each owns a verb: **THE FLYKILLER** (380, floor 7) *chains* — the current walks
 outward from the thing you hit, five links, shedding a fifth of its bite a hop.
@@ -406,7 +406,7 @@ rung sat above it.
 card foot]]** was the aisle's name next to pips that counted the *card's*
 ranks — two scopes touching, one of them labelled. Two labelled numbers now.
 
-**[[Weapons#GOD FINGER does not reload|GOD FINGER never reloads]]**, and
+**GOD FINGER never reloads**, and
 **[[The Deck#The two legendary cards|THE OTHER HAND is LEGENDARY-only]]** —
 measured 121 appearances over 4,000 hands, all 121 at LEGENDARY.
 
@@ -571,6 +571,73 @@ bigger than the item, so what you read across a room was a coloured blob and
 the sprite was the thing you could see least. Gone — and every drop now opens a
 **lightmap** hole instead, because that halo was also the only reason a medkit
 was findable on THE DARK ROOM and THE BLACKOUT.
+
+## `886cf09` — The wave bar, and the vault
+The [[How A Run Goes|five-wave change]] left three hard-coded tens behind; the
+last of them drew **ten ticks** in the HUD progress row. It sizes off `WAVES`
+now. The door was checked properly this time — placed inside the trigger box on
+the last wave, `S.room` goes 0 → 1 — and nineteen wave-count corrections went
+through the vault.
+
+## GOD FINGER moves up a rung, and THE DELI SLICER fills the seat
+**[[Weapons#GOD FINGER is LEGENDARY now, and it reloads again|GOD FINGER is
+LEGENDARY]]** and it reloads again. `noReload` is gone from the codebase
+entirely; the flag existed because a 2.4s rack every five shots was a *third*
+tax on a gun already paying a 0.5s charge and a 0.55s floor between shots. It
+came back cheaper than it left — six in the magazine, 1.9s to rack — for a
+measured 5.13s cycle that is two thirds firing.
+
+The trade is **sustained damage for burst**: 300dps standing still before, 270
+now, against 165 → **210 a slug** with `pierce: 99` still behind it. Price 190
+→ 360, and the rung halved how often PACI carries it (≈9% of visits at EPIC,
+2.7% at LEGENDARY).
+
+> [!warning] The paper DPS for a charge weapon is wrong by 43%
+> `mag × dmg ÷ (mag × (rate + charge) + reload)` gives 154 for GOD FINGER. The
+> real figure is 270, because a held trigger charges **during** the cooldown —
+> you pay 0.55s a shot, not 0.55 + 0.5. Every number in this entry was sampled
+> off the running game instead. See [[Weapons#Measured, not modelled]].
+
+**[[Weapons#THE DELI SLICER|THE DELI SLICER]]** (175, floor 7) is the new EPIC,
+and it exists for a structural reason as much as a thematic one: promoting GOD
+FINGER took it off the [[Economy#What a rung pays out|evolution ladder]], and
+EPIC would otherwise have been a rung holding one gun — which is not a choice,
+it is a receipt.
+
+It owns the one verb nothing else had: it **returns**. The disc flies 200px,
+**stalls** — velocity to zero, then accelerates home at 1500/s² capped at 520 —
+empties its hit list, and comes back through everything a second time, homing
+on *Damjan* rather than on where he threw from. Measured: 1.03s round trip, and
+one disc through a queue of five deals exactly 2 × 64 to every one of them.
+
+That makes it the exact middle of its tier. THE ROTISSERIE is damage you cannot
+aim; GOD FINGER is damage that lands the instant you release; the slicer is
+damage you aim perfectly and then have to wait for — and wait for *where you
+are standing*. Standing still it measures 160dps single-target and **805 into a
+queue**. Backing away from a wall you have thrown at, it measured **48**.
+
+> [!note] Three things happen at the turn and all three matter
+> It **stops** rather than reversing (a reversal reads as a ricochet off an
+> invisible wall, which is a completely different piece of information); it
+> **clears `hitIds`**, which is what makes the way home a second pass rather
+> than a victory lap; and it starts steering on the player. `bladeTurn()` is
+> called from reaching its reach, hitting a wall, and reaching the edge of the
+> arena, because all three mean *that is as far as it goes*.
+>
+> Coming home it ignores walls. A blade that dies behind a shelf you walked
+> around is not a decision, it is a tax on the level geometry.
+
+The silhouette is the point of the sprite. Every other gun in the rack is a
+long rectangle pointing +X, told apart by *colour* — and colour is the first
+thing a dim floor takes away. This one is a **circle**: a bright rim, a duller
+steel face, and a two-pixel brass hub, because a disc with a centre spins and a
+disc without one is a coin. The teeth are drawn on the projectile instead,
+where the wheel is six times the size and actually turning.
+
+Two new voices in [[Audio#The slicer's two sounds|audio.js]] — `slicer()`
+sweeps **upward** because the wheel is speeding up as it leaves, and
+`sliceHome()` is the only sound in the game for a round *arriving*. It ejects
+no case, which it used to do anyway.
 
 ## Related
 - [[Bugs Found]] — the defects behind each fix above, and two still open

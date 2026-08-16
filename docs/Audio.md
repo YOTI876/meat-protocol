@@ -22,10 +22,23 @@ generative score system.
 ## Per-weapon voices
 
 Each [[Weapons|weapon]]'s `sfx` field maps to a dedicated function —
-`shotgun()`, `nailgun()`, `plasma()`, `minigun()`, `railgun()`, `beam()`. The
+`shotgun()`, `nailgun()`, `plasma()`, `minigun()`, `railgun()`, `beam()`,
+`slicer()`. The
 base rifle uses `scarMk(lv)` instead, which **morphs** its own timbre based on
 the [[Progression#The evolving sidearm|current mark]] — the noise body thins,
 pitch rises, and a laser-like tone layer fades in as `lv` climbs from 1 to 10.
+
+## The slicer's two sounds
+
+THE DELI SLICER is the only weapon with a sound for its round *arriving*.
+`slicer()` is the throw — a **rising** sawtooth sweep (300→1150Hz), because the
+wheel is speeding up as it leaves rather than detonating, plus a thin square
+ring on top so it lands as steel and not as another plasma noise. `sliceHome()`
+is the catch: short, bright, and sweeping **upward** (2400→5200Hz), which is
+what separates a catch from an impact.
+
+It also skips `shell()`. A thrown disc has no case to eject, and it used to
+drop one on the floor anyway — see [[Weapons#THE DELI SLICER]].
 
 ## Formant speech
 

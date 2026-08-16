@@ -104,8 +104,8 @@ if (pool.length < shopSlots())
 
 The **depth gate is dropped** — never the contract gate, and never ownership.
 The rarity weights then do the gating that `floor` was doing: a floor-1 player
-*can* be shown GOD FINGER this way, at odds of about one visit in thirty, and
-cannot afford it anyway.
+*can* be shown GOD FINGER this way, at odds of about one visit in forty now
+that it is LEGENDARY, and cannot afford it anyway.
 
 Stand on a pedestal and press **E**.
 

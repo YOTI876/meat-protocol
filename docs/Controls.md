@@ -27,12 +27,12 @@ tags: [reference]
 `E` is context-sensitive: it's whatever you're standing next to. There is no
 separate key for TOMCE.
 
-> [!note] Thirteen guns, ten number keys
-> `WORDER` has thirteen entries but `Digit1`–`Digit0` only reach the first ten
-> slots. The three [[Weapons#The three LEGENDARIES|LEGENDARIES]] sit last, so
-> once you own everything they are wheel-or-`Q` only. Not a bug worth three
-> keys for — by the time you have found 380, 460 and 500 coins you are not
-> swapping off them by accident.
+> [!note] Fourteen guns, ten number keys
+> `WORDER` has fourteen entries but `Digit1`–`Digit0` only reach the first ten
+> slots. The four [[Weapons#Every gun above RARE owns a verb|LEGENDARIES]] sit
+> last, so once you own everything they are wheel-or-`Q` only. Not a bug worth
+> four keys for — by the time you have found 360, 380, 460 and 500 coins you
+> are not swapping off them by accident.
 
 ## Two things called a menu
 

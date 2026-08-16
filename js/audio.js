@@ -247,6 +247,21 @@ const A = (() => {
       if (!on) return; const t = now();
       tone('sawtooth', 60 + v * 260, 70 + v * 300, 0.10, 0.14, t);
     },
+    /* THE DELI SLICER. A wheel coming off its spindle: the whirr rises as it
+       leaves (it is speeding up, not firing), and a thin ring of rim on top so
+       it lands as steel rather than as another plasma noise. */
+    slicer() {
+      if (!on) return; const t = now();
+      tone('sawtooth', 300, 1150, 0.15, 0.16, t);
+      tone('square', 1800, 2400, 0.06, 0.10, t, 14);
+      burst(0.32, 0.13, t, 'bandpass', 3600, 1400, 7);
+    },
+    // and back onto it. Short, bright, upward — a catch, not an impact.
+    sliceHome() {
+      if (!on) return; const t = now();
+      burst(0.22, 0.05, t, 'bandpass', 2400, 5200, 9);
+      tone('square', 640, 1280, 0.06, 0.05, t);
+    },
     railgun() {
       if (!on) return; const t = now();
       tone('sawtooth', 2200, 90, 0.4, 0.5, t);

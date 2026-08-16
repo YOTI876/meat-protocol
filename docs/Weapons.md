@@ -5,7 +5,7 @@ tags: [reference, systems]
 
 # Weapons
 
-Thirteen guns. Damjan starts with **THE SIDEARM** and nothing else — everything
+Fourteen guns. Damjan starts with **THE SIDEARM** and nothing else — everything
 above it is bought from [[The Shop|PACI]], or kept forever off the
 [[Economy#What a rung pays out|evolution ladder]]. Guns are never scattered on
 the arena floor.
@@ -21,7 +21,8 @@ the arena floor.
 | **FREEZER BURN** | RARE | 95 | 55 | 9 | chills for 2.2s — *the cold aisle, weaponised* |
 | **THE HOG** | RARE | 120 | 120 | 10 | minigun, spins up, slows you 45% — *never stops* |
 | **THE ROTISSERIE** | EPIC | 165 | 70 | 14 | **fires in a spinning circle** regardless of aim, burn 10 |
-| **GOD FINGER** | EPIC | 190 | 5 | 165 | railgun, 0.5s charge, pierces everything, **never reloads** |
+| **THE DELI SLICER** | EPIC | 175 | 4 | 64 | a blade that flies out, stalls, and **comes back through everything a second time** — *it comes back. that is the good part and the bad part.* |
+| **GOD FINGER** | LEGENDARY | **360** | 6 | 210 | railgun, 0.5s charge, pierces everything — *you point. the room is shorter afterwards.* |
 | **THE FISH** | LEGENDARY | **500 coins** | 300 (as fuel) | 720/s | a fish. it opens its mouth and a laser comes out, and the laser cycles colour |
 | **THE FLYKILLER** | LEGENDARY | **380** | 24 | 44 | the current **chains** up to five more throats — *the blue light above the deli. it has opinions.* |
 | **BLACK FRIDAY** | LEGENDARY | **460** | 5 | 250 | a singularity that **drags the room together** and then goes off in the middle of it — *everything comes to the sale* |
@@ -30,27 +31,47 @@ Rarity is the same ladder the [[The Deck#Rarity, and why it matters|cards]]
 use, and it's what a gun shines at on the pedestal — `gr` in `WEP`. Full
 definitions live in `js/game.js`; `WORDER` is the slot order.
 
-## The three LEGENDARIES
+## Every gun above RARE owns a verb
 
-A LEGENDARY has to **do something the rack cannot already do**, or it is an
-EPIC that costs more. Each one owns a verb nothing else has, and none of them
-is simply the biggest number in its column — GOD FINGER still out-damages both
-of the new ones against a single target.
+A gun at the top of the ladder has to **do something the rack cannot already
+do**, or it is a cheaper gun with a bigger number on it. That is the whole
+design rule for the last two rungs, and it is why the tier reads as a set of
+choices rather than an order of preference.
 
-| | verb | best into | worst into |
+| | rung | verb | best into | worst into |
+|---|---|---|---|---|
+| **THE ROTISSERIE** | EPIC | *sprays* | being surrounded | anything at range |
+| **THE DELI SLICER** | EPIC | *returns* | a queue lined up on you | one thing that keeps moving |
+| **GOD FINGER** | LEGENDARY | *punches through* | a lane, and bosses | a scattered room |
+| **THE FISH** | LEGENDARY | *holds* | anything you can keep the line on | anything that makes you move |
+| **THE FLYKILLER** | LEGENDARY | *chains* | a queue | one large thing |
+| **BLACK FRIDAY** | LEGENDARY | *gathers* | a scattered room | one large thing |
+
+### Measured, not modelled
+
+Trigger held for 14 seconds into pinned unkillable dummies, Damjan standing
+still, no cards. Damage per second:
+
+| gun | rung | one target | a queue of five |
 |---|---|---|---|
-| **THE FISH** | *holds* | anything you can keep the line on | anything that makes you move |
-| **THE FLYKILLER** | *chains* | a queue | one large thing |
-| **BLACK FRIDAY** | *gathers* | a scattered room | one large thing |
+| THE SIDEARM *(control)* | COMMON | 81 | 81 |
+| SCAR-L | COMMON | 87 | 87 |
+| THE HOG | RARE | 151 | 164 |
+| **THE DELI SLICER** | EPIC | 160 | **805** |
+| **GOD FINGER** | LEGENDARY | **270** | **1350** |
+| THE FLYKILLER | LEGENDARY | 126 | 423 |
+| BLACK FRIDAY | LEGENDARY | — | 357 |
 
-Measured against eight packed dummies, one trigger pull each:
+> [!warning] The paper figures for GOD FINGER are wrong, and they are wrong in a
+> specific way
+> Multiplying `mag × dmg ÷ (mag × (rate + charge) + reload)` gives **154**. The
+> real number is **270**. The charge **overlaps the cooldown** when the trigger
+> is held — you are not paying 0.5s *and* 0.55s per shot, you are paying 0.55s —
+> so any model that adds them understates the gun by 43%. Sample the live game.
 
-| gun | targets hit | damage dealt |
-|---|---|---|
-| SCAR-L *(control)* | 1 / 8 | 13 |
-| GOD FINGER | 1 / 8 | 165 |
-| **THE FLYKILLER** | **6 / 8** | 162 |
-| **BLACK FRIDAY** | **8 / 8** | **1342** |
+BLACK FRIDAY reads as a dash against one target because the rig pins its
+dummies in place, and pinning fights the singularity's pull; its real
+single-target figure is not measurable this way.
 
 ### THE FLYKILLER
 
@@ -85,11 +106,16 @@ that everything is at the centre when it goes.
 > can be kited into a corner by a 460-coin purchase stops being a boss. They
 > take full damage; they just do not come when called.
 
-> [!note] Neither is on the evolution ladder
-> `EVO_TIER` stops at EPIC, so a rung can never offer a LEGENDARY — same rule
-> that keeps [[#THE FISH|THE FISH]] a purchase. See
-> [[Economy#What a rung pays out]]. Verified: ten rungs, every pool, no grade-4
-> gun ever offered.
+> [!note] None of the four is on the evolution ladder
+> `EVO_TIER` stops at EPIC, so a rung can never offer a LEGENDARY — the rule
+> that keeps [[#THE FISH|THE FISH]] a purchase, and that
+> [[#GOD FINGER is LEGENDARY now, and it reloads again|GOD FINGER]] now falls
+> under too. See [[Economy#What a rung pays out]]. Verified: ten rungs, every
+> pool, no grade-4 gun ever offered.
+>
+> Which is exactly why [[#THE DELI SLICER|the slicer]] exists. GOD FINGER
+> leaving EPIC would have left that rung holding one gun, and a pick screen
+> with one card on it is not a choice, it is a receipt.
 
 > [!note] Two numbers moved
 > **THE SIDEARM** fires 15% slower (`rate` 0.155 → 0.178 — `rate` is the delay
@@ -121,26 +147,94 @@ about a problem you did not have.
 > weapon now, so it cannot drift again. See
 > [[Bugs Found#19. The pistol opened every run on 14 rounds in a 12-round magazine]].
 
-## GOD FINGER does not reload
+## THE DELI SLICER
 
-`noReload: 1`. The magazine is not a resource: it does not deplete, so it
-cannot run out and there is nothing to rack. `startReload()` returns
-immediately and `emit()` skips the decrement.
+The wheel off the deli counter with a handle welded to it, and the only round
+in the game that **comes back**.
 
-The gun already pays for itself **twice** before a shot leaves it — a 0.5s
-charge you have to hold still through, and a 0.55s floor between shots. A
-2.4-second reload every five shots on top was a third tax on the same decision,
-and the one that made you stop playing: you spent it standing in the open
-having already committed to the fight. A charge weapon's rhythm should be
-charge / release / charge, and now it is.
+`blade: { reach: 200, ret: 520, acc: 1500 }`, `pierce: 99`, `life: 3.2`.
 
-**Rate of fire is unchanged, so damage per second is untouched.** The HUD says
-`NO RELOAD` in the gun's colour instead of drawing a pip row that never empties
-— a full bar that never moves is a bar you learn to stop reading.
+### The round trip
 
-One knock-on: BOTTOM OF THE BOX (the HOPPER rider, "the last third of a mag
-hits 35% harder") can never fire on GOD FINGER, because the magazine is always
-full. That is coherent rather than a gap — no mag, no dregs.
+| | |
+|---|---|
+| out | 200px at `spd` 400 — **0.50s** |
+| the turn | velocity to **zero**, then accelerate at 1500/s² toward Damjan, capped at 520 |
+| home | **~0.55s** from full reach |
+| caught | within 11px of the player, and it is gone |
+
+Measured end to end: **1.03s** from muzzle to catch at full reach, and one disc
+through a queue of five deals **exactly 2 × 64 to every one of them**.
+
+### Three things happen at the turn, and all three matter
+
+1. **It stops.** Not reverses — stops, hangs, and gathers speed back. Reversing
+   the velocity instead reads as a ricochet off an invisible wall, which is a
+   completely different and much worse piece of information to give the player.
+2. **`hitIds` is emptied.** This is what makes the way home a real second pass
+   rather than a victory lap. Everything it cut on the way out is a target
+   again.
+3. **It stops steering on its own angle and starts steering on Damjan**, every
+   frame, for the rest of its life.
+
+`bladeTurn()` is called from three places — reaching its reach, hitting a wall,
+and reaching the edge of the arena — because all three mean the same thing:
+*that is as far as it goes*.
+
+> [!note] The return ignores walls
+> A blade that dies behind a shelf you walked around is not a decision, it is a
+> tax on the level geometry. Outbound it turns on a wall; inbound it passes
+> through. Verified from six positions including point-blank into all four
+> walls and into a corner: **every disc turned and every disc came home.**
+> `life: 3.2` is the backstop — one cannot leak even in principle.
+
+> [!tip] It is a gun about where you are standing
+> The second pass is aimed at **you**, not at where you threw from. Measured
+> standing still it does 160 dps single-target; measured while drifting
+> backward under its own recoil, with the target pinned, it did **48**. In real
+> play that cuts the other way — enemies chase Damjan, so they are on the
+> return line by definition — but back away from a wall you have thrown at and
+> you threw half a gun away.
+
+## GOD FINGER is LEGENDARY now, and it reloads again
+
+It used to carry `noReload: 1` — the magazine was not a resource, so
+`startReload()` returned immediately and `emit()` skipped the decrement. That
+flag is gone from the codebase entirely.
+
+**Why it was there.** The gun already pays for itself twice before a shot
+leaves it: a 0.5s charge you hold still through, and a 0.55s floor between
+shots. A 2.4-second rack every five shots on top was a *third* tax on the same
+decision, and the one that made you stop playing — you spent it standing in the
+open having already committed to the fight.
+
+**Why it came back, and cheaper than it left.** Six in the magazine instead of
+five, 1.9s to rack instead of 2.4. Measured on a held trigger:
+
+```
+mag 6 -> 0 over 3.23s   (a shot every 0.55s)
+rack             1.90s
+                 -----
+cycle            5.13s   — roughly two thirds firing
+```
+
+What it costs the gun is **sustained** damage: 300dps standing still before,
+**270** now. What it buys is **burst** — 165 → **210** a slug, the biggest
+single round in the game after BLACK FRIDAY's, still with `pierce: 99` behind
+it. It is no longer the gun that never stops; it is the gun that ends whatever
+is in the lane and then needs a second.
+
+The rung follows from that. At EPIC it turned up on **~9%** of PACI's shop
+visits; at LEGENDARY it is **2.7%**, and the price went 190 → 360 — the
+cheapest of the four legendaries, just under THE FLYKILLER's 380.
+
+> [!note] Two knock-ons, both good
+> BOTTOM OF THE BOX (the HOPPER rider — "the last third of a mag hits 35%
+> harder") could never fire on GOD FINGER, because the magazine was always
+> full. It works now.
+>
+> The HUD's `NO RELOAD` line is gone with the flag, and the gun draws an
+> ordinary six-pip magazine like everything else.
 
 ## Knockback
 
@@ -232,7 +326,7 @@ all at once.
 | **floor 4** | FREEZER BURN |
 | **floor 5** | THE HOG, **THE FISH** |
 | **floor 6** | THE ROTISSERIE *(and its contract)* |
-| **floor 7** | GOD FINGER, **THE FLYKILLER** |
+| **floor 7** | THE DELI SLICER, **GOD FINGER**, **THE FLYKILLER** |
 | **floor 9** | **BLACK FRIDAY** |
 
 So a floor-1 shop offers three things totalling 130 coins against a floor of
@@ -270,7 +364,11 @@ SEAL** (8 floor bosses) is signed. `WEP.rot.lock = 'seal'` names the contract;
 - **THE HOG** ramps `p.spin` from 0→1 over 0.75s; fire rate and movement
   penalty both scale with it.
 - **GOD FINGER** accumulates `p.charge`; firing early does nothing, it only
-  releases at full charge.
+  releases at full charge. Held down, the charge runs **during** the cooldown,
+  which is why its paper DPS is badly wrong — see [[#Measured, not modelled]].
+- **THE DELI SLICER** throws a disc and takes it back. It ejects no case (there
+  isn't one) and the round is drawn as a turning wheel rather than a tracer,
+  because a streak is the wrong read for a thing about to reverse.
 - **THE FISH** doesn't fire discrete bullets — `updateBeam()` runs a
   continuous raycast each frame and drains the mag as fuel per second.
 

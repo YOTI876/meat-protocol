@@ -73,7 +73,7 @@ All in `js/game.js` unless noted.
 | tile variants | `TILE_VARIANTS = 12` | above `bakeTileAtlas` | how much floor there is before the eye finds the repeat. Raising it costs bake time **linearly**, unlike the old per-pixel loop — see [[Rendering#The floor]] |
 | floor surface | `FLOOR_TEX[]` | top of the floor section | which of the ten [[Floors#Surfaces\|surfaces]] a floor is made of |
 | spill blobs | 6, at 7% of tiles | `bakeSpills` / `bakeFloor` | how used the floor looks. Pre-rendered, so the rate is nearly free now |
-| never-reload guns | `noReload: 1` | `WEP` | the magazine stops being a resource. Only GOD FINGER — see [[Weapons#GOD FINGER does not reload]] |
+| returning rounds | `blade: { reach, ret, acc }` | `WEP` | the disc flies `reach` px, stalls, then accelerates home at `acc` capped at `ret`. Only THE DELI SLICER — see [[Weapons#THE DELI SLICER]] |
 | starting magazine | `WEP.pistol.mag` | `makePlayer()` | **read off the gun, never a literal** — see [[Bugs Found#19. The pistol opened every run on 14 rounds in a 12-round magazine]] |
 | sidearm mark bonus | `0.20` in `scarMul` | `ST()` | damage per [[Progression#The evolving sidearm\|floor mark]] |
 | music intensity curve | `0.12 + (wave/10)*0.72 + floor*0.16` | `startWave()` | how fast [[Music]] builds within a floor |

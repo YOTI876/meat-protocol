@@ -603,6 +603,35 @@ SPR.rot = SPRITE([          // THE ROTISSERIE
   '....GG..........'
 ]);
 
+/* THE DELI SLICER — the wheel off the counter, with a handle welded to it.
+
+   Every other gun in the rack is a long rectangle pointing +X. That is the
+   problem this silhouette solves: at 16x6 the barrel guns are told apart by
+   their *colour*, and colour is the first thing a dim floor takes away. So
+   this one is a CIRCLE. A disc three pixels of radius wide, mounted on a stub
+   at x7, reading as a wheel from across the room and from the hip.
+
+   Three things make it a wheel rather than a ball:
+     1. a bright rim (`X`) all the way round, one pixel thick, against a duller
+        steel face (`T`) — a ball is lit from one side, a wheel is lit at the
+        edge because the edge is what is turning.
+     2. a BRASS HUB (`y`/`Y`) dead centre. Two pixels, and they are the whole
+        reason the eye reads rotation: a disc with a centre spins, a disc
+        without one is a coin.
+     3. the `=` glint high on the upper-left rim, where the room's lamp is.
+
+   The teeth are not drawn here. At this size a tooth is smaller than the
+   pixel it would live in, so they are drawn on the projectile instead, where
+   the disc is six times the size and actually turning. */
+SPR.deli = SPRITE([         // THE DELI SLICER
+  '.........XXXXX..',
+  '..gggggGX=TTTTX.',
+  '..gGGGgGXTyYTTX.',
+  '..GGgggGXTTTTTX.',
+  '...GG....XXXXX..',
+  '....GG..........'
+]);
+
 SPR.mag = SPRITE([
   '.ooo.',
   'oGGGo',
@@ -2207,7 +2236,7 @@ const PROP_MAP = {
 };
 for (const k of ['scar', 'saw', 'nail', 'micro', 'hog', 'rail', 'omega', 'pistol',
                  'zap', 'void',
-                 'price', 'chill', 'rot', 'mag', 'grenade', 'coin', 'card',
+                 'price', 'chill', 'rot', 'deli', 'mag', 'grenade', 'coin', 'card',
                  'shield', 'pedestal', 'ammo', 'medkit']) {
   const s = SPR[k];
   SPR[k] = SPRITE(shade(up2(s.rows), PROP_MAP), s.pal, { ss: 2 });

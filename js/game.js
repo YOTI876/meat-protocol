@@ -583,19 +583,59 @@ const WEP = {
   chill: { id: 'chill', name: 'FREEZER BURN',  spr: SPR.chill, gr: 2, floor: 3, price: 95,  mag: 55,  rate: 0.055, dmg: 9,  spread: 0.14,  spd: 400, pellets: 1, reload: 2.2,  sfx: 'plasma',   col: '#9fe4ff', chill: 2.2, size: 2, tag: 'the cold aisle, weaponised' },
   hog:   { id: 'hog',   name: 'THE HOG',       spr: SPR.hog,   gr: 2, floor: 4, price: 120, mag: 120, rate: 0.032, dmg: 10, spread: 0.13,  spd: 500, pellets: 1, reload: 3.4,  sfx: 'minigun',  col: '#ffd28a', spin: 1, slow: 0.45, tag: 'spins up. never stops.' },
   rot:   { id: 'rot',   name: 'THE ROTISSERIE',spr: SPR.rot,   gr: 3, floor: 5, price: 165, mag: 70,  rate: 0.050, dmg: 14, spread: 0.05,  spd: 330, pellets: 1, reload: 2.6,  sfx: 'plasma',   col: '#ff9a3a', radial: 0.55, burn: 10, size: 2, lock: 'seal', tag: 'it does not care where you point it' },
+  /* THE DELI SLICER. The EPIC rung's second seat, and the only gun in the
+     rack whose round comes back.
+
+     ---- why a returning blade, and why here ----
+
+     Every weapon above RARE owns a verb nothing else has: THE ROTISSERIE
+     *sprays*, THE FLYKILLER *chains*, BLACK FRIDAY *gathers*, GOD FINGER
+     *punches through*. The slicer *returns* — a disc that flies out to a
+     fixed reach, stalls, and comes home through everything a second time.
+
+     That makes it the exact middle of the tier it sits in, which is the whole
+     reason it exists. THE ROTISSERIE is damage you cannot aim. GOD FINGER is
+     damage that lands the instant you release. The slicer is damage you aim
+     perfectly and then have to *wait for* — and, crucially, wait for **where
+     you are standing**, because the second pass is measured from you. Throw
+     it down a corridor and back out, and you threw half a gun away.
+
+     `blade.reach` is in pixels, not seconds, so the round trip is the same
+     length whatever else is modifying the gun; `ret` is faster than a player
+     can run, so it always catches up; `acc` is what stops the turn looking
+     like a bounce — it stalls, hangs, and gathers speed toward you. It clears
+     `hitIds` at the turn, which is what makes the way home a real second pass
+     rather than a victory lap. */
+  deli:  { id: 'deli',  name: 'THE DELI SLICER', spr: SPR.deli, gr: 3, floor: 6, price: 175, mag: 4,   rate: 0.50,  dmg: 64,  spread: 0.01, spd: 400, pellets: 1, reload: 1.7,  sfx: 'slicer',   col: '#dfe8f2', size: 3, pierce: 99, knock: 16, life: 3.2, blade: { reach: 200, ret: 520, acc: 1500 }, tag: 'it comes back. that is the good part and the bad part.' },
   // knock 200 -> 110. A rail slug should still throw what it hits; it should
   // not clear the lane it punched through.
-  /* GOD FINGER never reloads. `noReload` means the magazine is not a resource:
-     it does not deplete, so it cannot run out and there is nothing to rack.
+  /* GOD FINGER, promoted to LEGENDARY, and it reloads again.
 
-     The gun already pays for itself twice before a shot leaves it — a 0.5s
-     charge you have to hold still through, and a 0.55s floor between shots.
-     That is the cost. A 2.4-second reload every five shots on top was a third
-     tax on the same decision, and the one that made you stop playing: you
-     spent it standing in the open having already committed to the fight. A
-     charge weapon's rhythm should be charge / release / charge, and now it is.
-     Its rate of fire is unchanged, so its damage-per-second is untouched. */
-  rail:  { id: 'rail',  name: 'GOD FINGER',    spr: SPR.rail,  gr: 3, floor: 6, price: 190, mag: 5,   rate: 0.55,  dmg: 165, spread: 0,    spd: 950, pellets: 1, reload: 2.4,  noReload: 1, sfx: 'railgun',  col: '#a8e8ff', charge: 0.5, pierce: 99, size: 3, knock: 110, tag: 'points. it does not need reloading. things stop existing.' },
+     `noReload` is gone from the whole codebase. It came in because a 2.4s rack
+     every five shots was a *third* tax on a gun that already paid a 0.5s
+     charge and a 0.55s floor between shots, and the third tax was the one that
+     made you stop playing: you spent it standing in the open having already
+     committed to the fight.
+
+     None of that stopped being true, so the reload had to come back cheaper
+     than it left. Six in the magazine instead of five and 1.9s to rack instead
+     of 2.4: measured on a held trigger, that is six shots over 3.23s and then
+     1.90s of rack — a 5.13s cycle that is roughly two thirds firing. It gives
+     the gun the one thing it never had, which is a moment where it is *out*
+     and you had to have thought about that before you walked in.
+
+     What that costs it is SUSTAINED damage, and a lot: 300dps standing still
+     before, 270 now (measured, not modelled — the charge overlaps the cooldown
+     when the trigger is held, so the paper figure of 154 is simply wrong).
+     What it buys is BURST. 165 -> 210 a slug, which is the biggest single
+     round in the game after BLACK FRIDAY's, still with pierce 99 behind it.
+
+     That is the trade the rung is for: it is no longer the gun that never
+     stops, it is the gun that ends whatever is in the lane and then needs a
+     second. It is also off the evolution ladder now — EVO_TIER stops at EPIC,
+     so this is bought, like the other three, by someone who went and got the
+     money for it. */
+  rail:  { id: 'rail',  name: 'GOD FINGER',    spr: SPR.rail,  gr: 4, floor: 6, price: 360, mag: 6,   rate: 0.55,  dmg: 210, spread: 0,    spd: 950, pellets: 1, reload: 1.9,  sfx: 'railgun',  col: '#a8e8ff', charge: 0.5, pierce: 99, size: 3, knock: 110, tag: 'you point. the room is shorter afterwards.' },
   // THE FISH. Coins, not cards — 500 of them, which at COIN_RATE is most of a
   // deep run. `prism: 1` is what makes its beam cycle colour; see drawWorld.
   omega: { id: 'omega', name: 'THE FISH',      spr: SPR.omega, gr: 4, floor: 4, price: OMEGA_COINS, mag: 300, rate: 0.02, dmg: 720, spread: 0, spd: 0, pellets: 0, reload: 2.6, sfx: 'beam', col: '#c05cff', beam: 1, prism: 1, girth: 11, tag: 'it is a fish. it fires a laser. do not ask.' },
@@ -605,19 +645,19 @@ const WEP = {
      something the rack cannot already do, or it is just an EPIC that costs
      more, so each one owns a verb nothing else has: THE FLYKILLER *chains*,
      BLACK FRIDAY *gathers*. Neither is on the evolution ladder; EVO_TIER stops
-     at EPIC and these are bought, like the fish. */
+     at EPIC and these are bought, like the fish and like GOD FINGER. */
   zap:   { id: 'zap',   name: 'THE FLYKILLER', spr: SPR.zap,   gr: 4, floor: 6, price: 380, mag: 24,  rate: 0.30,  dmg: 44, spread: 0.02,  spd: 620, pellets: 1, reload: 2.2,  sfx: 'plasma',   col: '#9cf0ff', size: 2, chain: 5, chainR: 132, pin: 0.22, tag: 'the blue light above the deli. it has opinions.' },
   // `void` is a reserved word but a perfectly legal property name, and every
   // use of it here is string-keyed. Consistency with SPR.void wins.
   void:  { id: 'void',  name: 'BLACK FRIDAY',  spr: SPR.void,  gr: 4, floor: 8, price: 460, mag: 5,   rate: 0.95,  dmg: 250, spread: 0,    spd: 330, pellets: 1, reload: 3.1,  sfx: 'railgun',  col: '#c46bff', size: 4, life: 2.4, sing: { r: 96, pull: 340 }, knock: 0, tag: 'everything comes to the sale' }
 };
-const WORDER = ['pistol', 'scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot', 'rail', 'omega', 'zap', 'void'];
+const WORDER = ['pistol', 'scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot', 'deli', 'rail', 'omega', 'zap', 'void'];
 /* Two of these are behind contracts and simply are not in PACI's crate until
-   you have earned them — see CONTRACTS. The three LEGENDARIES are here too:
+   you have earned them — see CONTRACTS. All four LEGENDARIES are here too:
    they go through exactly the same depth/price gates as everything else, and
    `evoPickable()` reads this list but only ever asks it for grades 0-3, so a
    LEGENDARY can never fall out of an evolution rung. */
-const BUYABLE = ['scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot', 'rail', 'zap', 'void'];
+const BUYABLE = ['scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot', 'deli', 'rail', 'zap', 'void'];
 
 /* ---- COSMETICS. bought from the vault, kept forever. ----
 
@@ -2812,7 +2852,6 @@ function cycleWeapon(dir) {
 
 function startReload() {
   const p = S.p, w = curW();
-  if (w.noReload) return;                   // its magazine is not a resource
   if (p.reT > 0 || S.god || p.mags[w.id] >= magCap(w)) return;
   /* HAIR TRIGGER: run it dry and it is already loaded. Deliberately rewards
      emptying the magazine rather than tapping R, so it changes how you fire. */
@@ -2844,7 +2883,7 @@ function emit(w) {
   const spin = w.spin ? p.spin : 1;
   // FRENZY cuts the gap between shots by a third for as long as it lasts
   p.fireT = (w.spin ? lerp(0.16, w.rate, p.spin) : w.rate) * st.rateMul * (p.frenzyT > 0 ? 0.66 : 1);
-  if (!S.god && !w.noReload) p.mags[w.id]--;
+  if (!S.god) p.mags[w.id]--;
 
   const base = (w.spread + p.recoil * 0.05) * (S.god ? 0.4 : 1);
   const mx = p.x + Math.cos(p.ang) * 11, my = p.y + Math.sin(p.ang) * 11 - 1;
@@ -2891,6 +2930,9 @@ function emit(w) {
            a singularity: it does not collide, it arrives. */
         chain: w.chain || 0, chainR: w.chainR || 0,
         sing: w.sing || null, ghost: !!w.sing,
+        /* THE DELI SLICER. `blade` carries the whole round trip; `travel` and
+           `back` are the state it keeps while making it. */
+        blade: w.blade || null, travel: 0, back: 0, wheel: Math.random() * TAU,
         crit: forceCrit, spd: w.spd, god: S.god
       });
     }
@@ -2916,9 +2958,38 @@ function emit(w) {
   else if (evo) A.scarMk(S.scarLv);          // voice morphs toward a laser each mark
   else if (A[w.sfx]) A[w.sfx](spin);
   else A.shoot();
-  if (!w.beam) A.shell();
-  const ca = p.ang + Math.PI / 2 + rnd(-0.4, 0.4);
-  S.gibs.push({ x: mx, y: my, vx: Math.cos(ca) * 70, vy: Math.sin(ca) * 70, col: '#c9a227', life: 0.9, s: 1 });
+  /* A thrown disc has no case to eject, and a fish has no case at all. Both
+     used to drop a brass cylinder on the floor anyway. */
+  if (!w.beam && !w.blade) {
+    A.shell();
+    const ca = p.ang + Math.PI / 2 + rnd(-0.4, 0.4);
+    S.gibs.push({ x: mx, y: my, vx: Math.cos(ca) * 70, vy: Math.sin(ca) * 70, col: '#c9a227', life: 0.9, s: 1 });
+  }
+}
+
+/* ---- THE DELI SLICER's turn ----
+   The one moment the whole gun is built around. Three things happen at once
+   and all three matter:
+
+     1. the disc STOPS. Not reverses — stops. `rsp` starts at zero and climbs
+        by `acc`, so the blade hangs for a beat at the end of its reach before
+        it starts back. Reversing the velocity instead reads as a ricochet off
+        an invisible wall, which is a completely different (and much worse)
+        piece of information.
+     2. `hitIds` is emptied, which is what makes the way home a second pass
+        rather than a victory lap. Everything it cut on the way out is a
+        target again.
+     3. it stops steering on `spd` and starts steering on the player, every
+        frame, for the rest of its life.
+
+   Called from three places: reaching its reach, hitting a wall, and reaching
+   the edge of the arena. All three mean the same thing — that is as far as it
+   goes — so all three do the same thing. */
+function bladeTurn(b) {
+  if (b.back) return;
+  b.back = 1; b.rsp = 0; b.vx = 0; b.vy = 0;
+  b.hitIds.length = 0;
+  part(b.x, b.y, b.col, 4, 55, 0.24);
 }
 
 /* ---- THE FLYKILLER's chain ----
@@ -4420,6 +4491,28 @@ function update(rdt) {
         part(b.x + Math.cos(a2) * rr, b.y + Math.sin(a2) * rr, b.col, 1, 12, 0.3);
       }
     }
+    /* THE DELI SLICER's disc, out and back. */
+    if (b.blade) {
+      b.wheel += dt * 26;                            // the spin, for the draw
+      if (!b.back) {
+        b.travel += b.spd * dt;
+        if (b.travel >= b.blade.reach) bladeTurn(b);
+      } else {
+        /* Home on Damjan, not on the point he threw from. The gun is only
+           worth its rung if the second pass follows you — which is also the
+           only thing that makes standing still a mistake with it. */
+        const a = Math.atan2(S.p.y - b.y, S.p.x - b.x);
+        b.rsp = Math.min(b.blade.ret, (b.rsp || 0) + b.blade.acc * dt);
+        b.vx = Math.cos(a) * b.rsp; b.vy = Math.sin(a) * b.rsp;
+        if (Math.hypot(S.p.x - b.x, S.p.y - b.y) < 11) {   // caught
+          part(b.x, b.y, b.col, 5, 65, 0.2);
+          A.sliceHome();
+          S.bul.splice(i, 1);
+          continue;
+        }
+      }
+      if (Math.random() < dt * 26) part(b.x, b.y, b.col, 1, 20, 0.24);
+    }
     let removed = false;
     for (let sub = 0; sub < 2; sub++) {
       const px = b.x, py = b.y;
@@ -4443,6 +4536,20 @@ function update(rdt) {
           if (S.goroHits % 10 === 0 && S.goroHits < 30) float(b.x, b.y - 8, 'it is listening', '#b028ff');
           if (S.goroHits >= 30) triggerGoromania();
           S.bul.splice(i, 1); removed = true; break;
+        }
+        /* A disc does not stop on a crate — it turns round early, which is the
+           gun telling you the shot was too long. Coming HOME it ignores walls
+           entirely: the alternative is a blade that dies behind a shelf you
+           walked around, and losing half the shot to the level geometry is not
+           a decision, it is a tax. */
+        if (b.blade) {
+          if (!b.back) {
+            b.x = px; b.y = py;
+            bladeTurn(b);
+            sparks(b.x, b.y, Math.atan2(-b.vy, -b.vx), '#e8f0ff', 4, 130, 0.2, 0.8);
+            A.nadeBounce();
+          }
+          continue;
         }
         if (b.bounce > 0) {                       // microwave orbs ricochet
           b.bounce--;
@@ -4510,6 +4617,12 @@ function update(rdt) {
       }
       if (removed) break;
       if (b.x < 0 || b.y < 0 || b.x > S.aw || b.y > S.ah) {
+        // the disc turns at the edge of the room instead of leaving it
+        if (b.blade && !b.back) {
+          b.x = clamp(b.x, 2, S.aw - 2); b.y = clamp(b.y, 2, S.ah - 2);
+          bladeTurn(b);
+          continue;
+        }
         if (b.sing) singularityPop(b);
         S.bul.splice(i, 1); removed = true; break;
       }
@@ -6014,6 +6127,37 @@ function drawWorld() {
   ctx.globalCompositeOperation = 'lighter';
   ctx.lineCap = 'round';
   for (const b of S.bul) {
+    /* THE DELI SLICER's disc. Everything else in here is a tracer — a streak
+       back along its own velocity — and a streak is exactly the wrong read for
+       a thing that is about to turn round and come back at you. So it is drawn
+       as what it is: a wheel, turning, with teeth on it.
+
+       The teeth are the whole point. A plain ring at this size is a bubble;
+       six spokes breaking the rim are a saw blade, and they are what tells you
+       at a glance which of the two things in the air is yours. `wheel` was
+       seeded randomly at the muzzle so a mag dumped in one direction does not
+       come back as one rigid rotating object. */
+    if (b.blade) {
+      const r = b.size * 1.5 + 3;
+      ctx.globalAlpha = 0.26;
+      ctx.fillStyle = b.col;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r * 1.7, 0, TAU); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = b.col;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(b.x, b.y, r, 0, TAU); ctx.stroke();
+      ctx.lineWidth = 1.2;
+      for (let k = 0; k < 6; k++) {
+        const a = b.wheel + k * TAU / 6;
+        ctx.beginPath();
+        ctx.moveTo(b.x + Math.cos(a) * r * 0.5, b.y + Math.sin(a) * r * 0.5);
+        ctx.lineTo(b.x + Math.cos(a) * (r + 2.2), b.y + Math.sin(a) * (r + 2.2));
+        ctx.stroke();
+      }
+      ctx.fillStyle = '#fffdf2';
+      ctx.beginPath(); ctx.arc(b.x, b.y, 1.5, 0, TAU); ctx.fill();
+      continue;
+    }
     const tx = b.x - b.vx * 0.018, ty = b.y - b.vy * 0.018;
     ctx.globalAlpha = 0.22;
     ctx.strokeStyle = b.col; ctx.lineWidth = b.size * 4 + 3;
@@ -7467,13 +7611,6 @@ function drawHUD() {
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(8, H - 19, 62, 3);
     ctx.fillStyle = '#c8a04a'; ctx.fillRect(8, H - 19, 62 * prog, 3);
     if (prog > 0.9) { ctx.fillStyle = '#fff'; ctx.fillRect(8, H - 19, 62, 3); }
-  } else if (w.noReload) {
-    /* A full pip row that never empties is a bar you learn to stop reading.
-       Say what is actually true instead, in the gun's own colour. */
-    txt('NO RELOAD', 8, H - 22, w.col);
-    ctx.globalAlpha = 0.45 + Math.sin(S.t * 2) * 0.12;
-    ctx.fillStyle = w.col; ctx.fillRect(8, H - 19, 62, 2);
-    ctx.globalAlpha = 1;
   } else {
     /* Pips, not a string of '|' and '.'. That bar only ever held a steady
        width because Courier was monospaced; in a proportional face it would

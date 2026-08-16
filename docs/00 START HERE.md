@@ -36,7 +36,7 @@ three-phase fight you can actually beat.
 
 ## Systems
 
-- [[Weapons]] — the thirteen guns, and the three LEGENDARIES
+- [[Weapons]] — the fourteen guns, and the verb each one above RARE owns
 - [[The Shop]] — PACI, the only place guns are sold, and his temper
 - [[Enemies]] — the six types and how they think
 - [[Bosses]] — ten shuffled boss kits, six elites, the APEX, and THE MEAT PROTOCOL
