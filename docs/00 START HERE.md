@@ -48,6 +48,7 @@ three-phase fight you can actually beat.
 ## Under the hood
 
 - [[Rendering]] — render scale, the sprite pipeline, lighting, the screens
+- [[Instrumentation]] — the F3 probe and the `MEAT.soak()` measurement harness
 - [[Audio]] — synthesis, formant speech
 - [[Music]] — the generative score
 - [[File Map]] — what lives where
@@ -55,7 +56,7 @@ three-phase fight you can actually beat.
 ## Records
 
 - [[Changelog]] — every release, in order
-- [[Bugs Found]] — twenty-one real defects, what caused each, and two still open
+- [[Bugs Found]] — twenty-one real defects, what caused each, and three still open
 - [[Tuning Values]] — the single-number knobs
 - [[Deployment]] — GitHub and Vercel setup
 

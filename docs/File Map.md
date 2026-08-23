@@ -80,6 +80,9 @@ SLOP/
 `MEAT.triggerModagaz()`, `MEAT.enterShop()`, `MEAT.angerPaci(x, y)`,
 `MEAT.buildRoom(n)`, etc. Full list at the bottom of `js/game.js`.
 
+`MEAT.PROBE`, `MEAT.soak()` and `MEAT.soakDiff()` are the measurement harness
+— see [[Instrumentation]].
+
 Driving `MEAT.frame(t)` with synthetic timestamps is how every change in this
 project gets tested headlessly — see [[Bugs Found]] for what that has caught.
 The measured tables in [[Tuning Values]] and [[Difficulty Scaling]] come from

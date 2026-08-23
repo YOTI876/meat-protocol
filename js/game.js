@@ -97,6 +97,172 @@ function htxtWidth(s, size, track, font) {
   octx.restore();
   return w;
 }
+/* ============================================================
+   PROBE — frame-time and pool instrumentation.
+
+   Measurement only. Nothing in this block changes a gameplay number; the
+   moment it does it has stopped being a probe.
+
+   ---- the rules it has to obey, because it runs in the hot loop ----
+
+   No allocation per frame. Every buffer here is allocated once and written
+   by index. Percentiles sort a scratch buffer IN PLACE and only when
+   something asks to read them — once a frame for the F3 overlay, once a
+   sample for a soak — never unconditionally per frame.
+
+   `performance.now()` about ten times a frame costs ~0.5us against a 16.7ms
+   budget. `PROBE.overhead()` measures it rather than asserting it.
+
+   ---- what this cannot tell you, and it matters ----
+
+   Rendering.md's floor-bake warning applies to every number below: wall-clock
+   brackets around canvas work UNDER-REPORT it, because draw calls queue and
+   the real cost lands on whatever later call forces a flush. So the split
+   attributes JS-side time honestly and GPU-side time badly.
+
+   `PROBE.drain = 1` forces a readback flush after each phase, which makes
+   attribution accurate and frame pacing meaningless. Use it to find out WHERE
+   the time goes, never HOW MUCH. The unflushed numbers are the ones that
+   describe the frame you actually see.
+   ============================================================ */
+const PROBE_N = 512;                    // ~8s of history at 60fps
+const _pbT   = new Float64Array(PROBE_N);   // wall-clock stamp per sample
+const _pbTot = new Float32Array(PROBE_N);
+const _pbUpd = new Float32Array(PROBE_N);
+const _pbWld = new Float32Array(PROBE_N);   // drawWorld MINUS actors and particles
+const _pbAct = new Float32Array(PROBE_N);   // the actor pass: drawEnemy * n + drawPlayer
+const _pbPar = new Float32Array(PROBE_N);   // drawParticles
+const _pbLit = new Float32Array(PROBE_N);   // drawLight
+const _pbPst = new Float32Array(PROBE_N);   // post
+const _pbHud = new Float32Array(PROBE_N);   // drawHUD + whatever screen is open
+const _pbScr = new Float32Array(PROBE_N);   // scratch, sorted in place
+let _pbI = 0, _pbCount = 0, _pbWorst = 0, _pbWorstAt = 0;
+/* filled from inside drawWorld, zeroed at the top of every frame */
+let _accAct = 0, _accPar = 0;
+let _soaking = 0;                       // suppresses rAF so a soak can drive frame() itself
+
+/* Pre-allocated result objects. The stats API hands these back by reference,
+   so reading the probe never allocates either. */
+function _pbSlot() { return { avg: 0, p95: 0, p99: 0, max: 0, n: 0 }; }
+const _pbOut = [_pbSlot(), _pbSlot(), _pbSlot(), _pbSlot(), _pbSlot(), _pbSlot(), _pbSlot(), _pbSlot()];
+
+function _pbFlush() {
+  // a 1px readback is the cheapest way to make the driver finish what it queued
+  if (PROBE.drain) ctx.getImageData(0, 0, 1, 1);
+}
+
+/* Copy the samples inside the rolling window into the scratch buffer, newest
+   first. Walking backward and breaking on the first sample older than the
+   window is what makes this a TIME window rather than a frame-count one — at
+   20fps three seconds is 60 samples, not 180, and averaging 180 of them would
+   quietly reach back eight seconds exactly when the game is worst. */
+function _pbWindow(buf, ms) {
+  if (!_pbCount) return 0;
+  const now = _pbT[(_pbI - 1 + PROBE_N) % PROBE_N];
+  let n = 0;
+  for (let k = 0; k < _pbCount; k++) {
+    const i = (_pbI - 1 - k + PROBE_N * 2) % PROBE_N;
+    if (now - _pbT[i] > ms) break;
+    _pbScr[n++] = buf[i];
+  }
+  return n;
+}
+function _pbStat(buf, ms, out) {
+  const n = _pbWindow(buf, ms);
+  out.n = n;
+  if (!n) { out.avg = out.p95 = out.p99 = out.max = 0; return out; }
+  let s = 0, mx = 0;
+  for (let k = 0; k < n; k++) { const v = _pbScr[k]; s += v; if (v > mx) mx = v; }
+  // park the dead tail above every real sample so one in-place sort does it
+  _pbScr.fill(Infinity, n);
+  _pbScr.sort();
+  out.avg = s / n;
+  out.p95 = _pbScr[Math.min(n - 1, Math.floor(n * 0.95))];
+  out.p99 = _pbScr[Math.min(n - 1, Math.floor(n * 0.99))];
+  out.max = mx;
+  return out;
+}
+function _pbRec(t0, upd, wld, act, par, lit, pst, hud, tot) {
+  const i = _pbI;
+  _pbT[i] = t0; _pbTot[i] = tot; _pbUpd[i] = upd; _pbWld[i] = wld;
+  _pbAct[i] = act; _pbPar[i] = par; _pbLit[i] = lit; _pbPst[i] = pst; _pbHud[i] = hud;
+  _pbI = (i + 1) % PROBE_N;
+  if (_pbCount < PROBE_N) _pbCount++;
+  if (tot > _pbWorst) { _pbWorst = tot; _pbWorstAt = t0; }
+}
+
+const PROBE = {
+  on: 0,            // F3 overlay
+  drain: 0,         // see the warning above
+  win: 3000,        // rolling window, ms
+  reset() { _pbI = 0; _pbCount = 0; _pbWorst = 0; _pbWorstAt = 0; },
+  worst() { return _pbWorst; },
+  /* Reading is not the hot path, so this one allocates — deliberately, because
+     a caller that holds a reference to a recycled object gets lied to later. */
+  stats(ms) {
+    const w = ms || PROBE.win;
+    const f = (b) => { const o = _pbStat(b, w, _pbSlot()); return o; };
+    return {
+      windowMs: w, frames: _pbCount,
+      total: f(_pbTot), update: f(_pbUpd),
+      draw: { world: f(_pbWld), actors: f(_pbAct), particles: f(_pbPar),
+              light: f(_pbLit), post: f(_pbPst), hud: f(_pbHud) },
+      worstEver: _pbWorst
+    };
+  },
+  /* Everything the F3 overlay reads that is not a timing. Counts, caps and
+     occupancies in one place so the overlay and the soak cannot disagree. */
+  counts() {
+    return {
+      en: S.en.length, cracks: S.cracks.length, cap: S.capNow | 0, queue: S.queue.length,
+      bul: S.bul.length, eb: S.eb.length,
+      part: S.part.length, partCap: 900,
+      gibs: S.gibs.length, gibsCap: 420,
+      rings: S.rings.length, ringsCap: 80,
+      fx: S.fx.length, fxCap: 12,
+      floats: S.floats.length, arcs: S.arcs.length, drops: S.drops.length,
+      sprCache: _cache.size, sprVariants: _variants.size,
+      floor: S.room + 1, wave: S.wave, mode: S.mode
+    };
+  },
+  /* What the probe itself costs, and — more important — what it is ALLOWED
+     to resolve. A page that is not cross-origin isolated has
+     performance.now() coarsened to 100us as an anti-Spectre measure, which
+     means any single phase under about half a millisecond is being reported
+     as 0.0 or 0.1 and nothing in between.
+
+     That does not make the split useless, but it changes what may be read off
+     it. The quantization dithers frame to frame, so a WINDOWED AVERAGE
+     recovers real resolution — 180 frames of a 100us quantum averages to
+     roughly 7us — while any SINGLE frame's split is noise. Averages are safe
+     to reason about; individual frames are not.
+
+     To get 5us back, serve the page cross-origin isolated (COOP + COEP in
+     serve.js). That is a change to the server, not to the probe. */
+  overhead(n) {
+    const N = n || 20000;
+    let t = performance.now(), sink = 0;
+    for (let i = 0; i < N; i++) sink += performance.now();
+    const per = (performance.now() - t) / N;
+    // the smallest non-zero step the clock will actually report
+    let prev = performance.now(), q = Infinity;
+    for (let i = 0; i < 60000; i++) {
+      const v = performance.now();
+      if (v > prev) { if (v - prev < q) q = v - prev; prev = v; }
+    }
+    const qus = q === Infinity ? null : +(q * 1000).toFixed(2);
+    return { perCall_us: +(per * 1000).toFixed(4), callsPerFrame: 11,
+             perFrame_us: +(per * 11 * 1000).toFixed(3),
+             pctOf16ms: +(per * 11 / 16.7 * 100).toFixed(4),
+             clockQuantum_us: qus,
+             crossOriginIsolated: !!self.crossOriginIsolated,
+             readable: (qus && qus > 20)
+               ? 'COARSE CLOCK — trust windowed averages, never a single frame split'
+               : 'fine clock — per-frame splits are meaningful',
+             _sink: sink && 0 };
+  }
+};
+
 let floorCan = null, floorCtx = null, decalCan = null, decalCtx = null;
 
 /* ---------- helpers ---------- */
@@ -125,6 +291,9 @@ addEventListener('keydown', e => {
   if (keys[e.code]) return;
   keys[e.code] = true;
   if (e.code === 'KeyM') A.toggleMute();
+  // F3 is the probe. F4 toggles the flush mode it warns about.
+  if (e.code === 'F3') { e.preventDefault(); PROBE.on = PROBE.on ? 0 : 1; if (PROBE.on) PROBE.reset(); }
+  if (e.code === 'F4' && PROBE.on) { e.preventDefault(); PROBE.drain = PROBE.drain ? 0 : 1; PROBE.reset(); }
   if (e.code === 'Escape' || e.code === 'KeyP') {
     if (S.mode === 'play') S.mode = 'pause';
     else if (S.mode === 'pause') S.mode = 'play';
@@ -4010,6 +4179,7 @@ function updateWaves(dt) {
     const cap = Math.min(95, Math.round(18 + S.wave * 2.6 + S.room * 9.5 + (S.evo | 0) * 2 +
                                         Math.max(0, S.p.owned.length - 1) * 1.5 +
                                         Math.max(0, S.level - 1) * 0.8));
+    S.capNow = cap;                 // read-only, for PROBE — the gate below is unchanged
     /* Cracks take 0.75s to hatch but batches fire every 0.15s, so counting only
        what is already breathing lets a deep floor put five batches in the air
        before the cap notices — floor 14 was landing 159 against a cap of 78.
@@ -6085,7 +6255,9 @@ function drawWorld() {
   const actors = S.en.slice();
   actors.push(S.p);
   actors.sort((a, b) => a.y - b.y);
+  const _a0 = performance.now();
   for (const a of actors) { if (a === S.p) drawPlayer(a); else drawEnemy(a); }
+  _accAct += performance.now() - _a0;
 
   /* THE HOOKS. Drawn over the actors — they are on a rail above the floor,
      and they have to stay readable when the ring is inside a crowd. */
@@ -6210,7 +6382,9 @@ function drawWorld() {
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 0.5, 0, TAU); ctx.fill();
   }
 
+  const _q0 = performance.now();
   drawParticles();
+  _accPar += performance.now() - _q0;
 
   drawWalls(R, vl, vt, vr, vb);
   drawDoor();
@@ -8963,6 +9137,9 @@ function drawPause() {
    ============================================================ */
 let last = performance.now();
 function frame(now) {
+  const _f0 = performance.now();
+  _accAct = 0; _accPar = 0;
+  let _w0 = 0, _w1 = 0, _l1 = 0, _p1 = 0, _h1 = 0;
   const dt = clamp((now - last) / 1000, 0, 0.05);   // survives tab-switches and clock jumps
   last = now;
   if (S.muzzle) S.muzzle.t -= dt;
@@ -8978,7 +9155,9 @@ function frame(now) {
   }
   clickQueue = [];
 
+  const _u0 = performance.now();
   update(dt);
+  const _u1 = performance.now();
 
   ctx.setTransform(RS, 0, 0, RS, 0, 0);
   ctx.imageSmoothingEnabled = false;
@@ -8989,10 +9168,11 @@ function frame(now) {
   else if (S.mode === 'cos') drawCosmetics();
   else if (S.mode === 'contracts') drawContracts();
   else {
-    drawWorld();
-    drawLight();
-    post();
-    drawHUD();
+    _w0 = performance.now();
+    drawWorld();      _pbFlush(); _w1 = performance.now();
+    drawLight();      _pbFlush(); _l1 = performance.now();
+    post();           _pbFlush(); _p1 = performance.now();
+    drawHUD();        _pbFlush(); _h1 = performance.now();
     if (S.mode === 'pause') drawPause();
     if (S.mode === 'deck') drawDeck();
     if (S.mode === 'levelup') drawLevelUp();
@@ -9003,7 +9183,409 @@ function frame(now) {
   }
 
   if (S.fade > 0) { ctx.fillStyle = 'rgba(0,0,0,' + clamp(S.fade, 0, 1) + ')'; ctx.fillRect(0, 0, W, H); }
-  requestAnimationFrame(frame);
+
+  /* The probe records last so `total` covers the whole frame, and the overlay
+     draws after it so it can show the frame it just measured. `_w0` stays 0 on
+     the title/cosmetics/contracts screens, which do not go through the world
+     path — recording zeros there would drag every average down with frames
+     that never drew a world. */
+  if (_w0) {
+    _pbRec(_f0, _u1 - _u0, (_w1 - _w0) - _accAct - _accPar, _accAct, _accPar,
+           _l1 - _w1, _p1 - _l1, _h1 - _p1, performance.now() - _f0);
+  }
+  if (PROBE.on) drawDebug();
+  if (!_soaking) requestAnimationFrame(frame);
+}
+
+/* ============================================================
+   F3 — the debug overlay.
+
+   Drawn on #overlay, LAST, after the fade and after every modal screen, for
+   one reason: `uiWipe()` clears the overlay and any screen that paints over
+   the world calls it. A probe you cannot read on the pause screen is a probe
+   that disappears exactly when you stopped to look at something.
+
+   A bar is drawn for anything with a ceiling, because the question a pool
+   asks is never "how many" — it is "how close to the cap", and a number
+   cannot answer that at a glance. The bar goes amber at 70% and red at 90%.
+   ============================================================ */
+const _dbgRows = [];                          // reused; the overlay allocates nothing per frame
+function _dbgBar(x, y, w, v, cap, col) {
+  const k = uiScale, f = clamp(v / cap, 0, 1);
+  octx.save();
+  octx.fillStyle = 'rgba(255,255,255,0.13)';
+  octx.fillRect(x * k, y * k, w * k, 2 * k);
+  octx.fillStyle = f > 0.9 ? '#ff3b46' : f > 0.7 ? '#ffb03a' : (col || '#6ede7a');
+  octx.fillRect(x * k, y * k, w * f * k, 2 * k);
+  octx.restore();
+}
+function drawDebug() {
+  const st = PROBE.stats(PROBE.win), c = PROBE.counts();
+  const k = uiScale;
+  const X = 6, W0 = 150;
+  let y = 40;
+  // a panel, so the numbers survive a bright floor
+  octx.save();
+  octx.fillStyle = 'rgba(6,4,8,0.82)';
+  octx.fillRect((X - 3) * k, (y - 8) * k, (W0 + 6) * k, 150 * k);
+  octx.strokeStyle = 'rgba(255,255,255,0.10)'; octx.lineWidth = 1;
+  octx.strokeRect((X - 3) * k, (y - 8) * k, (W0 + 6) * k, 150 * k);
+  octx.restore();
+
+  const L = (s, col, sz) => { htxt(s, X, y, col || '#cfc6b8', 'left', sz || 5.5, { noShadow: 1, track: 0.02 }); y += 6.5; };
+  const R = (s, col, sz) => htxt(s, X + W0, y - 6.5, col || '#cfc6b8', 'right', sz || 5.5, { noShadow: 1, track: 0.02 });
+
+  const ms = st.total;
+  const budget = (v) => v > 16.7 ? '#ff3b46' : v > 8 ? '#ffb03a' : '#6ede7a';
+  L('F3  PROBE   ' + (PROBE.drain ? '[DRAINED — pacing is meaningless]' : '') , '#ff3b46', 6);
+  L('frame  avg ' + ms.avg.toFixed(2) + '   p95 ' + ms.p95.toFixed(2) +
+    '   p99 ' + ms.p99.toFixed(2), budget(ms.p99));
+  L('worst  window ' + ms.max.toFixed(2) + '   ever ' + st.worstEver.toFixed(2) +
+    '   (' + ms.n + ' fr / ' + (PROBE.win / 1000) + 's)', budget(ms.max));
+  y += 2;
+
+  const d = st.draw;
+  const drawTot = d.world.avg + d.actors.avg + d.particles.avg + d.light.avg + d.post.avg + d.hud.avg;
+  L('update ' + st.update.avg.toFixed(2) + '      draw ' + drawTot.toFixed(2), '#9fd8ff');
+  L('  world ' + d.world.avg.toFixed(2) + '   actors ' + d.actors.avg.toFixed(2) +
+    '   part ' + d.particles.avg.toFixed(2), '#7fa8c8');
+  L('  light ' + d.light.avg.toFixed(2) + '   post ' + d.post.avg.toFixed(2) +
+    '   hud ' + d.hud.avg.toFixed(2), '#7fa8c8');
+  y += 2;
+
+  L('en ' + c.en + ' + cracks ' + c.cracks + ' = ' + (c.en + c.cracks) +
+    ' / cap ' + c.cap + '     queue ' + c.queue,
+    (c.en + c.cracks) > c.cap ? '#ff3b46' : '#cfc6b8');
+  _dbgBar(X, y - 4.5, W0, c.en + c.cracks, Math.max(1, c.cap));
+  y += 3;
+  L('bullets ' + c.bul + '   enemy fire ' + c.eb + '   drops ' + c.drops);
+  y += 2;
+
+  L('part  ' + c.part + ' / ' + c.partCap);   _dbgBar(X + 46, y - 4.5, W0 - 46, c.part, c.partCap);
+  L('gibs  ' + c.gibs + ' / ' + c.gibsCap);   _dbgBar(X + 46, y - 4.5, W0 - 46, c.gibs, c.gibsCap);
+  L('rings ' + c.rings + ' / ' + c.ringsCap); _dbgBar(X + 46, y - 4.5, W0 - 46, c.rings, c.ringsCap);
+  L('fx    ' + c.fx + ' / ' + c.fxCap);       _dbgBar(X + 46, y - 4.5, W0 - 46, c.fx, c.fxCap);
+  L('floats ' + c.floats + '   arcs ' + c.arcs);
+  y += 2;
+
+  /* The one number that should NEVER climb during play. Rendering.md says an
+     entire ten-floor run bakes 29 canvases; anything that grows frame on
+     frame here is a cache key with a continuous value in it (Bugs Found #2). */
+  L('sprite cache ' + c.sprCache + ' baked   ' + c.sprVariants + ' palette variants',
+    c.sprCache > 200 ? '#ff3b46' : c.sprCache > 80 ? '#ffb03a' : '#6ede7a');
+  L('floor ' + c.floor + '  wave ' + c.wave + '/' + WAVES + '  ' + c.mode + '  kills ' + (S.kills | 0), '#8a8078');
+}
+
+/* ============================================================
+   SOAK — the deterministic measurement scenario.
+
+   Every performance claim about this game is supposed to be reproducible.
+   That means the same call has to produce the same run: same floor, same
+   wave, same spawn order, same drops, same numbers. `Math.random()` is
+   called from about ninety places, so the only honest way to pin it is to
+   replace it for the duration and put it back afterwards.
+
+   MEAT.soak({ floor, wave, seconds, seed, mode, samples, drain })
+
+     floor    0-9, the S.room index          (default 0)
+     wave     1-WAVES                        (default 3)
+     seconds  simulated, at a fixed 1/60     (default 30)
+     seed     any int; same seed, same run   (default 12345)
+     mode     'fill' — invincible, never fires. The arena fills to the cap.
+                       This is the scenario the tables in Difficulty Scaling
+                       were taken under.
+              'kill' — invincible, fires continuously at the nearest enemy.
+                       This is the one that reproduces the complaint, because
+                       the complaint is about KILLING, not about standing
+                       next to a crowd.
+     samples  seconds at which to snapshot   (default [3,10,20,30])
+     drain    force a canvas flush per phase — accurate attribution, useless
+              pacing. See the warning on PROBE.
+
+   Returns a JSON-safe object. Re-runnable: call it again after a change and
+   diff the same fields.
+
+   > Two things this deliberately does NOT do. It does not use
+   > requestAnimationFrame, because a fixed 1/60 step is the only way two runs
+   > are comparable — and `_soaking` suppresses the rAF that frame() would
+   > otherwise schedule, or every soak call would leave a second copy of the
+   > loop running forever. And it does not trust wall-clock ms as the headline
+   > number: driving frames synchronously makes draw calls batch and flush in
+   > clumps, which manufactures spikes no player sees. Rendering.md says so
+   > explicitly. Treat the COUNTS as authoritative and the MILLISECONDS as a
+   > shape, and take the real timings off a Chrome trace.
+   ============================================================ */
+function _soakFields() {
+  const p = S.p || {};
+  return { t: +(S.t || 0).toFixed(4), en: S.en.length, cracks: S.cracks.length,
+           queue: S.queue.length, bul: S.bul.length, eb: S.eb.length,
+           part: S.part.length, gibs: S.gibs.length, drops: S.drops.length,
+           kills: S.kills | 0, xp: S.xp | 0, lvl: S.level | 0,
+           px: +(p.x || 0).toFixed(3), py: +(p.y || 0).toFixed(3),
+           hp: +(p.hp || 0).toFixed(2), ang: +(p.ang || 0).toFixed(4),
+           mag: p.mags ? (p.mags[p.owned[p.wi]] | 0) : 0,
+           rng: _rngN,
+           wave: S.wave, mode: S.mode, spawnT: +(S.spawnT || 0).toFixed(4),
+           waveT: +(S.waveT || 0).toFixed(4), waveState: S.waveState };
+}
+
+function _soakHash() {
+  let h = 2166136261;
+  const mix = (v) => { h ^= ((v * 1000) | 0); h = Math.imul(h, 16777619); };
+  mix(S.en.length); mix(S.cracks.length); mix(S.queue.length); mix(S.bul.length);
+  mix(S.eb.length); mix(S.part.length); mix(S.gibs.length);
+  mix(S.kills | 0); mix(S.xp | 0); mix(S.t || 0);
+  /* the queue's CONTENTS, not just its length — hashing the length alone is
+     what let two different waves fingerprint as the same run */
+  for (let i = 0; i < S.queue.length; i++) { const q = S.queue[i]; for (let c = 0; c < q.length; c++) mix(q.charCodeAt(c)); }
+  if (S.p) { mix(S.p.x); mix(S.p.y); mix(S.p.hp); }
+  for (let i = 0; i < S.en.length; i++) { const e = S.en[i]; mix(e.x); mix(e.y); mix(e.hp); }
+  return h >>> 0;
+}
+
+function _mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ---- the verify wrapper ----
+
+   Three separate causes of first-run drift were found and fixed in
+   _soakOnce: an unpinned `last` giving frame 0 an arbitrary dt, setup
+   leaving the RNG at an unpredictable stream position, and a fingerprint that
+   hashed the spawn queue's LENGTH but not its CONTENTS — so two completely
+   different waves compared as equal.
+
+   A fourth remains. Something about the first execution of a given soak SHAPE
+   in a page session shifts it; a second call with the same options is stable
+   and every call after that is byte-identical to it. It is not isolated, and
+   the honest thing is to say so rather than to publish numbers that quietly
+   depend on call order.
+
+   So the guarantee is made structurally instead of by warming: run the
+   scenario, throw it away, run it again, and return the second — with
+   `verified` saying whether the two agreed. A caller now cannot accidentally
+   read a cold result, and if the build ever becomes genuinely
+   non-deterministic, `verified: false` says so in the result instead of
+   hiding in a number that looks plausible.
+
+   `verify: false` opts out and halves the cost, for a caller that is
+   iterating rather than recording. */
+function soak(opts) {
+  const o = opts || {};
+  if (o.verify === false) return _soakOnce(o);
+  const discard = _soakOnce(o);
+  const keep = _soakOnce(o);
+  keep.verified = discard.fingerprint === keep.fingerprint;
+  keep.discardedFingerprint = discard.fingerprint;
+  return keep;
+}
+
+/* Runs the same soak twice and reports the first frame at which the two
+   diverge. A harness that claims determinism without checking it is a harness
+   that will quietly stop being deterministic. */
+function soakDiff(opts) {
+  const o = Object.assign({}, opts || {}, { trace: (opts && opts.trace) || 15, fields: 1 });
+  const a = soak(o), b = soak(o);
+  if (!a.verified || !b.verified) { /* reported below */ }
+  let first = null;
+  for (let i = 0; i < Math.min(a.trace.length, b.trace.length); i++) {
+    if (a.trace[i][1] !== b.trace[i][1]) {
+      const fa = a.trace[i][2], fb = b.trace[i][2], differs = {};
+      for (const k in fa) if (fa[k] !== fb[k]) differs[k] = [fa[k], fb[k]];
+      first = { frame: a.trace[i][0], atSec: +(a.trace[i][0] / 60).toFixed(2),
+                differingFields: differs, a: fa, b: fb,
+                prevFrame: i ? a.trace[i - 1][0] : null };
+      break;
+    }
+  }
+  return { identical: a.fingerprint === b.fingerprint && !first,
+           bothVerified: !!a.verified && !!b.verified,
+           fingerprintA: a.fingerprint, fingerprintB: b.fingerprint,
+           firstDivergence: first, tracePoints: a.trace.length,
+           killsA: a.kills, killsB: b.kills };
+}
+
+/* Has a soak run yet in this page session? See the prologue in soak(). */
+let _soakWarmed = 0;
+let _rngN = 0;
+
+function _soakOnce(opts) {
+  const o = opts || {};
+  const floor = clamp(o.floor === undefined ? 0 : o.floor | 0, 0, ROOMS.length - 1);
+  const wave = clamp(o.wave === undefined ? 3 : o.wave | 0, 1, WAVES);
+  const secs = o.seconds === undefined ? 30 : +o.seconds;
+  const seed = o.seed === undefined ? 12345 : o.seed | 0;
+  const mode = o.mode || 'fill';
+  const marks = (o.samples || [3, 10, 20, 30]).filter(s => s <= secs).sort((a, b) => a - b);
+
+  const realRandom = Math.random, realDrain = PROBE.drain, realGod = S.god;
+  const realDown = mouse.down, realMx = mouse.x, realMy = mouse.y;
+  Math.random = _mulberry32(seed);
+  PROBE.drain = o.drain ? 1 : 0;
+  _soaking = 1;
+
+  const out = { input: { floor: floor + 1, wave, seconds: secs, seed, mode, drain: !!o.drain },
+                samples: [], kills: 0, errors: [], trace: [],
+                /* How many of the stepped frames were NOT in play. A soak that
+                   spends half its length on a level-up hand is not measuring
+                   what the caller thinks it is measuring — and the pools do
+                   not tick in those frames, which is a finding in itself. */
+                modeFrames: {} };
+  const traceEvery = o.trace ? (o.trace | 0 || 15) : 0;
+  try {
+    startRun();
+    S.room = floor;
+    buildRoom(floor);
+    /* startRun drops you into the opening beat; a soak wants the fight, so
+       clear the intro rather than spending three of its seconds on it. */
+    S.introT = 0; S.introMsgT = 0; S.fade = 0; S.fadeDir = 0; S.pending = null;
+    S.god = true;                       // the PLAYER not dying is not the same
+    /* Re-seed before the queue is built.
+
+       startRun() and buildRoom() spend a number of draws that is NOT stable
+       across calls in a page session, so startWave() — which samples the
+       enemy type table once per queued body — was drawing from a different
+       stream position every time. The queue LENGTH matched, which is why this
+       hid for so long: a fingerprint that hashes `queue.length` and not the
+       queue's contents sees two completely different waves as identical.
+
+       Each stage now starts at a known position of its own stream, so no
+       stage can inherit the draw count of the one before it. */
+    Math.random = _mulberry32(seed ^ 0x85EBCA6B);
+    startWave(wave);                    // as nothing dying — see `mode`
+    PROBE.reset();
+
+    const killsAt = () => (S.kills | 0);
+    const kills0 = killsAt();
+    let ts = 1000, mi = 0;
+    const STEP = 1000 / 60;
+    /* Pin the clock before the first stepped frame.
+
+       frame() derives dt from the module-level `last`, which holds whatever
+       the previous caller left there — the live rAF loop on a cold page, or
+       the tail of the previous soak. So frame 0 was getting a dt of anywhere
+       in [0, 0.05]: a cold page produced the clamp CEILING (0.05, because
+       ts=1016 against last≈0 is a full second before clamping) and a repeat
+       run produced ZERO (ts restarts at 1000, last is 9000, negative clamps
+       to 0). One frame of difference in the opening dt is enough to move
+       `spawnT` by 0.05s, which changes which frame the first batch lands on,
+       which changes everything after it.
+
+       Two identical calls have to produce identical runs or none of the
+       numbers below mean anything, so the clock starts where we say it does. */
+    last = ts;
+    /* And pin the crosshair, for the same reason.
+
+       `mouse` is module state, not S state, so freshState() does not touch it.
+       On frame 0 the arena holds cracks and no enemies yet, so 'kill' mode has
+       nothing to aim at and leaves the crosshair wherever the page left it —
+       the live rAF loop's value on a cold load, the previous soak's last
+       target afterwards. That is a different firing angle on the opening
+       frame, which is a different wall impact, which is one extra particle,
+       which is a different run.
+
+       This was the actual cause of "the first soak after a page load never
+       matches the ones after it". Anything outside S has to be pinned here or
+       the seed is not the only input. */
+    mouse.x = W / 2; mouse.y = H / 2; mouse.down = false;
+    /* Re-seed, so the measured window starts at a known stream position.
+
+       Setup and measurement are two different things and they need two
+       different guarantees. Setup has to be REPRODUCIBLE — same seed, same
+       arena, same queue — and it is, seeded above. But setup also CONSUMES an
+       unknown number of draws, and that count turned out to vary: the first
+       soak of a page session left the stream one draw off every subsequent
+       one, so a floor burner's `Math.random() < dt * 6` ambient particle
+       landed on frame 0 of run two and not of run one. One particle, and from
+       there the two runs are different games.
+
+       Rather than hunt the draw, take the dependency away: setup gets one
+       stream, the measured loop gets a fresh one. However many draws
+       startRun/buildRoom/startWave spend, the frame loop always begins at
+       position zero of its own sequence.
+
+       The constant is the golden-ratio word, used only to make the two
+       streams unrelated rather than offset by a fixed amount. */
+    const _base = _mulberry32(seed ^ 0x9E3779B9);
+    _rngN = 0;
+    Math.random = function () { _rngN++; return _base(); };
+    const N = Math.round(secs * 60);
+    for (let i = 0; i < N; i++) {
+      if (mode === 'kill') {
+        /* Point the crosshair at the nearest living thing and hold the
+           trigger. Aim is taken from the mouse every frame in update(), so
+           the only honest way to steer is to move the mouse. */
+        let best = null, bd = 1e9;
+        for (const e of S.en) {
+          if (e.dead) continue;
+          const d = (e.x - S.p.x) * (e.x - S.p.x) + (e.y - S.p.y) * (e.y - S.p.y);
+          if (d < bd) { bd = d; best = e; }
+        }
+        if (best) {
+          mouse.x = clamp(best.x - S.cam.cx + W / 2, 0, W);
+          mouse.y = clamp(best.y - S.cam.cy + H / 2, 0, H);
+        }
+        mouse.down = true;
+        S.p.reT = 0;                    // ammo is not what we are measuring
+      }
+      ts += STEP;
+      try { frame(ts); } catch (e) { out.errors.push('f' + i + ': ' + e.message); break; }
+      out.modeFrames[S.mode] = (out.modeFrames[S.mode] | 0) + 1;
+      if (traceEvery && i % traceEvery === 0)
+        out.trace.push(o.fields ? [i, _soakHash(), _soakFields()] : [i, _soakHash(), S.en.length, S.mode]);
+      const t = (i + 1) / 60;
+      while (mi < marks.length && t >= marks[mi]) {
+        const st = PROBE.stats(3000), c = PROBE.counts();
+        out.samples.push({
+          at: marks[mi], frames: st.frames,
+          ms: { avg: +st.total.avg.toFixed(3), p95: +st.total.p95.toFixed(3),
+                p99: +st.total.p99.toFixed(3), worstInWindow: +st.total.max.toFixed(3),
+                worstEver: +st.worstEver.toFixed(3) },
+          split: { update: +st.update.avg.toFixed(3), world: +st.draw.world.avg.toFixed(3),
+                   actors: +st.draw.actors.avg.toFixed(3), particles: +st.draw.particles.avg.toFixed(3),
+                   light: +st.draw.light.avg.toFixed(3), post: +st.draw.post.avg.toFixed(3),
+                   hud: +st.draw.hud.avg.toFixed(3) },
+          entities: { en: c.en, cracks: c.cracks, cap: c.cap, queue: c.queue,
+                      bul: c.bul, eb: c.eb },
+          pools: { part: c.part + '/' + c.partCap, gibs: c.gibs + '/' + c.gibsCap,
+                   rings: c.rings + '/' + c.ringsCap, fx: c.fx + '/' + c.fxCap,
+                   floats: c.floats, arcs: c.arcs, drops: c.drops },
+          sprites: { cache: c.sprCache, variants: c.sprVariants },
+          mode: c.mode,
+          /* A pool over its own ceiling is never normal. It means the cap did
+             not run, not that the cap is too low. */
+          overCap: (c.part > c.partCap ? 'part ' + c.part + '>' + c.partCap + ' ' : '') +
+                   (c.gibs > c.gibsCap ? 'gibs ' + c.gibs + '>' + c.gibsCap + ' ' : '') +
+                   (c.rings > c.ringsCap ? 'rings ' + c.rings + '>' + c.ringsCap : '') || null,
+          kills: killsAt() - kills0
+        });
+        mi++;
+      }
+    }
+    out.kills = killsAt() - kills0;
+    out.fingerprint = _soakHash();
+    out.peak = { part: 0, gibs: 0, rings: 0, fx: 0, en: 0, sprCache: 0 };
+    for (const s of out.samples) {
+      out.peak.en = Math.max(out.peak.en, s.entities.en);
+      out.peak.part = Math.max(out.peak.part, parseInt(s.pools.part));
+      out.peak.gibs = Math.max(out.peak.gibs, parseInt(s.pools.gibs));
+      out.peak.rings = Math.max(out.peak.rings, parseInt(s.pools.rings));
+      out.peak.fx = Math.max(out.peak.fx, parseInt(s.pools.fx));
+      out.peak.sprCache = Math.max(out.peak.sprCache, s.sprites.cache);
+    }
+  } finally {
+    Math.random = realRandom;
+    PROBE.drain = realDrain;
+    S.god = realGod;
+    mouse.down = realDown; mouse.x = realMx; mouse.y = realMy;
+    _soaking = 0;
+  }
+  return out;
 }
 
 /* ---------- presentation: never render below 200% ---------- */
@@ -9072,6 +9654,7 @@ window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantGod, breakSe
                 BOSS_FINAL, BOSS_HP, FINAL_HP, bossBudget, enterPhase, mortarAt, updateHaz, drawWin,
                 magCap, fireNova, SHOP_WAVES, diff, killEnemy, damageEnemy,
                 angerPaci, hurtStage, bodySprite, legSprite, shred, hurtPlayer, RS, quitToTitle,
-                armRig, armCells, armCols, ARM_SH_X, ARM_SH_Y };
+                armRig, armCells, armCols, ARM_SH_X, ARM_SH_Y,
+                PROBE, soak, soakDiff, drawDebug };
 
 })();

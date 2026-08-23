@@ -639,6 +639,47 @@ sweeps **upward** because the wheel is speeding up as it leaves, and
 `sliceHome()` is the only sound in the game for a round *arriving*. It ejects
 no case, which it used to do anyway.
 
+## Instrumentation: an F3 probe and a deterministic soak harness
+Measurement only — no gameplay number moves. See [[Instrumentation]].
+
+**F3** draws a live panel on the overlay: frame avg/p95/p99 over a rolling 3s
+window plus worst-ever, update vs draw with draw split six ways, entities and
+cracks against the live cap, every pool against its ceiling, `S.fx` depth, and
+the sprite cache size. It draws **last**, after the fade and after every modal
+screen, because `uiWipe()` would otherwise erase it exactly when you paused to
+read it. Cost, measured: 11 `performance.now()` calls a frame, ~6us, 0.036% of
+the budget.
+
+**`MEAT.soak({floor, wave, seconds, seed, mode})`** steps `frame()` at a fixed
+1/60 and returns counts and timings sampled at 3/10/20/30s. `mode: 'fill'`
+reproduces the scenario [[Difficulty Scaling]]'s tables were taken under;
+`mode: 'kill'` holds the trigger on the nearest enemy, which is the scenario the
+lag complaint is actually about.
+
+> [!warning] Two limits on the numbers, both measured rather than assumed
+> `performance.now()` is quantized to **100us** here (the page is not
+> cross-origin isolated), so a windowed average is meaningful and a single
+> frame's phase split is noise. And wall-clock brackets under-report canvas work
+> for the same reason [[Rendering#It used to be one enormous pixel loop, and that was the lag|the floor bake did]];
+> `PROBE.drain` (F4) trades pacing for attribution.
+
+**Determinism took four goes**, and the first three are worth keeping:
+frame 0 inherited `last` from whatever ran before, so its `dt` was anywhere in
+`[0, 0.05]`; setup left the RNG at an unpredictable stream position, so
+`startWave()` built a *different wave* each run; and the fingerprint hashed
+`queue.length` instead of the queue's contents, which is what hid the second one.
+`soakDiff()` now reports the first divergent frame field by field, and `soak()`
+runs twice and returns the verified second.
+
+> [!bug] It found something on its first real run
+> A 30s `kill` soak reported `part: "1203/900"` — a pool 34% past its own
+> ceiling. `updateParticles()` runs on `dead` and `win` but not on any other
+> non-play mode, and it holds both the expiry loop **and** all three pool caps.
+> Two particle spawners live in the draw path, which runs under every screen. So
+> a level-up hand grows the pool at **~43/s, linear, forever**. Logged as
+> [[Bugs Found#D. The pool caps do not run while a menu is open|open defect D]],
+> not fixed.
+
 ## Related
 - [[Bugs Found]] — the defects behind each fix above, and two still open
 - [[Tuning Values]] — where the numbers stand today
