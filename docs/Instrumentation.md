@@ -97,7 +97,7 @@ its own ceiling.
 `modeFrames` counts how many stepped frames were spent in each mode. A soak that
 spends half its length on a level-up hand is not measuring what the caller
 thinks it is — and, as it turned out, the pools do not tick in those frames at
-all. See [[Bugs Found#D. The pool caps do not run while a menu is open]].
+all. See [[Bugs Found#23. The pool caps did not run while a menu was open]].
 
 ### Determinism, and what it cost to get
 

@@ -677,7 +677,7 @@ runs twice and returns the verified second.
 > non-play mode, and it holds both the expiry loop **and** all three pool caps.
 > Two particle spawners live in the draw path, which runs under every screen. So
 > a level-up hand grows the pool at **~43/s, linear, forever**. Logged as
-> [[Bugs Found#D. The pool caps do not run while a menu is open|open defect D]],
+> [[Bugs Found#23. The pool caps did not run while a menu was open|defect D, now fix #23]],
 > not fixed.
 
 ## Related

@@ -333,11 +333,59 @@ both.
 > summon is skipped. Lowering it trades a bug-looking pop for pressure that
 > was not needed.
 
+## 23. The pool caps did not run while a menu was open
+
+**Found:** by the [[Instrumentation#`MEAT.soak(opts)`|soak harness]] on its
+first real run, reporting `part: "1203/900"` — and a pool over its own ceiling
+is never a cap set too low, it means the cap did not run. Reproduced in real
+Chrome at **1957 against a ceiling of 900**, still climbing when the reading
+was taken.
+
+`update()` called `updateParticles()` from the `'dead'` and `'win'` branches
+and nowhere else:
+
+```js
+if (S.mode === 'dead') { S.deadT += rdt; updateParticles(dt); updateCam(rdt); return; }
+if (S.mode === 'win')  { updateParticles(dt); updateCam(rdt); return; }
+if (S.mode !== 'play') { updateCam(rdt); return; }   // <- nothing ticks the pools
+```
+
+That function does **two** jobs and both stopped: things stopped expiring, and
+the three [[Rendering#Effects|soft ceilings]] — 900 particles, 420 gibs, 80
+rings — live at the bottom of it and stopped firing. So on pause, THE DECK, a
+level-up hand, the evolution pick, augments and PACI's shop, the pools were
+untended.
+
+That would be harmless if only the simulation fed them. **Eight particle
+spawners live in the DRAW path**, which runs under every one of those screens:
+
+| | |
+|---|---|
+| `drawPlayer` | the shield aura, the charge glow, and burning — up to ~60/s each |
+| `drawTomce` | his ambience |
+| `PROPS.brazier` | ~18/s **per drum** |
+| `drawCornerSigil` | ~15/s |
+| `PROPS.pipes`, `PROPS.carcass` | a drip each |
+
+Measured on floor 4 with a shield up: **39 particles a second** into a pool
+that had stopped draining. Linear, no plateau.
+
+**Fix:** the non-play branch ticks the effects too, which is the same call the
+death screen was already making. It is presentation, not simulation — the
+fight underneath stays frozen. Verified: 12 seconds held on a menu with the
+spawners live, pool steady at **33–46** and `S.en` unchanged at 27.
+
+> [!note] The same shape as #20, from the other side
+> There a gameplay counter ran on menus because it sat **above** the mode
+> guard. Here a **ceiling** failed to run on menus because it sat **below**
+> one. Both are the same question — is this line simulation or presentation? —
+> answered wrongly, in opposite directions.
+
 ---
 
 # Open
 
-Two defects, recorded here rather than fixed.
+One defect, recorded here rather than fixed.
 
 **THE FULL MENU** (previously B on this list) is **closed** — not by fixing it,
 but because the contract it lived in no longer exists. See
@@ -369,51 +417,6 @@ The [[Weapons#When PACI starts carrying it|depth gate]] added in the balance
 pass masks it slightly — `floor: 3` now holds FREEZER BURN back to floor 4 —
 but that is a different gate with a different number, and the contract still
 claims credit for it.
-
-## D. The pool caps do not run while a menu is open
-
-**Found:** by the [[Instrumentation#`MEAT.soak(opts)`|new soak harness]], on
-its first real run — a 30-second `kill` soak on floor 4 reported
-`part: "1203/900"`. A pool over its own ceiling is never a "cap set too low";
-it means the cap did not run.
-
-`update()` calls `updateParticles()` on **`dead`** and on **`win`**, and then
-returns:
-
-```js
-if (S.mode === 'dead') { S.deadT += rdt; updateParticles(dt); updateCam(rdt); return; }
-if (S.mode === 'win')  { updateParticles(dt); updateCam(rdt); return; }
-if (S.mode !== 'play') { updateCam(rdt); return; }   // <- no updateParticles
-```
-
-So on **pause, THE DECK, a level-up hand, the evolution pick, augments and
-PACI's shop**, `updateParticles()` never runs. That function does two jobs, and
-both stop: particles never **expire**, and the three
-[[Rendering#Effects|soft caps]] — 900 particles, 420 gibs, 80 rings — live at
-the bottom of it and never **fire**.
-
-Meanwhile two particle spawners sit in the **draw** path, which runs in every
-mode because `drawWorld()` is drawn under all of those screens:
-
-| | |
-|---|---|
-| `js/game.js:7380` | `drawPlayer()`'s shield aura, `Math.random() < 0.4` |
-| `js/game.js:6636` | a lit prop in the prop library, `Math.random() < 0.30` |
-
-Measured on the level-up screen: **~43 particles a second, linear, no
-plateau.** Held there for ten seconds the pool went 1030 → 1112 → 1195 → 1284
-→ 1363 → **1432**, having already blown through 900. In `fill` mode, where all
-1800 frames stay in `play`, the same pool never leaves **66–154**.
-
-This is the [[#20. The run clock ran while you were reading a menu|#20]] shape
-again, from the other side: there a counter ran on menus because it sat above
-the guard; here a **cap** fails to run on menus because it sits below one.
-
-> [!note] Why it is worth more than the particle count
-> `drawParticles()` is linear in the pool, so you return from the menu into a
-> frame that is already carrying 1400+ particles instead of the ~150 you left.
-> It costs most exactly where it is least welcome — you open a level-up hand
-> **because** you have been killing things, which means a busy arena.
 
 ## Related
 - [[Changelog]] — which commit each fix landed in

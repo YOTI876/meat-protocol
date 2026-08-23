@@ -4313,7 +4313,26 @@ function update(rdt) {
   if (S.mode === 'dead') { S.deadT += rdt; updateParticles(dt); updateCam(rdt); return; }
   // the win screen keeps the wreckage moving behind it, same as the death one
   if (S.mode === 'win') { updateParticles(dt); updateCam(rdt); return; }
-  if (S.mode !== 'play') { updateCam(rdt); return; }
+  /* EVERY non-play screen ticks the effects too, not just these two.
+
+     `updateParticles()` does two jobs — it expires things, and it holds all
+     three pool ceilings — and it used to be called from the 'dead' and 'win'
+     branches above and nowhere else. So on pause, THE DECK, a level-up hand,
+     the evolution pick, augments and PACI's shop, nothing expired and no cap
+     ran.
+
+     That would be harmless if the pools were only fed from the simulation.
+     They are not: EIGHT particle spawners live in the DRAW path, which runs
+     under every one of those screens — drawPlayer's shield aura and charge and
+     burn, drawTomce, the brazier, the corner sigil, the pipes, the carcass.
+     Between them they push about 40 a second into a pool that had stopped
+     draining, so a level-up hand grew it without bound: measured at 1957 live
+     against a ceiling of 900, and still climbing when the reading was taken.
+
+     Ticking them here is the same call the death screen already makes, and it
+     is presentation, not simulation — the fight below is still frozen. See
+     Bugs Found #23. */
+  if (S.mode !== 'play') { updateParticles(dt); updateCam(rdt); return; }
 
   /* THE RUN CLOCK, and it lives BELOW the mode guard on purpose.
 
