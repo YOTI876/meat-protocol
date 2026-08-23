@@ -4286,7 +4286,6 @@ function update(rdt) {
   S.goroT = Math.max(0, S.goroT - rdt);
   S.glusec = Math.max(0, S.glusec - rdt);
   S.jump = Math.max(0, S.jump - rdt);
-  if (S.comboT > 0) { S.comboT -= rdt; if (S.comboT <= 0) { S.combo = 1; S.streak = 0; } }
 
   /* An angry PACI does not attack. He stands there and the building reacts:
      the floor will not stop moving and the light goes the colour of the
@@ -4333,6 +4332,19 @@ function update(rdt) {
      is presentation, not simulation — the fight below is still frozen. See
      Bugs Found #23. */
   if (S.mode !== 'play') { updateParticles(dt); updateCam(rdt); return; }
+
+  /* THE COMBO WINDOW, below the guard for exactly the reason the run clock is.
+
+     `S.combo` reaches x25 on score and `S.comboT` is a 3.2-second window. This
+     line used to sit above the mode guard, so the window drained on menus —
+     and the menu you open most is the level-up hand, which you are handed FOR
+     KILLING, which means you are always mid-combo when it appears. Reading
+     three cards for four seconds silently reset a x25 multiplier and the
+     streak with it, and nothing on screen said so.
+
+     A menu should pause the beat, not consume it. Same lesson as #14 and #20;
+     see Bugs Found #24. */
+  if (S.comboT > 0) { S.comboT -= rdt; if (S.comboT <= 0) { S.combo = 1; S.streak = 0; } }
 
   /* THE RUN CLOCK, and it lives BELOW the mode guard on purpose.
 

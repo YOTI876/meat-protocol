@@ -381,6 +381,38 @@ spawners live, pool steady at **33–46** and `S.en` unchanged at 27.
 > one. Both are the same question — is this line simulation or presentation? —
 > answered wrongly, in opposite directions.
 
+## 24. Your combo expired while you read the level-up hand
+
+**Found:** by auditing every timer on the wrong side of the mode guard after
+[[#23. The pool caps did not run while a menu was open|#23]] — the point being
+that #23 was one instance of a class, not a one-off.
+
+`js/game.js`, in `update()`, **above** the guard:
+
+```js
+if (S.comboT > 0) { S.comboT -= rdt; if (S.comboT <= 0) { S.combo = 1; S.streak = 0; } }
+```
+
+`S.combo` climbs to **x25** and multiplies score on every kill; `S.comboT` is a
+**3.2-second** window. Above the guard, that window drained on menus — and the
+menu you open most is the level-up hand, which is handed to you **for
+killing**, so it always arrives mid-combo. Reading three cards for four seconds
+silently reset a x25 multiplier and the kill streak with it, and nothing on
+screen said it had happened.
+
+**Fix:** move it below the guard, next to the run clock, which is there for
+precisely the same reason. Verified: five seconds on a menu leaves combo x11
+and streak 10 untouched with `comboT` frozen at 3.2; five seconds in play still
+expires both.
+
+> [!note] Three of these now
+> [[#14. A menu inside the first 2.2 seconds killed the floor permanently|#14]]
+> wall-clock ran while a menu was open. [[#20. The run clock ran while you were reading a menu|#20]]
+> a game-time counter sat above the guard. #24 is #20 again with real stakes —
+> it was costing score rather than only misreporting it. The guard is the line
+> between simulation and presentation, and every timer has to be on the correct
+> side of it deliberately.
+
 ---
 
 # Open
