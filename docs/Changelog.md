@@ -680,7 +680,80 @@ runs twice and returns the verified second.
 > [[Bugs Found#23. The pool caps did not run while a menu was open|defect D, now fix #23]],
 > not fixed.
 
+## `5b4b315` — The elite summon gets a ceiling, by recycling the room
+
+[[Bugs Found#22. Elite summons bypassed the enemy cap|Defect A]] closed. The
+elite branch in `updateEnemy()` had neither the population gate nor the clamp
+that the [[Bosses#Summoning|floor-boss summon]] carries, so an elite alone in a
+room walked the count past the cap on its own — measured **89 to 154 against a
+cap of 95**, linear at ~1.6 bodies a second with the wave queue already empty.
+
+The obvious close is the gate `updateBoss()` uses, and it is the wrong one. A
+gate silences an elite exactly when the room is fullest, which is exactly when
+backing away is easiest — and backing away is the thing an elite exists to
+punish. Both were measured against the same seed:
+
+| | summons kept | renewal | frame time |
+|---|---|---|---|
+| refuse at the cap | **−86%** | 17.3/min | baseline |
+| **recycle at the cap** | same cap held | **33.3/min** | +1.6% |
+
+So it **recycles**: `retireOldestAdd()` removes the longest-standing body that
+is safely off-screen — 300px, no fallback, never an elite or a boss, never one
+you have damaged — and `eliteSummon()` opens a fresh crack in its place. The
+room stays the same size while what is in it keeps being reissued in front of
+you. `concurrencyCap()` and `liveLoad()` were extracted so the boss branch,
+the elite branch and the probe all read one number.
+
+> [!note] The retirement radius was measured twice
+> At 300px it never fires on screen. At the first attempt, **210px**, a quarter
+> of retirements used a near fallback and one removed a body **10px from
+> Damjan** — a corpse vanishing in frame reads as a bug, not a mechanic. The
+> fallback was deleted rather than tuned. Widening the *pool* the other way —
+> from summoned adds only to any untouched, off-screen enemy — is what took
+> renewal from 17.3 to 33.3/min; at the narrow pool, 30% of summons skipped.
+
+## `90f6173` `344fa78` `deda4fb` — Every timer on the correct side of the guard
+
+A soak found [[Bugs Found#23. The pool caps did not run while a menu was open|defect D]]
+on its first real run, and auditing the class around it found a second one.
+
+**`90f6173`** — `updateParticles()` ran on `dead` and `win` and no other
+non-play mode, and it holds the expiry loop *and* all three pool caps. Two
+particle spawners live in the draw path, which runs under every screen, so a
+level-up hand grew the pool at ~43/s forever. Now the effect pools and the
+camera tick on every screen and nothing else does. Measured on floor 3 with
+spawners live at 39/s: twelve seconds on a menu holds the pool at **33–46**
+instead of climbing to **1957**, with `S.en` frozen at 27.
+
+**`344fa78`** — the same class, with real stakes.
+[[Bugs Found#24. Your combo expired while you read the level-up hand|`S.comboT`]]
+sat above the guard, so a **3.2s** combo window drained on menus — including
+the level-up hand, which is handed to you *for killing* and therefore always
+arrives mid-combo. Moved below the guard, next to the run clock. Five seconds
+on a menu now leaves **combo x11 and streak 10** untouched; five in play still
+expires both.
+
+**`deda4fb`** — `S.props`, `S.floats` and `S.arcs` never had ceilings at all.
+160 / 160 / 40. Each forced to 600 trims within one frame.
+
+## `45f0652` — THE DESCENT finally pays out
+
+[[Bugs Found#25. THE DESCENT's reward did not exist|Defect C]] closed, and it
+is the last one on the list. The contract's line reads *"FREEZER BURN joins the
+crate"*; `WEP.chill` carried no `lock`, so it was buyable from the first shop
+that rolled it and reaching floor 8 changed nothing.
+
+Two closes were available and they are not equivalent — add the gate, or
+rewrite the promise. The gate won: a line the game says out loud in its own UI
+outranks a gun's availability on a first run, and rewriting would have left THE
+DESCENT paying nothing at all. `lock: 'deep'`, and both `shopStock()` and
+`evoPickable()` already read that field. Measured at floor 9 with an empty
+loadout, 500 rolls a side: **0** before the contract, **147** after. The RARE
+evolution rung keeps two guns when it is locked, so no rung ever drops to a
+single card.
+
 ## Related
-- [[Bugs Found]] — the defects behind each fix above, and two still open
+- [[Bugs Found]] — the defects behind each fix above, all of them now closed
 - [[Tuning Values]] — where the numbers stand today
 - [[Floors]] — the ten of them in full
