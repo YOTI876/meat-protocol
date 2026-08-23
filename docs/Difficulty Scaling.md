@@ -89,11 +89,18 @@ the things that punish standing still.
 ## Concurrent cap
 
 ```js
-cap = min(95, round(18 + wave*1.3 + floor*9.5 + evo*2
-                    + max(0, gunsOwned-1)*1.5 + max(0, level-1)*0.8))
+concurrencyCap() = min(95, round(18 + wave*2.6 + floor*9.5 + evo*2
+                                 + max(0, gunsOwned-1)*1.5 + max(0, level-1)*0.8))
 
-// gate: S.en.length + S.cracks.length < cap
+liveLoad()       = S.en.length + S.cracks.length     // gate: liveLoad() < cap
 ```
+
+> [!note] One definition, read by everything that spawns
+> This used to be computed inline in `updateWaves()` and nowhere else, which is
+> precisely how the elite summon came to ignore it — there was nothing to
+> ignore, because the number did not exist outside that one function. It is
+> `concurrencyCap()` now, and `eliteSummon()` reads the same function the wave
+> spawner does.
 
 This is the ceiling on simultaneously-alive enemies — the queue can be much
 larger; the cap just throttles how many exist at once.
@@ -143,11 +150,11 @@ count past the ceiling. Each boss also has its own interval and roster — see
 third phase does not summon at all**, because adds during a bullet-hell phase
 is how you make a fight unreadable rather than hard.
 
-## Elite summons are not capped
+## Elite summons: capped by recycling, not by refusing
 
-[[Bosses#Elites|Elites]] summon on their own timer in `updateEnemy()`, and
-that path has **neither of the two guards** the boss path has — no
-`S.en.length` gate, no clamp:
+[[Bosses#Elites|Elites]] summon on their own timer. That path used to have
+**neither of the two guards** the boss path has — no `S.en.length` gate, no
+clamp:
 
 ```js
 const adds = 1 + Math.floor(S.room * 0.7);   // floor 26 → 18
@@ -175,11 +182,61 @@ Note that the [[Enemies#The two late arrivals|CYST]] — added in the same pass
 that these measurements were re-run against — *does* gate its own hatching on
 `S.en.length < 70`. The elite branch is the outlier, not the convention.
 
-> [!warning] Known defect, not a design choice
-> The comment above the code says elites summon "so you cannot simply back
-> away from one," which is a reasonable intent. The missing part is the
-> ceiling — `updateBoss()` has one and `updateEnemy()`'s elite branch does
-> not. A deep elite fight is bounded only by how fast you kill it.
+### Why it does not use the gate `updateBoss()` uses
+
+The intent — "so you cannot simply back away from one" — is the thing a plain
+ceiling destroys. A `liveLoad() < cap` gate satisfies the cap and makes the
+elite **go quiet exactly when the room is fullest**, which is exactly when
+walking away is easiest. The cap and the intent pull against each other, so
+the choice was measured rather than argued.
+
+A 45-second kiting run on floor 8 wave 4 — Damjan retreating continuously,
+never firing, nothing dying:
+
+| | live max | summons/min | **reached you /min** | threat ring | ms |
+|---|---|---|---|---|---|
+| uncapped *(the defect)* | **164** | 106.7 | 81.3 | 66.5 | 9.90 |
+| plain gate | 95 | **14.7** | **14.7** | 52.3 | 8.03 |
+| **recycle** *(shipped)* | **95** | 69.3 | **33.3** | 56.6 | 8.16 |
+
+The gate cuts the elite's voice by **86%**. Recycling holds the identical
+ceiling and still delivers **2.3× the gate's renewal**, for +1.6% frame time,
+because the population is *conserved* rather than *frozen*: the room stays the
+same size and what is in it keeps being reissued in front of you.
+
+```js
+for (let i = 0; i < adds; i++) {
+  if (liveLoad() >= cap && !retireOldestAdd()) break;
+  S.cracks.push({ ...freeSpot(90), t: 0.75, type: pick([...]), sum: 1, born: S.t });
+}
+```
+
+### What may be recycled, and the rule that constrains all of it
+
+`retireOldestAdd()` takes the longest-standing body that is **further than
+`RETIRE_R = 300`** from Damjan, preferring earlier reinforcements and then
+falling back to any enemy still at **full health** — untouched means no bullets
+spent and no progress lost. A damaged enemy is work in progress and is never
+taken. Elites and bosses are never eligible at any distance.
+
+> [!warning] RETIRE_R is a visual constraint, not a tuning knob
+> The camera shows 480×270 game units, half-diagonal ≈ 275. A measured pass at
+> **210** retired an enemy **ten pixels from Damjan** — 25% of retirements used
+> a near fallback. A body vanishing in frame does not read as a mechanic, it
+> reads as a bug. There is no fallback now: if nothing is safely off-screen the
+> summon is simply skipped, which measured at a 16% skip rate and still left
+> renewal at 2.3× the gate.
+
+### Measured, before and after
+
+`MEAT.soak({ floor: 7, wave: 4, seconds: 30, seed: 4242, mode: 'fill' })`
+
+| at | before — live / over cap | after — live / over cap |
+|---|---|---|
+| 3s | 89 / −6 | 89 / −6 |
+| 10s | 99 / **+4** | 95 / **0** |
+| 20s | 119 / **+24** | 95 / **0** |
+| 30s | 134 / **+39** | 95 / **0** |
 
 > [!note] Ten floors caps how bad this can get
 > The measurements above go to floor 26 because they were taken when the

@@ -4172,13 +4172,26 @@ function startWave(n) {
   if (A.music) A.music.setIntensity(clamp(0.12 + (n / WAVES) * 0.72 + S.room * 0.16, 0, 1));
 }
 
+/* How many enemies may be breathing at once.
+
+   This used to be computed inline in updateWaves() and nowhere else, which is
+   exactly why the elite summon could ignore it — there was nothing to ignore,
+   the number did not exist outside that one function. One definition now, read
+   by the wave spawner and by the elite branch, so the two cannot drift. */
+function concurrencyCap() {
+  return Math.min(95, Math.round(18 + S.wave * 2.6 + S.room * 9.5 + (S.evo | 0) * 2 +
+                                 Math.max(0, S.p.owned.length - 1) * 1.5 +
+                                 Math.max(0, S.level - 1) * 0.8));
+}
+/* Everything on its way in as well as everything already breathing. Cracks
+   take 0.75s to hatch, so counting only the living is how deep floors used to
+   put five batches in the air before the cap noticed — see Bugs Found #13. */
+function liveLoad() { return S.en.length + S.cracks.length; }
+
 function updateWaves(dt) {
   if (S.waveState === 'fight') {
     S.spawnT -= dt;
-    // How many can be breathing at once, how fast they arrive, how many per crack
-    const cap = Math.min(95, Math.round(18 + S.wave * 2.6 + S.room * 9.5 + (S.evo | 0) * 2 +
-                                        Math.max(0, S.p.owned.length - 1) * 1.5 +
-                                        Math.max(0, S.level - 1) * 0.8));
+    const cap = concurrencyCap();
     S.capNow = cap;                 // read-only, for PROBE — the gate below is unchanged
     /* Cracks take 0.75s to hatch but batches fire every 0.15s, so counting only
        what is already breathing lets a deep floor put five batches in the air
@@ -4247,7 +4260,8 @@ function updateWaves(dt) {
     const c = S.cracks[i];
     c.t -= dt;
     if (c.t <= 0) {
-      spawnEnemy(c.type, c.x, c.y);
+      const ne = spawnEnemy(c.type, c.x, c.y);
+      if (c.sum) { ne.sum = 1; ne.born = c.born === undefined ? S.t : c.born; }
       part(c.x, c.y, '#c0202a', 14, 70, 0.5);
       S.cracks.splice(i, 1);
       if (Math.random() < 0.4) A.screech(true);
@@ -5088,6 +5102,86 @@ function update(rdt) {
   updateCam(rdt);
 }
 
+/* An elite calling for help — and the reason it does not simply use the gate
+   updateBoss() uses.
+
+   The intent written down in Difficulty Scaling is "so you cannot simply back
+   away from one". A plain `S.en.length < cap` gate satisfies the ceiling and
+   destroys that intent, because it goes quiet exactly when the room is fullest
+   — which is exactly when backing away is easiest. Both were built and
+   measured on a 45-second kiting run at floor 8 wave 4, Damjan retreating and
+   never firing:
+
+     | | live max | summons/min | reached you/min |
+     | uncapped (the defect) |  164 |  106.7 |  81.3 |
+     | plain gate            |   95 |   14.7 |  14.7 |
+     | recycle (this)        |   95 |   69.3 |  33.3 |
+
+   The gate cuts the elite's voice by 86% and leaves you free to walk away from
+   a full room. Recycling holds the same ceiling and still delivers 2.3x the
+   gate's renewal, because the population is conserved rather than frozen: the
+   room stays the same size, and what is IN it keeps being reissued in front of
+   you. Frame cost of the difference, measured: +1.6%. */
+function eliteSummon(e, adds) {
+  const cap = concurrencyCap();
+  for (let i = 0; i < adds; i++) {
+    // at the ceiling, something has to leave before something may arrive
+    if (liveLoad() >= cap && !retireOldestAdd()) break;
+    const q = freeSpot(90);
+    S.cracks.push({ x: q.x, y: q.y, t: 0.75,
+                    type: pick(['crawler', 'stalker', 'shrieker']), sum: 1, born: S.t });
+  }
+}
+
+/* Retire the longest-standing reinforcement, and only if it is somewhere you
+   cannot see it. Never an elite, never a boss.
+
+   RETIRE_R is the hard constraint on this whole mechanic. The camera shows
+   480x270 game units, so its half-diagonal is about 275 — anything retired
+   closer than that can pop out of existence in view, and a measured pass with
+   a 210 radius did exactly that: 25% of retirements used a near fallback and
+   one of them vanished TEN PIXELS from Damjan. That does not read as a
+   mechanic, it reads as a bug, and no amount of pressure is worth it.
+
+   So there is no fallback. If every reinforcement is close enough to see, the
+   summon is simply skipped for that slot — the elite falls back to gate
+   behaviour exactly when, and only when, gating is the honest thing to do.
+   Measured, that costs almost nothing: the median retirement sits at ~400px,
+   well outside the frame. */
+const RETIRE_R = 300;
+function retireOldestAdd() {
+  /* Who may be recycled, in priority order:
+
+     1. a REINFORCEMENT the elite made earlier. It was free pressure when it
+        arrived and it is free pressure when it leaves.
+     2. failing that, any ordinary enemy the player has NEVER TOUCHED. Full
+        health means no bullets spent on it and no progress lost, so recycling
+        it takes nothing the player had earned. A damaged enemy is work in
+        progress and is never taken.
+
+     Restricting this to (1) alone was measured and it is too small a pool —
+     summons are a minority of a 95-body room, so 30% of summon slots found
+     nothing safe and the elite went nearly as quiet as the plain gate. Both
+     groups are off-screen and unengaged, which is the property that actually
+     matters; which spawner made them is not.
+
+     Elites and bosses are never eligible, at any distance. */
+  let best = null, bestBorn = Infinity, bestRank = 9;
+  for (const o of S.en) {
+    if (o.dead || o.elite || o.boss) continue;
+    if (Math.hypot(o.x - S.p.x, o.y - S.p.y) <= RETIRE_R) continue;
+    const rank = o.sum ? 0 : (o.hp >= o.max ? 1 : 9);
+    if (rank === 9) continue;                       // damaged: work in progress
+    const bo = o.born === undefined ? -1 : o.born;
+    if (rank < bestRank || (rank === bestRank && bo < bestBorn)) { bestRank = rank; bestBorn = bo; best = o; }
+  }
+  if (!best) return false;
+  part(best.x, best.y, '#4a1016', 6, 50, 0.35);   // it sinks back into the floor
+  const i = S.en.indexOf(best);
+  if (i >= 0) S.en.splice(i, 1);
+  return true;
+}
+
 function updateEnemy(e, dt) {
   const p = S.p;
   const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1;
@@ -5108,10 +5202,7 @@ function updateEnemy(e, dt) {
                     r: 4, bob: rnd(0, TAU), dmg: e.dmg * 0.45, life: 2.6, col: e.eliteCol });
       }
       const adds = 1 + Math.floor(S.room * 0.7);
-      for (let i = 0; i < adds; i++) {
-        const q = freeSpot(90);
-        S.cracks.push({ x: q.x, y: q.y, t: 0.75, type: pick(['crawler', 'stalker', 'shrieker']) });
-      }
+      eliteSummon(e, adds);
       A.screech(); shake(4);
     }
   }
@@ -9655,6 +9746,7 @@ window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantGod, breakSe
                 magCap, fireNova, SHOP_WAVES, diff, killEnemy, damageEnemy,
                 angerPaci, hurtStage, bodySprite, legSprite, shred, hurtPlayer, RS, quitToTitle,
                 armRig, armCells, armCols, ARM_SH_X, ARM_SH_Y,
-                PROBE, soak, soakDiff, drawDebug };
+                PROBE, soak, soakDiff, drawDebug,
+                concurrencyCap, liveLoad, eliteSummon, retireOldestAdd };
 
 })();

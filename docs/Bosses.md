@@ -366,12 +366,19 @@ a committed build in a way that "holds four items" never quite was.
 > job. Stacking a build multiplier on top of both would make the boss wave the only
 > wave that matters.
 
-> [!warning] The elite summon still has no ceiling
-> Unlike the [[#Summoning|floor-boss summon]], the elite branch in
-> `updateEnemy()` has neither the population gate nor the clamp. Ten floors
-> caps how deep this can get — it is nothing like the floor-26 measurements
-> that found it — but it is still the one summon path in the game without a
-> ceiling. See [[Bugs Found#A. Elite summons bypass the enemy cap]].
+> [!note] The elite summon holds its ceiling differently from a boss
+> A [[#Summoning|floor boss]] refuses to summon past its cap. An elite instead
+> **recycles**: at the ceiling it retires the longest-standing body that is
+> safely off-screen and opens a fresh crack in its place, so the room stays
+> the same size while what is in it keeps being reissued in front of you.
+>
+> That difference is deliberate and it was measured. A plain refusal satisfies
+> the cap and silences the elite exactly when the room is fullest — which is
+> exactly when backing away is easiest, and backing away is the thing an elite
+> exists to punish. Refusing cut its summons by **86%**; recycling holds the
+> identical cap at **2.3×** the renewal. See
+> [[Difficulty Scaling#Elite summons: capped by recycling, not by refusing]]
+> and [[Bugs Found#22. Elite summons bypassed the enemy cap]].
 
 ## APEX
 

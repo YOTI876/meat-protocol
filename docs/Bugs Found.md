@@ -286,40 +286,62 @@ that as "nose, then mouth" — it resolves it as a moustache.
   separate features
 - **a mouth is a short line**, not one approaching the width of the jaw
 
+## 22. Elite summons bypassed the enemy cap
+
+**Found:** in a real Chrome trace, on a floor that actually ships. Floor 8,
+wave 4, **one** elite alive, the spawn queue already **empty**, nobody firing:
+
+```
+89 → 99 → 104 → 114 → 119 → 124 → 134 → 139 → 149 → 154     (cap: 95)
+```
+
+Linear, ~1.6 enemies a second, no plateau, for as long as the elite lived.
+`eliteSummon`'s branch had **neither** of the two guards the floor-boss path
+has — no `S.en.length` gate and no clamp on the count. Since the
+[[Enemies#Shared behaviour|separation pass]] is O(n²) and drawing an enemy
+costs ~40µs, this is what actually put the game into the regime where it felt
+bad: at 95 bodies it holds 60fps, at 140 it does not.
+
+> The note that used to sit here said ten floors "bounds it, but does not fix
+> it". That was too generous. Ten floors changes the **slope**, not the shape —
+> it still climbs without limit while the elite is alive, and 154 was reached
+> on floor 8 inside 40 seconds.
+
+**Why the obvious fix was the wrong one.** `updateBoss()`'s gate is a plain
+`S.en.length < addCap` refusal. Applied here it satisfies the ceiling and
+guts the documented intent — "so you cannot simply back away from one" —
+because it silences the elite exactly when the room is fullest, which is
+exactly when walking away is easiest. Measured on a 45s kiting run: the gate
+cut summons by **86%**, from 106.7/min to 14.7/min.
+
+**Fix:** at the ceiling the elite **recycles** instead of refusing.
+`retireOldestAdd()` retires the longest-standing body that is more than 300px
+away and either a previous reinforcement or still at full health, and a fresh
+crack opens in its place. Population conserved rather than frozen: same cap,
+**2.3×** the gate's renewal, +1.6% frame time. Full tables in
+[[Difficulty Scaling#Elite summons: capped by recycling, not by refusing]].
+
+The root cause was structural and is fixed as such: the ceiling used to be
+computed inline in `updateWaves()` and nowhere else, so there was no shared
+number for the elite branch to respect. It is `concurrencyCap()` now, read by
+both.
+
+> [!warning] The visual constraint is load-bearing
+> A first pass retired bodies beyond **210px** and measured one vanishing
+> **ten pixels from Damjan**. The camera's half-diagonal is ~275. `RETIRE_R`
+> is 300 and there is no near fallback — if nothing is safely off-screen the
+> summon is skipped. Lowering it trades a bug-looking pop for pressure that
+> was not needed.
+
 ---
 
 # Open
 
-Three defects, recorded here rather than fixed.
+Two defects, recorded here rather than fixed.
 
 **THE FULL MENU** (previously B on this list) is **closed** — not by fixing it,
 but because the contract it lived in no longer exists. See
 [[Contracts#CLOSING TIME replaced THE FULL MENU]].
-
-## A. Elite summons bypass the enemy cap
-
-`updateEnemy()`'s elite branch summons `1 + floor*0.7` reinforcements every
-2.2–3.2s with **neither** of the two guards the floor-boss path has — no
-`S.en.length < addCap` gate, no clamp on the count. The result does not
-plateau: on floor 26, with the spawn queue already empty, the live count
-climbs linearly — 93, 129, 147 … 291 at 30 seconds — for as long as the elite
-lives.
-
-Since the [[Enemies#Shared behaviour|separation pass]] is O(n²), this is
-[[#13. Deep floors overshot the enemy cap|#13]] again through a different
-door. Notably the CYST, added later, *does* gate its own hatching on
-`S.en.length < 70` — the elite branch is the outlier, not the convention.
-
-Measured tables in
-[[Difficulty Scaling#Elite summons are not capped]].
-
-> [!note] Ten floors bounds it, but does not fix it
-> Those measurements were taken when the descent had no bottom. `1 + floor*0.7`
-> on the deepest floor that now exists is **7** adds a cycle rather than 18, so
-> the 291-live figure is no longer reachable. The missing guard is still
-> missing — `updateBoss()` has a ceiling and `updateEnemy()`'s elite branch
-> does not — and the `hunt` twist on [[Floors|THE LAST AISLE]] puts three
-> elites on that floor instead of two.
 
 ## C. THE DESCENT's reward has no reward
 

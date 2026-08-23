@@ -14,12 +14,13 @@ All in `js/game.js` unless noted.
 |---|---|---|---|
 | wave count exponent | `n² * 0.26` | `startWave()` | later waves balloon faster |
 | floor spawn multiplier | `1 + floor*0.72` | `startWave()` | deeper floors get proportionally more enemies |
-| concurrent cap | `min(95, ...)` | `updateWaves()` | the hard ceiling on simultaneous enemies — the [[Enemies#Shared behaviour\|separation]] pass is O(n²), so this is the first thing to reconsider if performance dips. The gate counts cracks too; do not remove that, see [[Bugs Found#13. Deep floors overshot the enemy cap]] |
+| concurrent cap | `min(95, ...)` | `concurrencyCap()` | the hard ceiling on simultaneous enemies — the [[Enemies#Shared behaviour\|separation]] pass is O(n²), so this is the first thing to reconsider if performance dips. The gate counts cracks too; do not remove that, see [[Bugs Found#13. Deep floors overshot the enemy cap]] |
 | enemy HP multiplier | `1 + floor*1.25` | `diff()` | how spongy enemies get per floor |
 | enemy damage multiplier | `1 + floor*0.72` | `diff()` | how hard they hit |
 | contact cooldown | `CONTACT_CD = 0.74` | top of file | how often contact damage can land |
 | boss add cap | `min(30, 14 + floor*4 + evo*2)` | `updateBoss()` | ceiling on boss-summoned enemies alive at once |
-| elite summon count | `1 + floor*0.7` | `updateEnemy()` | **ungated** — see [[Bugs Found#A. Elite summons bypass the enemy cap]] |
+| elite summon count | `1 + floor*0.7` | `eliteSummon()` | how many reinforcements an elite calls each cycle. Gated by `concurrencyCap()` since [[Bugs Found#22. Elite summons bypassed the enemy cap|#22]] — at the ceiling it **recycles** rather than refusing |
+| elite retire radius | `RETIRE_R = 300` | `retireOldestAdd()` | how far off-screen a body must be before it may be recycled. The camera's half-diagonal is ~275, so **do not lower this** — at 210 a measured pass retired an enemy 10px from Damjan |
 | cyst hatch gate | `S.en.length < 70` | `updateEnemy()` | the only self-imposed spawn ceiling outside `updateBoss()` |
 | floor count | `FLOORS = ROOMS.length` | top of file | how long a run is. **10.** Adding an eleventh means adding a `BOSS_HP` rung with it |
 | twist strengths | `0.68` sight, `0.30` grip, `0.55` frost, `1.25` frail, `1.5`/`0.7` swarm | `updateTwist()` and inline | how loud each [[Floors#Twists\|floor rule]] is |
@@ -115,7 +116,7 @@ floor-8 row.
 | 26 / 8 | 93 | 95 | 237 | 3.31 |
 
 These are **not** a baseline to preserve — they are the defect in
-[[Bugs Found#A. Elite summons bypass the enemy cap]]. If a fix lands, the live
+[[Bugs Found#22. Elite summons bypassed the enemy cap]]. If a fix lands, the live
 column should come down to the ordinary-wave shape.
 
 ## Related
