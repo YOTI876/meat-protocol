@@ -377,7 +377,9 @@ grenade stop shaking the screen without becoming invisible. A kill-triggered
 effect that shakes the camera means the camera never settles for a whole run.
 
 Every pool is capped, oldest-first: **900** particles, **420** gibs, **80**
-rings, **160** props, **160** floats, **40** arcs. Measured at 222–601 fps per
+rings, **160** props, **160** floats, **40** arcs. The first three live in
+`FXCAP` rather than as literals in `updateParticles()`, so the probe reads the
+live number and a sweep does not need a reload. Measured at 222–601 fps per
 floor and 188 under deliberate load.
 
 > [!note] The last three were missed for a long time
@@ -392,6 +394,81 @@ floor and 188 under deliberate load.
 > `S.fx` drains **3 entries a frame, capped at 12**. A kill that triggers an
 > effect that kills something that triggers an effect is a recursion, and this
 > is the thing that flattens it into a queue.
+
+## The effect ceilings, swept
+
+The ceilings were set by argument, not by measurement — "well above anything
+normal play reaches". This is the measurement, taken in Chrome on the real
+game rather than off a [[Instrumentation#`MEAT.soak(opts)`|soak]], because
+[[Instrumentation#Determinism, and what it cost to get|milliseconds out of a
+soak are a shape and not a measurement]].
+
+Two scenarios, floor 7, 95 bodies, medians of 7 interleaved runs each. **Stall**
+is the sum of every frame's overshoot past 16.7ms; it is the only number here
+with enough resolution to discriminate, because the display is vsync-locked and
+every other frame lands on 16.7 or 33.3 exactly.
+
+| ceiling | burst stall | burst worst | sustained stall | fps |
+|---|---|---|---|---|
+| **900 / 420 / 80** *(shipping)* | 389ms | 50ms | 560ms | 51.6 |
+| 600 / 280 / 50 | 354 | 67 | 488 | 51.4 |
+| 400 / 200 / 40 | 274 | 50 | 484 | 53.2 |
+| 300 / 150 / 30 | **220** | 50 | — | 53.4 |
+| 250 / 120 / 25 | 289 | 50 | 424 | 53.7 |
+| 150 / 80 / 20 | 141 | 50 | — | 55.7 |
+| effects off *(floor)* | 54 | 50 | 397 | 56.8 |
+
+> [!warning] There is no cliff, and the worst frame never moves
+> The stall falls smoothly and roughly in proportion to the ceiling, all the
+> way down to nothing. There is no knee to find, so there is no "correct"
+> number the measurement can hand you — only a rate of exchange.
+>
+> And the **worst single frame is 50ms at every ceiling including zero**. The
+> spike is not the pool. See [[#What the burst frame actually costs]].
+
+Two other knobs were built for this sweep and both were removed after it:
+
+- **a lifetime multiplier.** Inert exactly where it is needed. At saturation
+  the ceiling has already truncated the pool, so draining life three times
+  faster left the live count at 835 against 850 — it cannot remove what the
+  cap has already removed. Below saturation it works as designed (199 → 74
+  particles at x3) and saves **0.05ms a frame**, while thinning every effect
+  in ordinary play. Wrong lever, wrong place.
+- **an emission multiplier**, on the theory that the cap limits what is
+  *alive* while the cost tracks what is *made*. It does not: cutting emission
+  by 95% left the burst frame identical (426µs a kill either way). What the
+  stall tracks is the live count, which is what the ceiling and only the
+  ceiling controls.
+
+## What the burst frame actually costs
+
+The thing that drops the frame when a NOVA clears a room is **`killEnemy()`
+itself**, and it is not cheap:
+
+| | |
+|---|---|
+| `killEnemy()`, floor 7 | **~426µs** (median of 9 batches of 23) |
+| 23 of them on one frame | **~10ms of JS before anything is drawn** |
+| the same 23 with emission at 5% | **426µs** — unchanged |
+| the whole particle draw pass at 900 | **0.35ms** |
+| `drawEnemy()` | ~40µs |
+
+A kill costs **ten times what drawing an enemy costs**, and a screen-clear
+fires two dozen of them inside one frame on top of a frame that already spends
+7ms. That is the 50ms frame, and no ceiling touches it. `ST()` is 7.6µs of it
+and `diff()` 0.3µs; the rest is in `deathBurst()` and the per-kill deck riders
+— including `blood()`, which is **6 + r x 2 individual `fillRect` calls** onto
+the persistent decal canvas, about 28 of them per kill and 644 across a
+screen-clear.
+
+> [!note] This is why the earlier reading was misleading
+> An [[Bugs Found|earlier pass]] found that clearing the effect pools mid-hitch
+> dropped the worst frame from 76.7 to 20.3ms with the same 55 bodies alive,
+> and concluded the effects layer was the spike. Swept properly, it is not:
+> emptying the pools removes the *sustained* cost that follows a burst, but the
+> burst frame itself is the same 50ms with the ceilings at zero. Clearing a
+> pool also stops it being refilled, which is what that reading was actually
+> measuring.
 
 ## Typefaces
 

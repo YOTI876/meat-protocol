@@ -216,9 +216,9 @@ const PROBE = {
     return {
       en: S.en.length, cracks: S.cracks.length, cap: S.capNow | 0, queue: S.queue.length,
       bul: S.bul.length, eb: S.eb.length,
-      part: S.part.length, partCap: 900,
-      gibs: S.gibs.length, gibsCap: 420,
-      rings: S.rings.length, ringsCap: 80,
+      part: S.part.length, partCap: FXCAP.part,
+      gibs: S.gibs.length, gibsCap: FXCAP.gibs,
+      rings: S.rings.length, ringsCap: FXCAP.rings,
       fx: S.fx.length, fxCap: 12,
       floats: S.floats.length, arcs: S.arcs.length, drops: S.drops.length,
       sprCache: _cache.size, sprVariants: _variants.size,
@@ -2774,6 +2774,20 @@ function spawnMini(idx) {
 }
 
 /* ---------- juice ---------- */
+/* ---- the effect ceilings, in one place ----
+
+   These were three literals buried in updateParticles(), which made them
+   unreadable from the probe and untunable from the console. They are a real
+   tuning surface, so they get a name.
+
+   Two other knobs were built here, measured, and taken back out — a lifetime
+   multiplier and an emission multiplier. Neither is a lever: at saturation the
+   ceiling has already truncated the pool, so draining life faster removes
+   nothing, and cutting emission by 95% left the burst frame identical. What
+   the stall tracks is the LIVE COUNT, which is what the ceiling and only the
+   ceiling controls. See [[Rendering#The effect ceilings, swept]]. */
+const FXCAP = { part: 900, gibs: 420, rings: 80 };
+
 function part(x, y, col, n, spd, life, size) {
   for (let i = 0; i < n; i++) {
     const a = rnd(0, TAU), s = rnd(spd * 0.3, spd);
@@ -5966,9 +5980,9 @@ function updateParticles(dt) {
      informative — dropping the tail of a burst costs nothing you were
      reading. The numbers are set well above anything normal play reaches
      (a busy wave sits around 300), so this only ever fires on a chain. */
-  if (S.part.length > 900) S.part.splice(0, S.part.length - 900);
-  if (S.gibs.length > 420) S.gibs.splice(0, S.gibs.length - 420);
-  if (S.rings.length > 80) S.rings.splice(0, S.rings.length - 80);
+  if (S.part.length > FXCAP.part) S.part.splice(0, S.part.length - FXCAP.part);
+  if (S.gibs.length > FXCAP.gibs) S.gibs.splice(0, S.gibs.length - FXCAP.gibs);
+  if (S.rings.length > FXCAP.rings) S.rings.splice(0, S.rings.length - FXCAP.rings);
   /* The three that never had one.
 
      The rule is that nothing grows without a ceiling, and these three were
@@ -9773,7 +9787,7 @@ requestAnimationFrame(frame);
 // dev hook
 window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantGod, breakSecret,
                 giveWeapon, explode, triggerModagaz, triggerGoromania,
-                evolve, resetEvolution, canEvolve, EVO_COST, EVO_MAX, EVO_TIER,
+                evolve, resetEvolution, canEvolve, EVO_COST, EVO_MAX, EVO_TIER, FXCAP,
                 evoGuns, evoCards, evoGunPool, evoCardPool, evoReward, evoFullSet,
                 openEvoPick, takeEvoGun, takeEvoCard, applyEvoLoadout,
                 OMEGA_COINS, COIN_RATE, powerMul,

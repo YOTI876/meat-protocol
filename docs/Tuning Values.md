@@ -21,7 +21,7 @@ All in `js/game.js` unless noted.
 | boss add cap | `min(30, 14 + floor*4 + evo*2)` | `updateBoss()` | ceiling on boss-summoned enemies alive at once |
 | elite summon count | `1 + floor*0.7` | `eliteSummon()` | how many reinforcements an elite calls each cycle. Gated by `concurrencyCap()` since [[Bugs Found#22. Elite summons bypassed the enemy cap|#22]] — at the ceiling it **recycles** rather than refusing |
 | elite retire radius | `RETIRE_R = 300` | `retireOldestAdd()` | how far off-screen a body must be before it may be recycled. The camera's half-diagonal is ~275, so **do not lower this** — at 210 a measured pass retired an enemy 10px from Damjan |
-| pool ceilings | `900` part / `420` gibs / `80` rings / `160` props / `160` floats / `40` arcs | `updateParticles()` | oldest-first eviction. They are set well above anything normal play reaches, so they only fire on a burst. See [[Rendering#Effects]] |
+| pool ceilings | `900` part / `420` gibs / `80` rings / `160` props / `160` floats / `40` arcs | `FXCAP` (first three), `updateParticles()` | oldest-first eviction. Set above anything normal play reaches, so they only fire on a burst. **Swept** — the stall falls smoothly with the ceiling and there is no knee: see [[Rendering#The effect ceilings, swept]] |
 | cyst hatch gate | `S.en.length < 70` | `updateEnemy()` | the only self-imposed spawn ceiling outside `updateBoss()` |
 | floor count | `FLOORS = ROOMS.length` | top of file | how long a run is. **10.** Adding an eleventh means adding a `BOSS_HP` rung with it |
 | twist strengths | `0.68` sight, `0.30` grip, `0.55` frost, `1.25` frail, `1.5`/`0.7` swarm | `updateTwist()` and inline | how loud each [[Floors#Twists\|floor rule]] is |
@@ -70,7 +70,7 @@ All in `js/game.js` unless noted.
 | shop rarity weights | `SHOP_W = [100, 52, 24, 9, 2.5]` | `shopStock()` | how textured the crate is. A LEGENDARY pedestal is ~1 seat in 70 |
 | apex cadence | `APEX_EVERY = 5` | top of file | how often the floor boss comes up wrong. With ten floors and the last one taken, this means **exactly one APEX a run** |
 | house knockback | `38` | `fire()` | the default shove for any gun with no `knock` of its own. Was 60; the shotgun's own went 140 → 45 |
-| particle ceilings | 900 part / 420 gib / 80 ring | `updateParticles()` | oldest-first splice. The frame budget's real backstop — see [[Rendering#Effects]] |
+| particle ceilings | 900 part / 420 gib / 80 ring | `FXCAP` | oldest-first splice. NOT the frame budget's backstop — the 50ms burst frame is [[Rendering#What the burst frame actually costs|`killEnemy()`]], not the pools |
 | deferred effect drain | 3 a frame, cap 12 | `S.fx` | how fast kill-triggered effects resolve. This is what stops an OVERKILL chain recursing |
 | tile variants | `TILE_VARIANTS = 12` | above `bakeTileAtlas` | how much floor there is before the eye finds the repeat. Raising it costs bake time **linearly**, unlike the old per-pixel loop — see [[Rendering#The floor]] |
 | floor surface | `FLOOR_TEX[]` | top of the floor section | which of the ten [[Floors#Surfaces\|surfaces]] a floor is made of |
