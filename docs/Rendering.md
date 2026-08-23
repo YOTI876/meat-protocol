@@ -377,7 +377,16 @@ grenade stop shaking the screen without becoming invisible. A kill-triggered
 effect that shakes the camera means the camera never settles for a whole run.
 
 Every pool is capped, oldest-first: **900** particles, **420** gibs, **80**
-rings. Measured at 222–601 fps per floor and 188 under deliberate load.
+rings, **160** props, **160** floats, **40** arcs. Measured at 222–601 fps per
+floor and 188 under deliberate load.
+
+> [!note] The last three were missed for a long time
+> Props, damage floats and BUTCHER'S BILL's arcs had no ceiling at all. Each
+> was bounded in *practice* by how fast the thing that spawns it can fire —
+> which is exactly the argument that was made about particles right up until a
+> piercing shot put five thousand of them on screen. Floats are the one that
+> can genuinely run: one number per hit, and a shotgun into a crowd is nine
+> hits times n bodies on a single frame.
 
 > [!note] The deferred queue is why any of this is safe
 > `S.fx` drains **3 entries a frame, capped at 12**. A kill that triggers an

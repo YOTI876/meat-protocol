@@ -5969,6 +5969,23 @@ function updateParticles(dt) {
   if (S.part.length > 900) S.part.splice(0, S.part.length - 900);
   if (S.gibs.length > 420) S.gibs.splice(0, S.gibs.length - 420);
   if (S.rings.length > 80) S.rings.splice(0, S.rings.length - 80);
+  /* The three that never had one.
+
+     The rule is that nothing grows without a ceiling, and these three were
+     simply missed: PROPS (debris knocked off scenery), FLOATS (the damage
+     numbers) and ARCS (BUTCHER'S BILL's lightning). All three are bounded in
+     PRACTICE by how fast the thing that makes them can fire, which is exactly
+     the argument that was made about particles before a piercing shot put five
+     thousand of them on screen.
+
+     Floats are the one that can actually run: a damage number per hit, and a
+     shotgun into a crowd is nine hits x n bodies on one frame. 160 is far
+     above anything readable — you cannot read forty numbers, let alone a
+     hundred and sixty — so this only ever fires on a burst, which is the same
+     property the other three ceilings have. */
+  if (S.props.length > 160) S.props.splice(0, S.props.length - 160);
+  if (S.floats.length > 160) S.floats.splice(0, S.floats.length - 160);
+  if (S.arcs.length > 40) S.arcs.splice(0, S.arcs.length - 40);
   for (let i = S.floats.length - 1; i >= 0; i--) {
     const f = S.floats[i]; f.y += f.vy * dt; f.vy *= 0.92; f.life -= dt;
     if (f.life <= 0) S.floats.splice(i, 1);

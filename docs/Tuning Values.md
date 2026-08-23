@@ -21,6 +21,7 @@ All in `js/game.js` unless noted.
 | boss add cap | `min(30, 14 + floor*4 + evo*2)` | `updateBoss()` | ceiling on boss-summoned enemies alive at once |
 | elite summon count | `1 + floor*0.7` | `eliteSummon()` | how many reinforcements an elite calls each cycle. Gated by `concurrencyCap()` since [[Bugs Found#22. Elite summons bypassed the enemy cap|#22]] — at the ceiling it **recycles** rather than refusing |
 | elite retire radius | `RETIRE_R = 300` | `retireOldestAdd()` | how far off-screen a body must be before it may be recycled. The camera's half-diagonal is ~275, so **do not lower this** — at 210 a measured pass retired an enemy 10px from Damjan |
+| pool ceilings | `900` part / `420` gibs / `80` rings / `160` props / `160` floats / `40` arcs | `updateParticles()` | oldest-first eviction. They are set well above anything normal play reaches, so they only fire on a burst. See [[Rendering#Effects]] |
 | cyst hatch gate | `S.en.length < 70` | `updateEnemy()` | the only self-imposed spawn ceiling outside `updateBoss()` |
 | floor count | `FLOORS = ROOMS.length` | top of file | how long a run is. **10.** Adding an eleventh means adding a `BOSS_HP` rung with it |
 | twist strengths | `0.68` sight, `0.30` grip, `0.55` frost, `1.25` frail, `1.5`/`0.7` swarm | `updateTwist()` and inline | how loud each [[Floors#Twists\|floor rule]] is |
