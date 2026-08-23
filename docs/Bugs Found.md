@@ -413,42 +413,59 @@ expires both.
 > between simulation and presentation, and every timer has to be on the correct
 > side of it deliberately.
 
+## 25. THE DESCENT's reward did not exist
+
+**Found:** by reading the contract table against `WEP`. Carried open on this
+list as **defect C** rather than fixed, because it had two possible closes and
+picking the wrong one quietly rewrites a gun's availability.
+
+THE DESCENT's unlock line reads *"FREEZER BURN joins the crate"*. `WEP.chill`
+carried no `lock`:
+
+```js
+const BUYABLE = ['scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', ... ];
+//                                                        ^ unconditional
+rot: { ... lock: 'seal' ... }    // the only gun that actually filtered
+```
+
+`shopStock()` and `evoPickable()` both gate on `WEP[id].lock`, and `chill` set
+none — so FREEZER BURN was buyable from the first shop that rolled it, and
+reaching floor 8 signed the contract, fired the toast, and changed nothing. The
+comment above `shopStock()` already read *"two guns are behind contracts"*,
+which is the clearest evidence of which way this was always meant to go.
+
+**Fix:** `lock: 'deep'` on `chill` — the close that makes the contract line
+true, rather than the one that rewrites the line to match the code. A promise
+the game says out loud in its own UI is worth more than a gun's availability on
+a first run, and the alternative would have left THE DESCENT paying out nothing
+at all.
+
+Verified with the save forced either side of the gate, 500 shop rolls each at
+floor 9 with an empty loadout:
+
+| `deep` | contract | FREEZER BURN in 500 rolls | RARE evolution rung |
+|---|---|---|---|
+| 1 | unsigned | **0** | MICROWAVE, THE HOG |
+| 8 | signed | **147** | MICROWAVE, FREEZER BURN, THE HOG |
+
+> [!note] The rung was the thing to check, not the shop
+> RARE holds exactly three guns and two rungs draw from it, so locking one
+> could have left a rung with a single card on it — which is not a choice, it
+> is a receipt. It doesn't: two guns for two rungs, and `evoGunPool()`'s
+> widening covers the last one anyway. The gate was safe to add only because
+> that pool had the headroom.
+
 ---
 
 # Open
 
-One defect, recorded here rather than fixed.
+**None.** Every defect on this list is closed.
 
-**THE FULL MENU** (previously B on this list) is **closed** — not by fixing it,
-but because the contract it lived in no longer exists. See
-[[Contracts#CLOSING TIME replaced THE FULL MENU]].
-
-## C. THE DESCENT's reward has no reward
-
-The last surviving contract with a promise it doesn't keep. Its unlock line
-reads *"FREEZER BURN joins the crate"* — but `WEP.chill` has never carried a
-`lock`:
-
-```js
-const BUYABLE = ['scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot', 'rail'];
-//                                                        ^ unconditional
-rot: { ... lock: 'seal' ... }    // the only gun that actually filters
-```
-
-`shopStock()` filters on `WEP[id].lock`, and `chill` doesn't set one, so
-FREEZER BURN has always been buyable from the first shop that rolled it.
-Reaching floor 8 signs the contract, toasts it, and changes nothing.
-
-Two ways to close it, and they are not equivalent:
-
-- give `chill` `lock: 'deep'`, which makes the contract line true and puts
-  FREEZER BURN behind floor 8 on a first run
-- rewrite the contract's reward to something that exists
-
-The [[Weapons#When PACI starts carrying it|depth gate]] added in the balance
-pass masks it slightly — `floor: 3` now holds FREEZER BURN back to floor 4 —
-but that is a different gate with a different number, and the contract still
-claims credit for it.
+**THE FULL MENU** (previously B) closed without a fix — the contract it lived
+in no longer exists. See [[Contracts#CLOSING TIME replaced THE FULL MENU]].
+**Defect A** closed as [[#22. Elite summons bypassed the enemy cap|#22]],
+**D** as [[#23. The pool caps did not run while a menu was open|#23]], and
+**C** as [[#25. THE DESCENT's reward did not exist|#25]] above.
 
 ## Related
 - [[Changelog]] — which commit each fix landed in

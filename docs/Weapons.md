@@ -323,7 +323,7 @@ all at once.
 | **floor 1** | SCAR-L, MEAT SPLITTER, THE PRICE GUN |
 | **floor 2** | THE STAPLER |
 | **floor 3** | MICROWAVE |
-| **floor 4** | FREEZER BURN |
+| **floor 4** | FREEZER BURN *(and its contract)* |
 | **floor 5** | THE HOG, **THE FISH** |
 | **floor 6** | THE ROTISSERIE *(and its contract)* |
 | **floor 7** | THE DELI SLICER, **GOD FINGER**, **THE FLYKILLER** |
@@ -335,21 +335,30 @@ roughly 60 coins income: enough to buy one and want the others.
 THE FISH is no longer exempt. Cards used to be its gate, so it was appended to
 the pool unconditionally; 500 coins and floor 5 are its gate now.
 
-## One is locked behind a contract
+## Two are locked behind contracts
 
-**THE ROTISSERIE** is not in `shopStock()`'s pool at all until **BREAK THE
-SEAL** (8 floor bosses) is signed. `WEP.rot.lock = 'seal'` names the contract;
-`shopStock()` filters on it.
+Neither is in `shopStock()`'s pool — or on the
+[[Economy#What a rung pays out|evolution ladder]] — until its contract is
+signed. `lock` names the contract; both gates read the same field.
 
-> [!warning] THE DESCENT's reward is not implemented
-> The contract's unlock line reads *"FREEZER BURN joins the crate"*, but
-> `WEP.chill` carries **no `lock`** — it has always been in `BUYABLE`
-> unconditionally, so the contract signs, toasts, displays as signed, and
-> changes nothing. This predates the depth gate; `floor: 3` is now the only
-> thing holding FREEZER BURN back. It is the **last** contract with a promise
-> it doesn't keep — THE FULL MENU, which had the same failure mode, was
-> [[Contracts#CLOSING TIME replaced THE FULL MENU|replaced outright]]. See
-> [[Bugs Found#C. THE DESCENT's reward has no reward]].
+| gun | `lock` | contract |
+|---|---|---|
+| **THE ROTISSERIE** | `'seal'` | **BREAK THE SEAL** — 8 floor bosses |
+| **FREEZER BURN** | `'deep'` | **THE DESCENT** — reach floor 8 |
+
+> [!note] FREEZER BURN was unlocked for most of this project
+> THE DESCENT's line reads *"FREEZER BURN joins the crate"* and for a long time
+> that was decoration: `chill` carried no `lock`, so the contract signed,
+> toasted, displayed as signed and changed nothing. Two closes were available —
+> add the gate, or rewrite the promise — and the gate won, because a line the
+> game says out loud in its own UI outranks a gun's availability on a first run.
+> Measured: **0 of 500** shop rolls before the contract, **147** after. See
+> [[Bugs Found#25. THE DESCENT's reward did not exist]].
+>
+> A first run therefore reaches floor 8 without ever seeing it. That is the
+> point — it is the reward for the descent, not a stocking item, and the depth
+> gate (`floor: 3`) is now a second gate behind the first rather than the only
+> one.
 
 ## Handling notes
 

@@ -52,7 +52,7 @@ Three gates build the pool:
 | gate | is | fails when |
 |---|---|---|
 | `owned` | you already have it | always, once bought — including guns from your [[Economy#Evolution\|evolution roster]] |
-| `lock` | a [[Contracts\|contract]] you have not signed | THE ROTISSERIE, until BREAK THE SEAL |
+| `lock` | a [[Contracts\|contract]] you have not signed | THE ROTISSERIE until BREAK THE SEAL; FREEZER BURN until THE DESCENT |
 | `floor` | how deep you are | see [[Weapons#When PACI starts carrying it]] |
 
 Price is the fourth gate, and the only one you can argue with.

@@ -75,13 +75,13 @@ once — so a contract you signed three runs ago stays quiet.
 - **when a hand is dealt** — GRADED, APEX PREDATOR, CLOSING TIME
 - **when PACI stocks his room** — REGULAR, BREAK THE SEAL, THE DESCENT
 
-> [!warning] THE DESCENT's reward still doesn't exist
-> Its unlock reads *"FREEZER BURN joins the crate"*, but `WEP.chill` has never
-> carried a `lock` — `shopStock()` filters on `WEP[id].lock` and `chill` sets
-> none, so FREEZER BURN has always been buyable from the first shop that rolled
-> it. The [[Weapons#When PACI starts carrying it|depth gate]] masks it slightly
-> (`floor: 3` holds it back to floor 4) but that is a different gate with a
-> different number. See [[Bugs Found#C. THE DESCENT's reward has no reward]].
+> [!note] THE DESCENT pays out for real now
+> For most of this project its unlock line was decoration: `WEP.chill` carried
+> no `lock`, so FREEZER BURN was buyable from the first shop that rolled it and
+> signing the contract changed nothing. `lock: 'deep'` closed it — the fix that
+> makes the line true rather than the one that rewrites the line. Measured
+> either side of the gate: **0 of 500** shop rolls before, **147** after. See
+> [[Bugs Found#25. THE DESCENT's reward did not exist]].
 
 > [!note] Contracts survive EVOLVE
 > Evolving wipes coins and cards. It does **not** touch contract progress or
