@@ -457,6 +457,64 @@ floor 9 with an empty loadout:
 
 ---
 
+## 26. The probe measured draw calls being ISSUED, not drawing
+
+**Found:** by disbelieving a conclusion the probe had already given, twice.
+This one is in the [[Instrumentation|measurement harness]] rather than in the
+game, and it is on this list because it cost a whole cycle of work aimed at the
+wrong layer.
+
+`PROBE` brackets each render phase with `performance.now()`:
+
+```js
+const _p0 = performance.now();
+drawParticles();                 // 900 fillRect / arc / stroke calls
+_accPar += performance.now() - _p0;
+```
+
+That reads **0.35ms at 900 live particles**, and the number is correct. It is
+also nearly meaningless, because a canvas draw call returns as soon as it is
+*recorded*. The rasterisation happens later, on the compositor, and lands in
+the **gap between frames** where no bracket around JS can see it.
+
+So the probe reported the cost of *asking* for 900 particles, not the cost of
+*drawing* them — and 0.35ms of asking was used to argue that batching the
+effects layer could never win more than 2% of a frame. Measured properly, the
+effects layer is about **75% of the burst stall**.
+
+**How it was caught.** Not by a better bracket — by an A/B that leaves JS
+almost unchanged and changes only what reaches the screen. Same 22 kills, same
+`deathBurst()` calls, ceilings at 900/420/80 against 1/1/1:
+
+| | frames over 25ms | stall |
+|---|---|---|
+| effects on | 13 / 16 / 22 / 12 | 217 / 268 / 402 / 270 ms |
+| effects off | 4 / 4 / 2 / 0 | **69 / 68 / 35 / 1 ms** |
+
+The JS difference between those arms is `updateParticles` plus
+`drawParticles` over 900 entries instead of 1 — about **0.7ms a frame, 28ms
+across the window**. The stall difference is **202ms**. Roughly **85% of it is
+outside JS**.
+
+> [!warning] The rule this leaves behind
+> **A wall-clock bracket around canvas work is a lower bound and nothing more.**
+> [[Rendering#It used to be one enormous pixel loop, and that was the lag|The
+> floor bake]] said this, [[Instrumentation#Two things the timings cannot tell you|the
+> probe's own documentation]] says it in a callout, and it was still used to
+> close a question it cannot answer.
+>
+> To attribute GPU-side cost, **change what is drawn and measure the frame
+> gap** — never bracket the call and believe the number. `PROBE.drain` exists
+> for exactly this and was not used. When a phase's JS time and its effect on
+> frame pacing disagree, the pacing is right.
+
+This is [[#11. Crates spawning on Damjan's head|#11]] again, one level up. There
+the test was wrong before the code was; here the **instrument** was wrong before
+the code was, and it was wrong in a way that produced a confident, specific,
+plausible number. A number is not evidence that the thing was measured.
+
+---
+
 # Open
 
 **None.** Every defect on this list is closed.

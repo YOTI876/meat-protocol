@@ -68,6 +68,27 @@ pool asks is never "how many" but "how close to the cap". Amber at 70%, red at
 > `PROBE.drain = 1` (F4) forces a 1px readback after every phase, which makes
 > attribution accurate and frame pacing meaningless. Use it to find out **where**
 > time goes, never **how much**.
+>
+> **This warning was written, published, and then ignored.** The particle pass
+> measures 0.35ms at 900 live particles with `drain` off, and that figure was
+> used to rule out batching the effects layer. The effects layer turned out to
+> be ~75% of the burst stall. See
+> [[Bugs Found#26. The probe measured draw calls being ISSUED, not drawing]].
+
+## How to attribute GPU-side cost
+
+The phase split cannot do it, and no bracket around JS can. The only instrument
+that works is **an A/B that changes what reaches the screen while leaving the
+JS as close to identical as possible, measured on the frame gap**:
+
+- keep the same kills, the same spawns, the same call counts
+- change one thing about what is *drawn* — a ceiling, a blend mode, a pass
+- read **frames over budget** and **total stall**, never the phase split
+- interleave the arms and take medians of at least four reps; a single capture
+  on this machine has varied from 0 to 22 over-budget frames on the same
+  scenario
+
+When the phase split and the frame gap disagree, **the frame gap is right**.
 
 Probe cost, measured rather than claimed: 11 `performance.now()` calls a frame,
 **~6us**, **0.036%** of a 16.7ms budget.
