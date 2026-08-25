@@ -56,7 +56,7 @@ three-phase fight you can actually beat.
 ## Records
 
 - [[Changelog]] — every release, in order
-- [[Bugs Found]] — twenty-six real defects, what caused each, and none still open
+- [[Bugs Found]] — twenty-eight real defects, what caused each, and none still open
 - [[Tuning Values]] — the single-number knobs
 - [[Deployment]] — GitHub and Vercel setup
 

@@ -21,6 +21,8 @@ All in `js/game.js` unless noted.
 | boss add cap | `min(30, 14 + floor*4 + evo*2)` | `updateBoss()` | ceiling on boss-summoned enemies alive at once |
 | elite summon count | `1 + floor*0.7` | `eliteSummon()` | how many reinforcements an elite calls each cycle. Gated by `concurrencyCap()` since [[Bugs Found#22. Elite summons bypassed the enemy cap|#22]] — at the ceiling it **recycles** rather than refusing |
 | elite retire radius | `RETIRE_R = 300` | `retireOldestAdd()` | how far off-screen a body must be before it may be recycled. The camera's half-diagonal is ~275, so **do not lower this** — at 210 a measured pass retired an enemy 10px from Damjan |
+| hitstop duty | `HS_DUTY = 0.35` / `HS_POOL = 0.12` / `HS_MIN = 1/60` | top of file | how much of any stretch a kill stream may freeze, how much back to back, and the smallest grant worth making. Bosses bypass. See [[Bugs Found#27. Hitstop re-armed on every kill, so a stream never un-froze]] |
+| hitstop, one kill | `0.035`s (boss `0.3`s) | `killEnemy()` | the beat itself, unchanged — the budget governs how often you get it |
 | pool ceilings | `900` part / `420` gibs / `80` rings / `160` props / `160` floats / `40` arcs | `FXCAP` (first three), `updateParticles()` | oldest-first eviction. Set above anything normal play reaches, so they only fire on a burst. **Swept** — the stall falls smoothly with the ceiling and there is no knee: see [[Rendering#The effect ceilings, swept]] |
 | cyst hatch gate | `S.en.length < 70` | `updateEnemy()` | the only self-imposed spawn ceiling outside `updateBoss()` |
 | floor count | `FLOORS = ROOMS.length` | top of file | how long a run is. **10.** Adding an eleventh means adding a `BOSS_HP` rung with it |

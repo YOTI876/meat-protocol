@@ -143,7 +143,7 @@ non-crit hits:
 > used, and none after. It is a constant string, so it cannot leak the way
 > [[Bugs Found#2. God-mode rainbow tint leaked the sprite cache|#2]] did.
 
-> [!warning] A bullet hits ONE enemy per frame, whatever its pierce
+> [!note] A bullet used to hit ONE enemy per frame, whatever its pierce
 > The collision loop in `updateBullets()` breaks after the first enemy it
 > finds. `pierce: 99` does not mean 99 bodies on one frame — it means the
 > round survives to hit one more on the NEXT frame. A slug through six enemies

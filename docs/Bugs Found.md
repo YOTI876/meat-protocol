@@ -513,6 +513,111 @@ the test was wrong before the code was; here the **instrument** was wrong before
 the code was, and it was wrong in a way that produced a confident, specific,
 plausible number. A number is not evidence that the thing was measured.
 
+## 27. Hitstop re-armed on every kill, so a stream never un-froze
+
+**Found:** by giving the player a switch and asking. Two cycles of performance
+work had gone into dropped frames, and the thing actually being felt was this.
+
+`killEnemy()` did `S.hitstop = Math.max(S.hitstop, 0.035)`, and `update()` scales
+`dt` to **8%** while it runs. Draw is untouched — the screen keeps painting at
+60 while the simulation crawls.
+
+`Math.max` handles **simultaneity** correctly: ten kills on one frame buy one
+kill's worth, not ten. What it did not handle is a **stream**. 0.035s is about
+two frames at 60Hz, so kills arriving faster than every two frames re-armed it
+before it expired, indefinitely. Measured: active on **20 of 40 frames** through
+a pierce shot and **28 of 50** through a NOVA, with no upper bound at all.
+
+> [!note] This is why it was so hard to find
+> Nothing is dropping a frame in that window. The frame gap is a clean 16.7ms,
+> the profiler is clean, the pools are within their caps — and the game feels
+> like it is stuttering, because almost nothing moves for half a second. Every
+> measurement taken across two cycles was **correct**; the model was wrong.
+
+**Fix:** a duty cycle, the same shape as `deathBurst()`'s per-frame budget.
+
+```js
+const HS_DUTY = 0.35;   // at most this fraction of any stretch may be frozen
+const HS_POOL = 0.12;   // and never more than this much of it back to back
+const HS_MIN  = 1 / 60; // and never a grant too small to pay for a frame
+```
+
+The bank refills with real time and drains while hitstop runs; a kill arms only
+what the bank can pay for. Bosses and the finale bypass it — those are designed
+beats, one at a time, and they are what the freeze is *for*.
+
+| kill rate | frozen frames |
+|---|---|
+| one every 2nd frame (90 kills) | **40%** |
+| one every 4th frame | 38% |
+| one every 8th frame | 37% |
+| sparse (6 kills in 3s) | **14%** |
+| a single isolated kill | full 0.035s, unchanged |
+| a boss on an empty bank | full 0.3s, unchanged |
+
+> [!warning] The duty has to be charged in FRAMES, not in seconds
+> The obvious accounting — drain the bank by however much hitstop actually ran —
+> is wrong, and it measured **55–60%** against a knob set to 35%. Hitstop scales
+> the *whole frame* however little of it remains, so a 1ms grant buys a full
+> frozen frame for a thousandth of the budget. Charge a frame per frozen frame,
+> and refuse any grant the bank cannot pay a full frame for.
+
+---
+
+## 28. A piercing round hit one enemy per frame, not one room
+
+**Found:** while trying to reproduce [[#27. Hitstop re-armed on every kill, so a stream never un-froze|#27]]
+and failing. No matter how tightly the bodies were packed, a slug with
+`pierce: 99` would not produce a multi-kill frame in the harness. The harness
+was right.
+
+The bullet/enemy loop in `updateBullets()` ended with an unconditional
+`break`:
+
+```js
+b.hitIds.push(e);
+if (b.hitIds.length > b.pierce) { S.bul.splice(i, 1); removed = true; }
+break;                       // <- after the FIRST body, every time
+```
+
+So `pierce: 99` never meant "passes through 99 bodies". It meant **survives 99
+frames**. A slug through six enemies was six consecutive frames, each paying a
+hit, a kill, and its own 0.035s of hitstop — which is most of why a pierce shot
+felt worse than anything else in the game.
+
+> [!note] It was never a decision
+`git log -L` on those lines: the `break` is in the **initial commit**
+> and no commit has touched it since. `hitIds` and `pierce` were there from
+> the start too, so it is not a leftover from before piercing existed. It is
+> simply the shape the loop was written in on day one and never revisited.
+
+Everything written about it since assumed otherwise, including the code:
+
+- `deathBurst()` — *"a round that punches through eight things fires eight of
+  these on the SAME FRAME"*. That comment is the justification for the entire
+  per-frame burst budget, and it describes behaviour that could not happen.
+- [[Weapons]] — GOD FINGER *"pierces everything"*
+- README — *"pierces the entire room"*
+
+**Fix:** drop the `break` and break only when the round runs out of pierce.
+`hitIds` is already a permanent per-enemy cooldown — the `indexOf` guard at
+the top of the loop — so continuing cannot double-tap anything. It just lets the
+round spend its pierce budget on the frame it arrives.
+
+Verified: a slug into a packed knot of twelve now lands **13 hits on one frame**
+where it previously landed one. Which also means the burst budget in
+`deathBurst()` now protects against the case its own comment described.
+
+> [!note] The lesson, and it is not the usual one
+> [[#11. Crates spawning on Damjan's head|#11]] was a wrong test.
+> [[#26. The probe measured draw calls being ISSUED, not drawing|#26]] was a wrong
+> instrument. This one is neither: **every measurement was right and the model
+> was wrong.** A symptom reported as performance was game logic the whole time,
+> and the only thing that found it was handing the player a switch
+> ([[Instrumentation#`MEAT.FX` — one switch per thing a hit does|`MEAT.FX`]]) and
+> asking which one changed the feel. Two cycles of correct profiling could not
+> have found it, because there was nothing wrong with the frames.
+
 ---
 
 # Open

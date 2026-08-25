@@ -386,7 +386,7 @@ signed. `lock` names the contract; both gates read the same field.
 There is no armory. Every weapon modifier is a [[The Deck|card]] now, and it
 applies to **whatever you happen to be holding** rather than to one gun you
 paid to improve: the whole **TOOLS** aisle (CYCLE, SPLIT, CALIBER, HOPPER,
-QUICK HANDS, RICOCHET, GUIDANCE, MUNITIONS) plus everything in **BLADES**.
+QUICK HANDS, RICOCHET, MUNITIONS) plus everything in **BLADES**.
 
 > [!warning] SPLIT was the card that broke this
 > One rank used to fan **2n+1** rounds with the centre shot at full power, so

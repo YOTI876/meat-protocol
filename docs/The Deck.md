@@ -68,7 +68,7 @@ numbers are:
 |---|---|---|
 | MALICE | SHARPENED | every 6th shot always crits |
 | CLEAVER | FOLLOW-THROUGH | crits splash everything within 26 |
-| CARVE | SKEWER | each body a shot passes adds +25% damage |
+| CARVE | SKEWER | each body a shot passes adds +25% damage — and since [[Bugs Found#28. A piercing round hit one enemy per frame, not one room\|#28]] a shot really does pass several in one frame |
 | ROUGHAGE | STOCKED | and it heals you for that much on the spot |
 | GRAZING | GORGED | healing past full banks a shield instead |
 | CALLUS | THICK HIDE | the first hit of every wave does nothing |

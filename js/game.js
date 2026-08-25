@@ -1091,6 +1091,43 @@ function cosDef(id) { return COSMETICS.find(c => c.id === id) || COSMETICS[0]; }
 /* ============================================================
    STATE
    ============================================================ */
+/* ---- HITSTOP, and why it needs a budget ----
+
+   A kill freezes the simulation to 8% for 0.035s -- about two frames at 60Hz.
+   Math.max already handles SIMULTANEITY correctly: ten kills on one frame buy
+   one kill's worth, not ten. What it does not handle is a STREAM. Hitstop
+   re-arms on every kill, so kills arriving faster than every two frames hold
+   the game in near-freeze indefinitely, with the screen still painting at 60.
+   Measured before this: active on 20 of 40 frames through a pierce shot and
+   28 of 50 through a NOVA. That is the thing that reads as lag, and it is not
+   a dropped frame -- see [[Bugs Found#27. Hitstop re-armed on every kill]].
+
+   So a duty cycle. The bank refills with real time and drains while hitstop
+   runs, and a kill can only arm what the bank can pay for. One isolated kill
+   still gets its full weight, because the bank is full by then. A stream gets
+   progressively less, and MOTION IS GUARANTEED for at least (1 - HS_DUTY) of
+   any stretch. Same idea as deathBurst's per-frame budget: the first is full
+   price and they get cheaper the more of them share a window.
+
+   Bosses and the finale bypass it. Those are designed beats, one at a time,
+   and they are the moment the freeze is FOR. */
+const HS_DUTY = 0.35;      // at most this fraction of any stretch may be frozen
+const HS_POOL = 0.12;      // and never more than this much of it back to back
+
+/* A beat costs a whole frame whatever it is worth on paper, so a grant smaller
+   than a frame is not a cheap beat -- it is a full-price one bought with small
+   change. Without this floor the duty settled at 55% against the 35% it is set
+   to, because every refill tick could still buy one more frozen frame. If the
+   bank cannot pay for a frame, the kill simply does not get one; at 60Hz a
+   sub-frame freeze is not something anybody can see anyway. */
+const HS_MIN = 1 / 60;
+
+function armHitstop(t, bypass) {
+  if (bypass) { S.hitstop = Math.max(S.hitstop, t); return; }
+  if (S.hsBank < HS_MIN) return;
+  S.hitstop = Math.max(S.hitstop, Math.min(t, S.hsBank));
+}
+
 const S = {};
 /* MM:SS, and H:MM:SS only once there is an hour to show — a leading `0:` on
    every run of a game whose floors take four minutes is two characters of
@@ -1142,7 +1179,7 @@ function freshState() {
     bossKills: 0, shopDue: false, shopsSeen: 0, inShop: false, shopStash: null, paci: null,
     apex: false, mini: null,
     score: 0, combo: 1, comboT: 0, kills: 0, streak: 0,
-    flash: 0, flashCol: '#fff', hitstop: 0, slow: 0, redness: 0, modT: 0,
+    flash: 0, flashCol: '#fff', hitstop: 0, hsBank: HS_POOL, slow: 0, redness: 0, modT: 0,
     burstT: -1, burstN: 0,      // per-frame death-burst budget, see deathBurst
     jump: 0, jumpSpr: null, muzzle: null, beamHit: null,
     msg: '', msgT: 0, sub: '', banner: null, prompt: null,
@@ -1255,7 +1292,7 @@ function ST() {
                      + (aisleT3('hardware') ? 0.35 : 0) - ag('shortfuse') * 0.16),
     reloadMul: Math.max(0.2, 1 - dkc('quick') / 100 - (aisleT3('hardware') ? 0.22 : 0) - ag('shortfuse') * 0.22),
     bounce: dkc('ricochet') + (fz('crosscut') ? 2 : 0),
-    home: dkc('guidance'),
+    home: 0,
     burn: dkc('spoiled'),
     slowHit: dkc('coldsnap') / 100,
     freeze: dkc('frostbite') / 100,
@@ -1493,8 +1530,6 @@ const CARDS = [
     r: { n: 'SLAM FIRE', d: 'a finished reload blows the room back' } },
   { id: 'ricochet',  name: 'RICOCHET',      aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 3, d: v => 'shots bounce ' + v + ' more times',
     r: { n: 'ANGLE OF ATTACK', d: 'every bounce adds +30% damage' } },
-  { id: 'guidance',  name: 'GUIDANCE',      aisle: 'hardware', max: 2, b: 2, v: 1.1, dec: 1, cap: 3.5, d: v => 'shots steer, turn rate ' + v,
-    r: { n: 'LOCK', d: 'they pick their own target and keep it' } },
   { id: 'munitions', name: 'MUNITIONS',     aisle: 'hardware', max: 2, b: 1, v: 1, int: 1, cap: 2, d: v => '+' + v + ' frag every wave',
     r: { n: 'INCENDIARY', d: 'frags leave the ground burning' } },
   /* ---- inherited from the GLOCK-18 ----
@@ -1637,8 +1672,27 @@ function cardName(c) { return c.name; }
 function dealCards(n, luckBonus) {
   const luck = S.luck + (luckBonus || 0);
   const out = [];
-  for (const f of availableFusions()) {
-    if (out.length >= Math.max(1, n - 1)) break;      // never a hand of nothing but off-cuts
+  /* Shuffled, not taken in FUSIONS order.
+
+     Off-cuts are LEGENDARY and they jump the queue ahead of the random pool,
+     so whichever one is ready decides what your legendary seat holds. Taken in
+     list order that made the whole thing deterministic -- and PRIME CUT is the
+     one whose condition is generic (three cards at RARE or better, rather than
+     two named cards at rank), so it is ready in nearly every run and it was
+     nearly always the one you saw. A legendary you can set your watch by is
+     not a legendary.
+
+     Fisher-Yates over a copy: the source array is a module constant and the
+     hand is dealt from it every level-up. */
+  const ready = availableFusions();
+  for (let i = ready.length - 1; i > 0; i--) {
+    const j = (Math.random() * (i + 1)) | 0;
+    const t = ready[i]; ready[i] = ready[j]; ready[j] = t;
+  }
+  /* And at most ONE a hand. Two off-cuts in three seats is a hand with no
+     ordinary choice left in it. */
+  for (const f of ready) {
+    if (out.length >= 1) break;
     out.push({ fusion: f, g: 4, val: 0 });
   }
   const pool = CARDS.filter(c => dkr(c.id) < c.max && cardUnlocked(c));
@@ -3183,7 +3237,7 @@ function emit(w) {
         // correct answer to everything.
         knock: w.knock === undefined ? 38 : w.knock, pin: w.pin || 0, burn: (w.burn || 0) + st.burn,
         bounce: (w.bounce || 0) + st.bounce, mark: w.mark || 0, chill: w.chill || 0,
-        home: homing, lock: rd('guidance') ? null : undefined,
+        home: homing,
         /* THE FLYKILLER and BLACK FRIDAY. `ghost` is what makes a singularity
            a singularity: it does not collide, it arrives. */
         chain: w.chain || 0, chainR: w.chainR || 0,
@@ -3501,7 +3555,7 @@ function killEnemy(e, ang) {
      8,829 bodies across a full old run against 6,306 now. */
   gainXP(e.boss ? 90 : Math.max(2, Math.round(e.score * 0.59)));
   if (FX.burst) deathBurst(e, ang);
-  S.hitstop = Math.max(S.hitstop, e.boss ? 0.3 : 0.035);
+  armHitstop(e.boss ? 0.3 : 0.035, !!e.boss);
   shake(e.boss ? 18 : 2.5);
   A.gib();
 
@@ -4368,7 +4422,19 @@ function update(rdt) {
      nothing broke, but a timer that keeps counting past its own end is a timer
      you cannot reason about, and it made every trace of a kill burst read
      hs=-0.015 instead of hs=0. */
-  if (S.hitstop > 0) { S.hitstop = Math.max(0, S.hitstop - rdt); if (FX.hitstop) dt *= 0.08; }
+  /* Refill first, then spend, so a frame can never pay out of a bank it has
+     not been credited for yet. Clamped at zero at both ends. */
+  S.hsBank = Math.min(HS_POOL, (S.hsBank || 0) + rdt * HS_DUTY);
+  if (S.hitstop > 0) {
+    S.hitstop = Math.max(0, S.hitstop - rdt);
+    /* A WHOLE FRAME, not the seconds left on the clock. Hitstop scales the
+       entire frame however little of it remains, so charging the bank only the
+       remainder under-counts badly: a 1ms grant bought a full frozen frame for
+       a thousandth of the budget, and the duty measured 60% against the 35% it
+       is set to. Charge what the player actually loses, which is a frame. */
+    S.hsBank = Math.max(0, S.hsBank - rdt);
+    if (FX.hitstop) dt *= 0.08;
+  }
   else if (S.slow > 0) { S.slow -= rdt; dt *= 0.35; }
 
   if (S.msgT > 0) S.msgT -= rdt;
@@ -4747,19 +4813,20 @@ function update(rdt) {
   /* ---- bullets ---- */
   for (let i = S.bul.length - 1; i >= 0; i--) {
     const b = S.bul[i];
-    // Seeking rounds steer toward the nearest thing they haven't already hit.
+    /* Seeking rounds steer toward the nearest thing they have not already hit.
+
+       Two things still set `home`: NOVA's ring of 20, and CROSSFIRE, which
+       turns SPLIT's two forks back toward what you were aiming past. Both are
+       shaped effects with a cost you pay for. GUIDANCE -- a card that simply
+       made every round you fired curve into the nearest body, with a rider
+       that let it pick a target and keep it -- was removed: it is an aimbot,
+       and a shooter where aiming is optional is a different game. */
     if (b.home) {
-      /* LOCK: the round picks one and keeps it, instead of re-deciding every
-         frame and drifting between two things that are equally close. */
       let best = null, bd = 260;
-      if (b.lock && !b.lock.dead && b.hitIds.indexOf(b.lock) < 0) best = b.lock;
-      else {
-        for (const e of S.en) {
-          if (e.dead || b.hitIds.indexOf(e) >= 0) continue;
-          const d2 = Math.hypot(e.x - b.x, e.y - b.y);
-          if (d2 < bd) { bd = d2; best = e; }
-        }
-        if (b.lock !== undefined) b.lock = best;
+      for (const e of S.en) {
+        if (e.dead || b.hitIds.indexOf(e) >= 0) continue;
+        const d2 = Math.hypot(e.x - b.x, e.y - b.y);
+        if (d2 < bd) { bd = d2; best = e; }
       }
       if (best) {
         const want = Math.atan2(best.y - b.y, best.x - b.x);
@@ -4919,8 +4986,14 @@ function update(rdt) {
           // THE FLYKILLER: the round stops here, the current does not
           if (b.chain) chainZap(e, hd, b.chain, b.chainR, b.col);
           b.hitIds.push(e);
-          if (b.hitIds.length > b.pierce) { S.bul.splice(i, 1); removed = true; }
-          break;
+          /* No break. The loop used to stop at the first body it found, so a
+             round with pierce 99 hit ONE thing a frame and survived to hit the
+             next thing on the NEXT frame -- six frames for six enemies, each
+             with its own hitstop. hitIds is already a permanent per-enemy
+             cooldown (the `indexOf` guard at the top), so continuing cannot
+             double-tap anything; it just lets the round spend its pierce
+             budget on the frame it actually arrives. See [[Bugs Found#28]]. */
+          if (b.hitIds.length > b.pierce) { S.bul.splice(i, 1); removed = true; break; }
         }
       }
       if (removed) break;
@@ -9875,7 +9948,7 @@ requestAnimationFrame(frame);
 // dev hook
 window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantGod, breakSecret,
                 giveWeapon, explode, triggerModagaz, triggerGoromania,
-                evolve, resetEvolution, canEvolve, EVO_COST, EVO_MAX, EVO_TIER, FXCAP, FX,
+                evolve, resetEvolution, canEvolve, EVO_COST, EVO_MAX, EVO_TIER, FXCAP, FX, HS_DUTY, HS_POOL, armHitstop,
                 evoGuns, evoCards, evoGunPool, evoCardPool, evoReward, evoFullSet,
                 openEvoPick, takeEvoGun, takeEvoCard, applyEvoLoadout,
                 OMEGA_COINS, COIN_RATE, powerMul,
