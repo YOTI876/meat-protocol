@@ -764,7 +764,7 @@ is drawn and reading the frame gap, the effects layer is about **75%** of the
 burst stall. Logged as [[Bugs Found#26. The probe measured draw calls being ISSUED, not drawing|#26]],
 with the positive form written into [[Instrumentation#How to attribute GPU-side cost]].
 
-## `HASH2` — Batch the effects layer, and bake the light blob
+## `1332c9b` — Batch the effects layer, and bake the light blob
 
 [[Rendering#One composite flip per pass, and one baked light blob|Measured]] on
 floor 7 with 140 bodies and four NOVA screen-clears, nine interleaved reps,
