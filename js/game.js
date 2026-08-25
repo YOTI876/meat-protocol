@@ -38,6 +38,38 @@ let uiScale = 2;
 
 const _l = subCanvas(W, H), lcan = _l.can, lctx = _l.ctx;
 
+/* ---- the lightmap's hole, baked once ----
+
+   drawLight() punches a soft hole per light source, and it used to build a
+   fresh createRadialGradient -- object, two colour stops, radial fill -- for
+   every one of them on every frame. That is once per enemy AND once per ring,
+   so a NOVA taking the ring pool from 0 to 80 roughly doubles the number of
+   gradients allocated and radial fills issued on the exact frame the burst
+   lands. It measured as the single biggest thing in the burst.
+
+   The ramp is identical for every blob; only radius and peak alpha differ. So
+   it is baked once at 128px and blitted, scaled, with globalAlpha carrying the
+   peak. Same precedent as the floor atlas and the spill sprites: if the shape
+   does not change, bake it.
+
+   Smoothing has to be turned on for the blit and back off afterwards.
+   subCanvas() disables it so the pixel art stays crisp, and a soft radial ramp
+   is the one thing on this canvas that is not pixel art -- sampled nearest
+   neighbour it comes out wider and brighter than the gradient it replaces,
+   which lifts the darkness off the whole room. Verified against the original
+   by alpha profile rather than by eye: within 2/255 at an enemy blob and
+   1/255 at a ring. */
+const _blobCan = (() => {
+  const B = 128, c = document.createElement('canvas');
+  c.width = c.height = B;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(B / 2, B / 2, 1, B / 2, B / 2, B / 2);
+  gr.addColorStop(0, 'rgba(0,0,0,1)');
+  gr.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, B, B);
+  return c;
+})();
+
 /* ---------- crisp UI text (drawn on the high-res overlay) ----------
    Coordinates are in game space (480x270) and scaled up, so layout code stays
    identical to the pixel canvas — only the rasterisation is sharper. One
@@ -2886,30 +2918,50 @@ function ring(x, y, r, col, life, wid) { S.rings.push({ x, y, r0: 2, r1: r, col,
    velocity, so the DIRECTION of a hit is visible; `glow` ones go through
    'lighter' so an impact core or a muzzle actually blows out instead of
    sitting on the image as a grey square. */
+/* TWO PASSES, ONE STATE CHANGE.
+
+   This used to be a single loop that set globalCompositeOperation to 'lighter'
+   and back around every glow particle it met. At a burst that is two blend
+   state changes per glow core, interleaved with the flat squares, so the
+   rasteriser cannot batch anything: it sees a state change, a few draws, a
+   state change, a few draws, all the way down a pool of 900.
+
+   The pool is walked twice instead — once for everything in source-over, once
+   for the additive cores behind a single flip. Two passes over an array is
+   nothing, and it allocates nothing, which is the constraint that rules out
+   sorting into buckets. `lit` means a frame with no glow particles never
+   touches the blend state at all.
+
+   It also draws better. The cores are the frame a thing STOPS EXISTING on, and
+   they now land on top of the debris rather than under whichever squares
+   happened to be later in the array. */
 function drawParticles() {
   ctx.save();
   ctx.lineCap = 'round';
   for (const q of S.part) {
+    if (q.glow) continue;
     const a = clamp(q.life / q.max, 0, 1);
+    ctx.globalAlpha = a;
     if (q.trail) {
-      ctx.globalAlpha = a;
       ctx.strokeStyle = q.col;
       ctx.lineWidth = 1 + a * 0.8;
       ctx.beginPath();
       ctx.moveTo(q.x, q.y);
       ctx.lineTo(q.x - q.vx * 0.026, q.y - q.vy * 0.026);
       ctx.stroke();
-    } else if (q.glow) {
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = a;
-      ctx.fillStyle = q.col;
-      ctx.beginPath(); ctx.arc(q.x, q.y, q.s * (0.5 + a), 0, TAU); ctx.fill();
-      ctx.globalCompositeOperation = 'source-over';
     } else {
-      ctx.globalAlpha = a;
       ctx.fillStyle = q.col;
       ctx.fillRect(q.x | 0, q.y | 0, q.s, q.s);
     }
+  }
+  let lit = false;
+  for (const q of S.part) {
+    if (!q.glow) continue;
+    if (!lit) { ctx.globalCompositeOperation = 'lighter'; lit = true; }
+    const a = clamp(q.life / q.max, 0, 1);
+    ctx.globalAlpha = a;
+    ctx.fillStyle = q.col;
+    ctx.beginPath(); ctx.arc(q.x, q.y, q.s * (0.5 + a), 0, TAU); ctx.fill();
   }
   ctx.restore();
   ctx.globalAlpha = 1;
@@ -4289,7 +4341,11 @@ function updateWaves(dt) {
 function update(rdt) {
   S.t += rdt;
   let dt = rdt;
-  if (S.hitstop > 0) { S.hitstop -= rdt; dt *= 0.08; }
+  /* Clamped at zero. It used to run negative -- nothing read it below zero so
+     nothing broke, but a timer that keeps counting past its own end is a timer
+     you cannot reason about, and it made every trace of a kill burst read
+     hs=-0.015 instead of hs=0. */
+  if (S.hitstop > 0) { S.hitstop = Math.max(0, S.hitstop - rdt); dt *= 0.08; }
   else if (S.slow > 0) { S.slow -= rdt; dt *= 0.35; }
 
   if (S.msgT > 0) S.msgT -= rdt;
@@ -6285,6 +6341,9 @@ function drawWorld() {
      hot inner edge trailing the leading one — three lines, and every one of
      the two dozen call sites gets sharper for free. The width also thins as
      it goes, so it dissipates instead of just disappearing. */
+  /* Two passes and one state change, for the reason drawParticles() is two
+     passes: the hot leading edge is additive, and flipping the blend state
+     around each of eighty rings breaks every batch between them. */
   ctx.save();
   for (const r of S.rings) {
     const u = clamp(1 - r.life / r.max, 0, 1);
@@ -6295,15 +6354,16 @@ function drawWorld() {
     ctx.strokeStyle = r.col;
     ctx.lineWidth = Math.max(0.6, r.wid * (1 - u * 0.65));
     ctx.beginPath(); ctx.arc(r.x, r.y, rad, 0, TAU); ctx.stroke();
-    // the leading edge, hotter and thinner, just inside the front
-    if (u < 0.55) {
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = (1 - u / 0.55) * 0.5;
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(r.x, r.y, rad * 0.94, 0, TAU); ctx.stroke();
-      ctx.globalCompositeOperation = 'source-over';
-    }
+  }
+  let ringLit = false;
+  for (const r of S.rings) {
+    const u = clamp(1 - r.life / r.max, 0, 1);
+    if (u >= 0.55) continue;
+    if (!ringLit) { ctx.globalCompositeOperation = 'lighter'; ctx.lineWidth = 1;
+                    ctx.strokeStyle = '#ffffff'; ringLit = true; }
+    const ease = 1 - Math.pow(1 - u, 3);
+    ctx.globalAlpha = (1 - u / 0.55) * 0.5;
+    ctx.beginPath(); ctx.arc(r.x, r.y, lerp(r.r0, r.r1, ease) * 0.94, 0, TAU); ctx.stroke();
   }
   ctx.restore();
   ctx.globalAlpha = 1;
@@ -7725,9 +7785,12 @@ function drawLight() {
   const blob = (wx, wy, r, a) => {
     const s = worldToScreen(wx, wy);
     if (s.x < -r || s.x > W + r || s.y < -r || s.y > H + r) return;
-    const gg = lctx.createRadialGradient(s.x, s.y, 1, s.x, s.y, r * z);
-    gg.addColorStop(0, 'rgba(0,0,0,' + a + ')'); gg.addColorStop(1, 'rgba(0,0,0,0)');
-    lctx.fillStyle = gg; lctx.beginPath(); lctx.arc(s.x, s.y, r * z, 0, TAU); lctx.fill();
+    const rad = r * z;
+    lctx.globalAlpha = a;
+    lctx.imageSmoothingEnabled = true;
+    lctx.drawImage(_blobCan, s.x - rad, s.y - rad, rad * 2, rad * 2);
+    lctx.imageSmoothingEnabled = false;
+    lctx.globalAlpha = 1;
   };
 
   if (S.muzzle && S.muzzle.t > 0) blob(S.muzzle.x, S.muzzle.y, S.muzzle.big ? 130 : 92, 1);

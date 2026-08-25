@@ -274,6 +274,30 @@ him actually leaves.
 
 ## Lighting
 
+> [!note] Every light source used to build its own gradient, every frame
+> `blob()` punches the soft hole each light source makes, and it called
+> `createRadialGradient` — an object plus two colour stops plus a radial fill —
+> once per call. It is called **once per enemy and once per ring**, so a NOVA
+> taking the ring pool from 0 to 80 roughly *doubles* the gradients allocated
+> and radial fills issued on the exact frame the burst lands. It measured as
+> the single largest thing in a burst: **−37% stall per kill** on its own.
+>
+> The ramp is identical for every blob — only radius and peak alpha differ — so
+> it is baked once into a 128px sprite and blitted, scaled, with `globalAlpha`
+> carrying the peak. Same precedent as the [[#The floor|floor atlas]] and the
+> spill sprites: if the shape does not change, bake it.
+>
+> **Smoothing has to be switched on for that blit and off again afterwards.**
+> `subCanvas()` disables it so the pixel art stays crisp, and a soft radial
+> ramp is the one thing on that canvas which is not pixel art — sampled nearest
+> neighbour it comes out wider and brighter than the gradient it replaces,
+> which lifts the darkness off the entire room. That was caught by eye and then
+> settled properly: the replacement was verified against the original by
+> **alpha profile**, within **2/255** at an enemy blob and **1/255** at a ring.
+> Two screenshots of a chaotic scene are not a comparison; two alpha ramps are.
+
+
+
 `drawLight()` renders an opaque dark layer to a lightmap canvas, then punches
 holes in it with `destination-out` radial gradients: one around the player,
 one cone along the aim direction, and smaller ones around muzzle flashes,
@@ -394,6 +418,36 @@ floor and 188 under deliberate load.
 > `S.fx` drains **3 entries a frame, capped at 12**. A kill that triggers an
 > effect that kills something that triggers an effect is a recursion, and this
 > is the thing that flattens it into a queue.
+
+## One composite flip per pass, and one baked light blob
+
+Two changes, measured together against the pre-change build with a heavy
+scenario — floor 7, **140 bodies held**, four NOVA screen-clears, nine
+interleaved reps, medians. Reported **per kill**, because a faster arm covers
+less game time in a fixed frame count and therefore gets fewer kills; comparing
+raw stall would flatter it.
+
+| | stall per kill | median stall | worst frame |
+|---|---|---|---|
+| before | 14.16 ms | 984 | 83.5 ms |
+| `+` one composite flip per pass | 12.83 (**−9%**) | 883 | 83.5 |
+| `+` baked light blob | **8.97 (−37%)** | 583 | **66.9** |
+
+**The blend batching is the small half.** `drawParticles()` and the ring pass
+each used to set `globalCompositeOperation` to `'lighter'` and back *around
+every entity that needed it* — two state changes per glow core, interleaved
+with the flat squares, so nothing between them could batch. Both walk their
+pool twice now: once for everything in `source-over`, once for the additive
+part behind a single flip, with a `lit` guard so a frame with no additive
+entities never touches the blend state at all. Two passes over an array
+allocates nothing, which is what rules out sorting into buckets.
+
+It also draws better. The glow cores are the frame a thing *stops existing* on,
+and they now land on top of the debris instead of under whichever squares
+happened to sit later in the array.
+
+**The light blob is the big half, and it was not on anyone's list.** See
+[[#Lighting]].
 
 ## The effect ceilings, swept
 

@@ -753,6 +753,36 @@ loadout, 500 rolls a side: **0** before the contract, **147** after. The RARE
 evolution rung keeps two guns when it is locked, so no rung ever drops to a
 single card.
 
+## `6fa4327` — Record the measurement error that cost a cycle
+
+`PROBE` brackets each render phase with `performance.now()`, and a canvas draw
+call returns as soon as it is *recorded* — the rasterisation lands in the gap
+between frames, where no bracket around JS can see it. So "the particle pass is
+0.35ms at 900 live particles" was the cost of *asking* for 900 particles, and
+it was used to rule out batching the effects layer. Measured by changing what
+is drawn and reading the frame gap, the effects layer is about **75%** of the
+burst stall. Logged as [[Bugs Found#26. The probe measured draw calls being ISSUED, not drawing|#26]],
+with the positive form written into [[Instrumentation#How to attribute GPU-side cost]].
+
+## `HASH2` — Batch the effects layer, and bake the light blob
+
+[[Rendering#One composite flip per pass, and one baked light blob|Measured]] on
+floor 7 with 140 bodies and four NOVA screen-clears, nine interleaved reps,
+reported per kill: **14.16ms → 8.97ms of stall per kill, −37%**, worst frame
+83.5 → 66.9ms.
+
+The batching is the small half (−9%): `drawParticles()` and the ring pass each
+flipped `globalCompositeOperation` around every entity that needed it, and now
+walk their pool twice with one flip between. The
+[[Rendering#Lighting|baked light blob]] is the rest, and it was not on the list
+— `blob()` built a fresh `createRadialGradient` per light source per frame,
+once per enemy *and once per ring*, so a NOVA doubled the count on the frame
+the burst landed.
+
+`S.hitstop` is also clamped at zero. It ran negative before; nothing read it
+below zero so nothing broke, but a timer that keeps counting past its own end
+is a timer you cannot reason about.
+
 ## Related
 - [[Bugs Found]] — the defects behind each fix above, all of them now closed
 - [[Tuning Values]] — where the numbers stand today
