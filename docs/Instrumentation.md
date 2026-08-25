@@ -93,6 +93,82 @@ When the phase split and the frame gap disagree, **the frame gap is right**.
 Probe cost, measured rather than claimed: 11 `performance.now()` calls a frame,
 **~6us**, **0.036%** of a 16.7ms budget.
 
+## `MEAT.FX` — one switch per thing a hit does
+
+"It feels laggy" is not one symptom. Real dropped frames and
+[[#Hitstop is a second symptom in the same clothes|hitstop holding the
+simulation at 8%]] while the screen keeps painting at 60 feel nearly identical
+from the chair, and no amount of profiling settles which one a player is
+reacting to. These are for settling it **by feel** — flip one from the console,
+play the same fight, see whether it changed.
+
+```js
+MEAT.FX.hitstop = 0      // and back to 1
+```
+
+| switch | `0` turns off | verified by |
+|---|---|---|
+| `hitstop` | the 8% time-scale after a kill — the kill still lands | a body travels **2.3px** in six frames with it, **14.9px** without |
+| `flash` | the white tint on an enemy that just took a hit | drawn brightness 712633 → 641243 |
+| `knock` | knockback from a bullet — **gameplay**, bodies stop moving | struck enemy `vx` 97.6 → −5.5 |
+| `burst` | `deathBurst()`: the pop, gibs, meat cloud, sparks, embers | a kill makes 60 particles + 12 gibs → 0 and 0 |
+| `decals` | `blood()` painting the arena-sized decal canvas | 23.4µs → 5.6µs a hit |
+| `eyes` | the two additive eye dots per enemy | drawn pixels differ |
+| `lights` | the lightmap hole per enemy and per ring | room goes visibly darker |
+
+Only `knock` changes gameplay; the rest are presentation. `hitstop` still
+drains its timer when off, so turning it off cannot strand the game in slow
+motion.
+
+## What a plain bullet hit costs
+
+The **hit** path, not the kill path — you hit far more things than you kill, so
+it is worth knowing separately. Median of seven runs of 3,000 non-lethal,
+non-crit hits:
+
+| on the frame a bullet lands | µs |
+|---|---|
+| `blood()` — 6 + r×2 individual `fillRect` calls onto the decal canvas | **17.8** |
+| `ST()` — the stat table, rebuilt from the deck | **6.3** |
+| knockback, the `e.hit` flash flag, squash, `spray()`, `impact()`, the damage number | **< 1 combined** |
+| **total** `damageEnemy()` | **23.5** |
+| a crit on top (`A.hit()`, 10 particles, a ring) | +0.9 |
+
+> [!note] Three things the hit path does NOT do
+> It never touches `S.hitstop`. It never shakes the screen. It never builds a
+> gradient. Those all belong to the kill path, and the suspicion that a hit
+> carried its own copy of them is measurably wrong.
+>
+> The flash tint mints **exactly one** sprite-cache entry, the first time it is
+> used, and none after. It is a constant string, so it cannot leak the way
+> [[Bugs Found#2. God-mode rainbow tint leaked the sprite cache|#2]] did.
+
+> [!warning] A bullet hits ONE enemy per frame, whatever its pierce
+> The collision loop in `updateBullets()` breaks after the first enemy it
+> finds. `pierce: 99` does not mean 99 bodies on one frame — it means the
+> round survives to hit one more on the NEXT frame. A slug through six enemies
+> is six consecutive frames, each paying a hit and, if lethal, a kill and
+> another 0.035s of hitstop. That is why a pierce shot cannot be made to
+> produce a multi-kill frame in a harness, and it is most of why it feels the
+> way it does.
+
+At nine hits on one frame — a shotgun into a crowd, the worst realistic case —
+the whole hit path is **2.3% of a frame**. It is not the hitch.
+
+## Hitstop is a second symptom in the same clothes
+
+`killEnemy()` does `S.hitstop = Math.max(S.hitstop, 0.035)`, and `update()`
+scales `dt` to **8%** while it runs — draw is untouched. `Math.max` means ten
+simultaneous kills buy one kill's worth, which is right. What is not right is
+that it **re-arms on every kill**: 0.035s is about two frames at 60Hz, so kills
+arriving faster than every two frames hold the simulation in near-freeze
+indefinitely. Measured on a burst: active on **20 of 40 frames** through a
+pierce shot and **28 of 50** through a NOVA.
+
+Nothing is dropping a frame in that window. The screen is painting at 60 and
+almost nothing is moving, which from the chair is indistinguishable from a
+stall. `MEAT.FX.hitstop = 0` is how you tell them apart.
+
 ## `MEAT.soak(opts)`
 
 ```js

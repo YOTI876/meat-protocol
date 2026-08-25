@@ -2820,6 +2820,29 @@ function spawnMini(idx) {
    ceiling controls. See [[Rendering#The effect ceilings, swept]]. */
 const FXCAP = { part: 900, gibs: 420, rings: 80 };
 
+/* ---- FX: one switch per thing that happens when you hit something ----
+
+   "It feels laggy" is not one symptom. Real dropped frames and a hitstop
+   holding the simulation at 8% while the screen keeps painting at 60 feel
+   nearly identical from the chair, and no amount of profiling settles which
+   one a player is reacting to. These are for settling it BY FEEL: flip one,
+   play the same fight, see if it changed.
+
+   Every one of them is a presentation switch except knock, which is
+   gameplay, and burst, which changes how much of the pool a death fills.
+   Set from the console:  MEAT.FX.hitstop = 0
+
+   | switch    | 0 turns off |
+   |-----------|-------------|
+   | hitstop   | the 8% time-scale after a kill -- the kill still lands |
+   | flash     | the white tint on an enemy that just took a hit |
+   | knock     | knockback from a bullet (GAMEPLAY -- bodies stop moving) |
+   | burst     | deathBurst: the pop, gibs, meat cloud, sparks, embers |
+   | decals    | blood() painting the arena-sized decal canvas |
+   | eyes      | the two additive eye dots per enemy |
+   | lights    | the lightmap hole per enemy and per ring |          */
+const FX = { hitstop: 1, flash: 1, knock: 1, burst: 1, decals: 1, eyes: 1, lights: 1 };
+
 function part(x, y, col, n, spd, life, size) {
   for (let i = 0; i < n; i++) {
     const a = rnd(0, TAU), s = rnd(spd * 0.3, spd);
@@ -2873,7 +2896,7 @@ function gib(x, y, col, n) {
 /* Decals are baked at render resolution now, so a splash can be a spatter of
    fine droplets around a wet core instead of a handful of blocks. */
 function blood(x, y, r, col) {
-  if (!decalCtx) return;
+  if (!decalCtx || !FX.decals) return;
   const P = 1 / RS;
   decalCtx.fillStyle = col || 'rgba(96,10,16,0.55)';
   for (let i = 0; i < 6; i++) {
@@ -3477,7 +3500,7 @@ function killEnemy(e, ang) {
      with, which is a harder game rather than a shorter one. The 1.4 is measured:
      8,829 bodies across a full old run against 6,306 now. */
   gainXP(e.boss ? 90 : Math.max(2, Math.round(e.score * 0.59)));
-  deathBurst(e, ang);
+  if (FX.burst) deathBurst(e, ang);
   S.hitstop = Math.max(S.hitstop, e.boss ? 0.3 : 0.035);
   shake(e.boss ? 18 : 2.5);
   A.gib();
@@ -4345,7 +4368,7 @@ function update(rdt) {
      nothing broke, but a timer that keeps counting past its own end is a timer
      you cannot reason about, and it made every trace of a kill burst read
      hs=-0.015 instead of hs=0. */
-  if (S.hitstop > 0) { S.hitstop = Math.max(0, S.hitstop - rdt); dt *= 0.08; }
+  if (S.hitstop > 0) { S.hitstop = Math.max(0, S.hitstop - rdt); if (FX.hitstop) dt *= 0.08; }
   else if (S.slow > 0) { S.slow -= rdt; dt *= 0.35; }
 
   if (S.msgT > 0) S.msgT -= rdt;
@@ -4867,7 +4890,7 @@ function update(rdt) {
         if (e.dead || b.hitIds.indexOf(e) >= 0) continue;
         if (Math.hypot(e.x - b.x, e.y - b.y) < e.r + 3.5 + b.size) {
           const a = Math.atan2(b.vy, b.vx);
-          if (b.knock) { e.vx += Math.cos(a) * b.knock; e.vy += Math.sin(a) * b.knock; }
+          if (b.knock && FX.knock) { e.vx += Math.cos(a) * b.knock; e.vy += Math.sin(a) * b.knock; }
           if (b.pin) e.stun = Math.max(e.stun, b.pin);
           if (b.burn) { e.burn = Math.max(e.burn, b.burn); e.burnT = Math.max(e.burnT, 2.6); }
           if (b.mark && e.mark <= 0) { e.mark = b.mark; float(e.x, e.y - 12, 'ON SALE', '#ff4ab0'); }
@@ -7701,7 +7724,7 @@ function drawEnemy(e) {
   }
 
   let tint = e.tint || null;
-  if (e.hit > 0) tint = 'rgba(255,255,255,0.85)';
+  if (e.hit > 0 && FX.flash) tint = 'rgba(255,255,255,0.85)';
   else if (e.burnT > 0) tint = 'rgba(255,120,40,0.45)';
   else if (e.stun > 0) tint = 'rgba(247,220,85,0.4)';
   else if (e.poseT > 0) tint = 'rgba(255,90,90,0.32)';   // lit up while winding up
@@ -7718,6 +7741,7 @@ function drawEnemy(e) {
   ctx.restore();
 
   // eyes burn through the dark — anchored off the art, not guessed
+  if (FX.eyes) {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   const eye = e.bank ? e.bank.eye : { y: -3, sep: 2.6 };
@@ -7730,6 +7754,7 @@ function drawEnemy(e) {
   ctx.fillRect(ex - sep - eg / 2, ey, eg, eg);
   ctx.fillRect(ex + sep - eg / 2, ey, eg, eg);
   ctx.restore();
+  }
 
   if (e.boss && e.phase === 'tell') {
     ctx.save(); ctx.globalCompositeOperation = 'lighter';
@@ -7829,10 +7854,10 @@ function drawLight() {
       ? 1 + Math.sin(S.t * 6 + w.x) * 0.09 : 1;
     blob(w.x + w.w / 2, w.y + w.h / 2, r * flick, 0.55);
   }
-  for (const e of S.en) blob(e.x, e.y, e.boss ? 40 : 15, 0.42);
+  if (FX.lights) for (const e of S.en) blob(e.x, e.y, e.boss ? 40 : 15, 0.42);
   // incoming fire lights its own way in, so a dark room can't hide it
   for (const b of S.eb) blob(b.x, b.y, 26, 0.75);
-  for (const r of S.rings) blob(r.x, r.y, r.r1 * 0.8, clamp(r.life / r.max, 0, 1) * 0.8);
+  if (FX.lights) for (const r of S.rings) blob(r.x, r.y, r.r1 * 0.8, clamp(r.life / r.max, 0, 1) * 0.8);
 
   lctx.globalCompositeOperation = 'source-over';
   blit(ctx, lcan, 0, 0);
@@ -9850,7 +9875,7 @@ requestAnimationFrame(frame);
 // dev hook
 window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantGod, breakSecret,
                 giveWeapon, explode, triggerModagaz, triggerGoromania,
-                evolve, resetEvolution, canEvolve, EVO_COST, EVO_MAX, EVO_TIER, FXCAP,
+                evolve, resetEvolution, canEvolve, EVO_COST, EVO_MAX, EVO_TIER, FXCAP, FX,
                 evoGuns, evoCards, evoGunPool, evoCardPool, evoReward, evoFullSet,
                 openEvoPick, takeEvoGun, takeEvoCard, applyEvoLoadout,
                 OMEGA_COINS, COIN_RATE, powerMul,
