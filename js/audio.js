@@ -5,6 +5,26 @@ const A = (() => {
   let ac = null, master = null, droneGain = null, droneNodes = [], on = false, muted = false;
   let noise = null, musicBus = null;
 
+  /* ---- volume ----
+
+     0.45 used to be a literal in two places -- init() and toggleMute() -- so
+     the only choice a player had was all or nothing, and unmuting always went
+     back to whatever those literals said. It is a stored value now, in eleven
+     steps, kept in the same save the rest of the settings live in.
+
+     MUSIC_MIX is how loud the score sits under the sound effects. It rides the
+     master with everything else, so turning the whole thing down turns the
+     music down with it rather than leaving a band playing over silence. */
+  const VOL_KEY = 'meat_vol', VOL_STEPS = 10, MUSIC_MIX = 0.85;
+  let vol = 0.45;
+  try {
+    const raw = localStorage.getItem(VOL_KEY);
+    if (raw !== null) { const v = parseFloat(raw); if (v >= 0 && v <= 1) vol = v; }
+  } catch (e) { /* private mode: fall back to the default and carry on */ }
+  const applyVol = (glide) => {
+    if (master) master.gain.setTargetAtTime(muted ? 0 : vol, ac.currentTime, glide === undefined ? 0.03 : glide);
+  };
+
   function makeNoise() {
     const len = ac.sampleRate * 2;
     const buf = ac.createBuffer(1, len, ac.sampleRate);
@@ -17,7 +37,7 @@ const A = (() => {
     if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
     ac = new (window.AudioContext || window.webkitAudioContext)();
     master = ac.createGain();
-    master.gain.value = 0.45;
+    master.gain.value = muted ? 0 : vol;
     master.connect(ac.destination);
     noise = makeNoise();
     on = true;
@@ -25,7 +45,7 @@ const A = (() => {
     // The score gets its own bus under master, so muting and SFX ducking
     // both still apply to it.
     musicBus = ac.createGain();
-    musicBus.gain.value = 0.85;
+    musicBus.gain.value = MUSIC_MIX;
     musicBus.connect(master);
     if (typeof MUSIC !== 'undefined') MUSIC.attach(ac, musicBus);
   }
@@ -105,8 +125,22 @@ const A = (() => {
   const api = {
     init,
     ready: () => on && !muted,
-    toggleMute() { muted = !muted; if (master) master.gain.setTargetAtTime(muted ? 0 : 0.45, now(), 0.05); return muted; },
+    toggleMute() { muted = !muted; applyVol(0.05); return muted; },
     isMuted: () => muted,
+    /* Reported as 0-10 because that is what the HUD shows and what the keys
+       step through; the curve to gain is squared, so the quiet half of the
+       range has somewhere to go instead of being all one loudness. */
+    volSteps: () => VOL_STEPS,
+    vol: () => Math.round(Math.sqrt(vol / 0.9) * VOL_STEPS),
+    setVol(step) {
+      const st = Math.max(0, Math.min(VOL_STEPS, Math.round(step)));
+      vol = 0.9 * Math.pow(st / VOL_STEPS, 2);
+      if (st > 0) muted = false;
+      applyVol();
+      try { localStorage.setItem(VOL_KEY, String(vol)); } catch (e) {}
+      return st;
+    },
+    nudgeVol(d) { return api.setVol(api.vol() + d); },
     setDread,
     music: (typeof MUSIC !== 'undefined') ? MUSIC : null,
     /* Ducks the score under a big moment (boss roar, explosion) and lets it back up. */
@@ -390,6 +424,75 @@ const A = (() => {
     breath() {
       if (!on) return; const t = now();
       burst(0.16, 0.55, t, 'bandpass', 320 + Math.random() * 260, 180, 2.4);
+    },
+
+    /* ---- the ordinary ones ----
+       Everything below was a silent event before. None of them is a set piece;
+       they are the noises a room makes when you are moving around in it, and
+       their absence is the kind of thing you notice without being able to name. */
+    // a body meeting a wall, or another body
+    thud() {
+      if (!on) return; const t = now();
+      burst(0.13, 0.09, t, 'lowpass', 420, 130, 1.2);
+      tone('sine', 96, 54, 0.11, 0.08, t);
+    },
+    // a round that hit masonry instead of meat
+    ricochet() {
+      if (!on) return; const t = now();
+      const f = 1500 + Math.random() * 1400;
+      tone('square', f, f * 0.32, 0.07, 0.13, t);
+      burst(0.09, 0.05, t, 'highpass', 4200, 3000, 2);
+    },
+    // the empty-magazine click, distinct from dryfire's whole failed action
+    click() {
+      if (!on) return; const t = now();
+      burst(0.10, 0.018, t, 'bandpass', 2600, 2200, 6);
+    },
+    // an enemy noticing you
+    alert() {
+      if (!on) return; const t = now();
+      tone('sawtooth', 300, 520, 0.10, 0.16, t);
+      burst(0.07, 0.12, t, 'bandpass', 900, 1500, 3);
+    },
+    // the level-up hand arriving
+    levelup() {
+      if (!on) return; const t = now();
+      [0, 4, 7, 12].forEach((semi, i) => {
+        tone('triangle', 330 * Math.pow(2, semi / 12), 330 * Math.pow(2, semi / 12),
+             0.13, 0.30, t + i * 0.055);
+      });
+      burst(0.10, 0.5, t, 'highpass', 2600, 5200, 1);
+    },
+    // a card taken
+    cardTake() {
+      if (!on) return; const t = now();
+      tone('triangle', 520, 780, 0.14, 0.14, t);
+      tone('sine', 1040, 1560, 0.07, 0.16, t + 0.03);
+    },
+    // the shop door, and the floor door, are not the same door
+    floorClear() {
+      if (!on) return; const t = now();
+      [0, 5, 7].forEach((semi, i) =>
+        tone('sawtooth', 165 * Math.pow(2, semi / 12), 165 * Math.pow(2, semi / 12),
+             0.16, 0.7, t + i * 0.10));
+      burst(0.18, 0.9, t, 'lowpass', 1200, 300, 1);
+    },
+    // low health, once per crossing rather than per frame
+    lowHealth() {
+      if (!on) return; const t = now();
+      tone('sine', 190, 120, 0.20, 0.42, t);
+      tone('sine', 95, 62, 0.16, 0.5, t);
+    },
+    // something big landing on the floor
+    stomp() {
+      if (!on) return; const t = now();
+      tone('sine', 120, 34, 0.34, 0.30, t);
+      burst(0.24, 0.22, t, 'lowpass', 700, 120, 1);
+    },
+    // the volume keys, so the change is audible at the level you just set
+    blip() {
+      if (!on) return; const t = now();
+      tone('square', 660, 660, 0.10, 0.05, t);
     },
 
     death() {

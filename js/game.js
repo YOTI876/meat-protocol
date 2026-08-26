@@ -322,7 +322,15 @@ addEventListener('keydown', e => {
   if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault();
   if (keys[e.code]) return;
   keys[e.code] = true;
-  if (e.code === 'KeyM') A.toggleMute();
+  if (e.code === 'KeyM') { const m = A.toggleMute(); msg('SOUND', m ? 'MUTED' : 'ON  ' + volBar(), 1.2); }
+  /* Volume, on the two keys every game has put it on. Both the main row and
+     the numpad, because a laptop has one and a desktop has the other. */
+  if (e.code === 'Minus' || e.code === 'NumpadSubtract') {
+    const v = A.nudgeVol(-1); A.blip(); msg('VOLUME', volBar(), 1.0);
+  }
+  if (e.code === 'Equal' || e.code === 'NumpadAdd') {
+    const v = A.nudgeVol(1); A.blip(); msg('VOLUME', volBar(), 1.0);
+  }
   // F3 is the probe. F4 toggles the flush mode it warns about.
   if (e.code === 'F3') { e.preventDefault(); PROBE.on = PROBE.on ? 0 : 1; if (PROBE.on) PROBE.reset(); }
   if (e.code === 'F4' && PROBE.on) { e.preventDefault(); PROBE.drain = PROBE.drain ? 0 : 1; PROBE.reset(); }
@@ -657,8 +665,19 @@ const BOSS_FINAL = {
 /* How much health the FLOOR's boss has, before diff().hp multiplies it.
    Indexed by floor, not by identity — see the roster comment. Nine rungs for
    nine floors; floor 10 has its own number. */
-const BOSS_HP = [1350, 1520, 1700, 1880, 2060, 2250, 2440, 2640, 2850];
-const FINAL_HP = 4200;
+/* A floor boss was dying in well under the length of its own pattern set --
+   you could put one down before it had shown you the second thing it does,
+   which makes a boss a damage check rather than a fight.
+
+   One multiplier rather than nine hand-edited numbers, because the SHAPE of
+   the curve was never the problem: floor 1 should still be the gentlest and
+   the finale should still be the wall. Turn this and the whole ladder moves
+   together. Note these are only the base; spawnBoss multiplies again by
+   diff().hp and by 1.35, so floor 9 is already 14x floor 1 before this. */
+const BOSS_HP_MUL = 2.2;
+const BOSS_HP = [1350, 1520, 1700, 1880, 2060, 2250, 2440, 2640, 2850]
+  .map(h => Math.round(h * BOSS_HP_MUL));
+const FINAL_HP = Math.round(4200 * BOSS_HP_MUL);
 /* The single place that answers "how much boss is this floor worth". Both
    spawnBoss and spawnMini go through it, so an elite can never be priced
    against a different number than the boss it is a share of. */
@@ -839,7 +858,15 @@ const WEP = {
   rail:  { id: 'rail',  name: 'GOD FINGER',    spr: SPR.rail,  gr: 4, floor: 6, price: 360, mag: 6,   rate: 0.55,  dmg: 210, spread: 0,    spd: 950, pellets: 1, reload: 1.9,  sfx: 'railgun',  col: '#a8e8ff', charge: 0.5, pierce: 99, size: 3, knock: 110, tag: 'you point. the room is shorter afterwards.' },
   // THE FISH. Coins, not cards — 500 of them, which at COIN_RATE is most of a
   // deep run. `prism: 1` is what makes its beam cycle colour; see drawWorld.
-  omega: { id: 'omega', name: 'THE FISH',      spr: SPR.omega, gr: 4, floor: 4, price: OMEGA_COINS, mag: 300, rate: 0.02, dmg: 720, spread: 0, spd: 0, pellets: 0, reload: 2.6, sfx: 'beam', col: '#c05cff', beam: 1, prism: 1, girth: 11, tag: 'it is a fish. it fires a laser. do not ask.' },
+  /* THE FISH, cut down. It used to be 720 a second to EVERY body inside an
+     880x22px swathe, held for seven seconds a magazine -- which is not a
+     weapon, it is a button that deletes rooms. Four things changed and they
+     work together: it is half as wide, it does not reach across the arena any
+     more, it falls off along its own length, and each additional body in the
+     beam takes less than the one in front of it. What is left is a focused
+     beam that melts what it is pointed at, which is what a fish with a laser
+     ought to be. See [[Weapons#THE FISH, cut down]]. */
+  omega: { id: 'omega', name: 'THE FISH',      spr: SPR.omega, gr: 4, floor: 4, price: OMEGA_COINS, mag: 200, rate: 0.02, dmg: 300, spread: 0, spd: 0, pellets: 0, reload: 3.4, sfx: 'beam', col: '#c05cff', beam: 1, prism: 1, girth: 5, reach: 120, falloff: 0.55, spread2: 0.5, tag: 'it is a fish. it fires a laser. do not ask.' },
   /* ---- the other two LEGENDARIES ----
      Both are deep, both are expensive, and neither is a bigger number than the
      gun below it — that is the point of the rung. A LEGENDARY has to do
@@ -1133,6 +1160,15 @@ const S = {};
    every run of a game whose floors take four minutes is two characters of
    nothing. Floors are padded so the number never changes width mid-wave and
    jitters the right edge of the HUD. */
+/* Ten blocks and a number. The same shape the ammo counter uses, because it
+   is the same question -- how much of this is left. */
+function volBar() {
+  const v = A.vol(), n = A.volSteps();
+  let s = '';
+  for (let i = 0; i < n; i++) s += i < v ? '\u2588' : '\u2591';
+  return s + '  ' + (v * 10) + '%';
+}
+
 function runClock(t) {
   const s = Math.max(0, (t === undefined ? S.runT : t) | 0);
   const h = (s / 3600) | 0, m = ((s / 60) | 0) % 60;
@@ -1833,6 +1869,7 @@ function openLevelUp(luckBonus) {
   S.mode = 'levelup';
   S.lvlLuck = luckBonus || 0;
   S.hand = dealCards(handSize(), S.lvlLuck);
+  A.levelup();
   dealDrama(S.hand);
 }
 function rerollHand() {
@@ -1859,6 +1896,7 @@ function afterPick(g) {
 function takeCard(o) {
   if (S.upgPts <= 0 || !o) return;
   if (o.fusion) return takeFusion(o);
+  A.cardTake();
   const c = o.c;
   const before = ais(c.aisle);
   const d = S.deck[c.id] || (S.deck[c.id] = { rank: 0, amt: 0, g: 0 });
@@ -3369,21 +3407,44 @@ function updateBeam(dt) {
   if (!w.beam || !mouse.down || p.reT > 0) { p.beamT = 0; return; }
   if (p.mags.omega <= 0 && !S.god) { startReload(); return; }
   p.beamT += dt;
-  if (!S.god) p.mags.omega -= dt * 42;
+  if (!S.god) p.mags.omega -= dt * 46;
   if (p.mags.omega < 0) p.mags.omega = 0;
 
   const ox = p.x + Math.cos(p.ang) * 11, oy = p.y + Math.sin(p.ang) * 11 - 1;
   let ex = ox, ey = oy;
   const hits = [];
   const girth = w.girth * (1 + st.split * 0.45);   // SPLIT widens the beam instead of forking it
-  for (let i = 1; i < 220; i++) {
+  const reach = w.reach || 220;
+  /* `hits` comes out ordered near-to-far, because the march is near-to-far.
+     Both of the falloffs below depend on that and neither sorts, which is what
+     keeps this off the allocation list in a loop that runs every frame the
+     trigger is down. */
+  for (let i = 1; i < reach; i++) {
     const nx = ox + Math.cos(p.ang) * i * 4, ny = oy + Math.sin(p.ang) * i * 4;
     if (pointInWall(nx, ny)) break;
     ex = nx; ey = ny;
     for (const e of S.en) if (!e.dead && hits.indexOf(e) < 0 && Math.hypot(e.x - nx, e.y - ny) < e.r + girth) hits.push(e);
   }
   S.beamHit = { x: ox, y: oy, ex, ey, girth, prism: !!w.prism };
-  for (const e of hits) damageEnemy(e, (w.dmg + st.flatDmg * 8) * st.dmgMul / st.rateMul * dt, true, p.ang);
+  const base = (w.dmg + st.flatDmg * 8) * st.dmgMul / st.rateMul * dt;
+  const maxD = reach * 4;
+  for (let i = 0; i < hits.length; i++) {
+    const e = hits[i];
+    /* DEPTH: the beam spends itself on the way out, so the body at the end of
+       it takes `falloff` of what the body at the muzzle takes. Standing off
+       and raking the room is now worse than walking into it. */
+    let k = 1;
+    if (w.falloff !== undefined) {
+      const d = Math.hypot(e.x - ox, e.y - oy) / maxD;
+      k *= 1 - (1 - w.falloff) * Math.min(1, d);
+    }
+    /* WIDTH: and each body behind the first takes less again. Same shape as
+       deathBurst's per-frame budget -- the first is full price and they get
+       cheaper -- for the same reason: without a term like this, one input
+       scales linearly with how many things happen to be lined up behind it. */
+    if (w.spread2 !== undefined) k *= 1 / (1 + i * w.spread2);
+    damageEnemy(e, base * k, true, p.ang);
+  }
   // the spark at the far end wears whatever the beam is currently doing
   if (Math.random() < dt * 70)
     spray(ex, ey, p.ang + Math.PI, w.prism ? 'hsl(' + ((S.t * 95) % 360) + ',100%,78%)' : '#e0a8ff', 4, 150, 0.35, 1.4);
@@ -4922,6 +4983,7 @@ function update(rdt) {
             b.x = px; b.y = py;
             bladeTurn(b);
             sparks(b.x, b.y, Math.atan2(-b.vy, -b.vx), '#e8f0ff', 4, 130, 0.2, 0.8);
+            A.ricochet();
             A.nadeBounce();
           }
           continue;
@@ -9965,7 +10027,7 @@ window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantGod, breakSe
                 AUGMENTS, ag, dealAugments, openAugments, takeAugment, refuseAugments,
                 spawnMini, MINIS, BOSS_WAVE, MINI_WAVES, miniWaves, isApexFloor, bossIndexFor,
                 ROOMS, FLOORS, isLastFloor, twist, isTwist, rollRoster, updateTwist,
-                BOSS_FINAL, BOSS_HP, FINAL_HP, bossBudget, enterPhase, mortarAt, updateHaz, drawWin,
+                BOSS_FINAL, BOSS_HP, BOSS_HP_MUL, FINAL_HP, bossBudget, enterPhase, mortarAt, updateHaz, drawWin,
                 magCap, fireNova, SHOP_WAVES, diff, killEnemy, damageEnemy,
                 angerPaci, hurtStage, bodySprite, legSprite, shred, hurtPlayer, RS, quitToTitle,
                 armRig, armCells, armCols, ARM_SH_X, ARM_SH_Y,

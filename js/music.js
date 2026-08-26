@@ -11,6 +11,7 @@
      pad    always      the room breathing
      bass   >0.10       the pulse
      drums  >0.28       kick / snare / hats, patterns thicken with intensity
+     gtr    >0.34       palm-muted chug, power chords, and a lead over the top
      arp    >0.42       circling 16ths
      stab   boss only   dissonant minor-2nd hits
 
@@ -211,6 +212,107 @@ const MUSIC = (() => {
     o.start(t); o.stop(t + 1.8);
   }
 
+  /* ---------- guitar ----------
+
+     The score was already phrygian and locrian, which is the harmony metal
+     borrowed in the first place, so a distorted layer does not have to be
+     bolted on -- it plays the same degrees everything else does.
+
+     Three voices, because a rhythm guitar is not one sound:
+       vChug    palm-muted low root, gallop pattern, the engine
+       vPower   root + fifth + octave, held, the wall behind it
+       vLead    one voice up top with vibrato and a bend into the note
+
+     Distortion is a waveshaper rather than a clipped gain, so it saturates
+     instead of tearing. The curve is built once and shared by all three. */
+  let distCurve = null;
+  function makeDistCurve(k) {
+    const N = 8192, c = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      const x = (i * 2) / N - 1;
+      c[i] = ((1 + k) * x) / (1 + k * Math.abs(x));   // soft asymptotic clip
+    }
+    return c;
+  }
+  function distort(drive) {
+    const ws = ac.createWaveShaper();
+    if (!distCurve) distCurve = makeDistCurve(28);
+    ws.curve = distCurve;
+    ws.oversample = '4x';
+    const pre = ac.createGain(); pre.gain.value = drive;
+    pre.connect(ws);
+    return { in: pre, out: ws };
+  }
+
+  /* A cabinet, roughly: nothing below 80Hz, nothing above 4k, and a peak in
+     the low mids where a speaker cone lives. Without this a distorted saw is
+     a wasp in a jar rather than an amplifier. */
+  function cab(dest) {
+    const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 85;
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3900; lp.Q.value = 0.7;
+    const mid = ac.createBiquadFilter(); mid.type = 'peaking';
+    mid.frequency.value = 780; mid.Q.value = 1.1; mid.gain.value = 5;
+    hp.connect(mid); mid.connect(lp); lp.connect(dest);
+    return hp;
+  }
+
+  function vChug(t, f0, vol) {
+    const d = distort(14), c = cab(busses.gtr.g);
+    const o = ac.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f0;
+    const o2 = ac.createOscillator(); o2.type = 'square';
+    o2.frequency.value = f0; o2.detune.value = -7;
+    o.connect(d.in); o2.connect(d.in);
+    // palm mute: the note is choked almost immediately, so it reads as a hit
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(vol * 0.25, t + 0.055);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+    d.out.connect(g); g.connect(c);
+    o.start(t); o.stop(t + 0.2); o2.start(t); o2.stop(t + 0.2);
+  }
+
+  function vPower(t, degree, dur, vol) {
+    const d = distort(9), c = cab(busses.gtr.g);
+    // root, fifth, octave -- a power chord has no third, which is why it fits
+    // a scale whose third is the thing that keeps changing
+    const f0 = nf(degree, -1);
+    const fifth = f0 * Math.pow(2, 7 / 12);
+    [[f0, 0], [fifth, 6], [f0 * 2, -5]].forEach(([f, det]) => {
+      const o = ac.createOscillator();
+      o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = det;
+      o.connect(d.in);
+      o.start(t); o.stop(t + dur + 0.1);
+    });
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+    g.gain.setValueAtTime(vol, t + dur * 0.72);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    d.out.connect(g); g.connect(c);
+  }
+
+  function vLead(t, f0, dur, vol) {
+    const d = distort(20), c = cab(busses.gtr.g);
+    const o = ac.createOscillator(); o.type = 'sawtooth';
+    // bend up into the note, then vibrato -- the two things that stop a
+    // synthesised lead sounding like an organ
+    o.frequency.setValueAtTime(f0 * 0.945, t);
+    o.frequency.exponentialRampToValueAtTime(f0, t + 0.055);
+    const lfo = ac.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 5.6;
+    const lg = ac.createGain(); lg.gain.value = f0 * 0.011;
+    lfo.connect(lg); lg.connect(o.frequency);
+    o.connect(d.in);
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.03);
+    g.gain.setValueAtTime(vol, t + dur * 0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    d.out.connect(g); g.connect(c);
+    o.start(t); o.stop(t + dur + 0.1);
+    lfo.start(t); lfo.stop(t + dur + 0.1);
+  }
+
   function vStab(t, degree) {
     // the chord tone and the note a semitone above it, together
     const f0 = nf(degree, 1);
@@ -234,6 +336,14 @@ const MUSIC = (() => {
   const P_BASS  = [1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0];
   const ARP_UP  = [0, 2, 4, 6, 4, 2];
   const ARP_DN  = [6, 4, 2, 0, 2, 4];
+  /* A gallop -- the figure that makes a riff sound like it is running. Long,
+     short-short, long, short-short. */
+  const P_CHUG  = [1,0,1,1, 0,0,1,1, 1,0,1,1, 0,1,1,0];
+  const P_CHUG2 = [1,1,1,1, 0,1,1,1, 1,1,1,1, 0,1,1,1];   // flat out
+  // where the riff walks off the root, in scale degrees
+  const RIFF    = [0,0,0,1, 0,0,0,3, 0,0,0,1, 0,5,4,0];
+  const LEAD_A  = [7, 6, 4, 6, 7, 9, 7, 6];
+  const LEAD_B  = [4, 6, 7, 9, 11, 9, 7, 6];
 
   function scheduleStep(s, t) {
     const k = key();
@@ -264,6 +374,24 @@ const MUSIC = (() => {
       if (hot > 0.75 && i16 % 2 === 1) vHat(t, 0.05, i16 === 15);
     }
 
+    /* ---- guitar ----
+       Comes in above the drums and below the arp, so the band assembles in
+       the order a band assembles in: pulse, kit, guitar, everything else. */
+    if (hot > 0.34) {
+      const cp = hot > 0.66 ? P_CHUG2 : P_CHUG;
+      if (cp[i16]) vChug(t, nf(deg + RIFF[i16], -1), 0.24 + hot * 0.10);
+      // the wall arrives on the bar, and only once it is properly loud
+      if (i16 === 0 && hot > 0.5) vPower(t, deg, barLen * 0.92, 0.13 + hot * 0.06);
+      if (i16 === 8 && hot > 0.78) vPower(t, deg + 3, barLen * 0.44, 0.11);
+    }
+    /* The lead is the last thing to arrive and the first to go. Two bars of
+       eighths every fourth bar, so it is a hook and not a drone. */
+    if (hot > 0.62 && (bar === 1 || bar === 3) && i16 % 2 === 0) {
+      const L = bar === 1 ? LEAD_A : LEAD_B;
+      const li = (i16 / 2) | 0;
+      vLead(t, nf(deg + L[li], 1), (60 / bpm) * 0.46, 0.085 + hot * 0.045);
+    }
+
     if (hot > 0.42) {
       const seq = (Math.floor(s / 32) % 2) ? ARP_DN : ARP_UP;
       const nIdx = Math.floor(s / 2) % seq.length;
@@ -292,6 +420,7 @@ const MUSIC = (() => {
     setBus('pad',   menuMode ? 0.85 : 0.55 + hot * 0.45, t);
     setBus('bass',  menuMode ? 0.35 : (hot > 0.10 ? 0.75 + hot * 0.25 : 0), t);
     setBus('drums', menuMode ? 0    : (hot > 0.28 ? 0.6 + hot * 0.4 : 0), t);
+    setBus('gtr',   menuMode ? 0    : (hot > 0.34 ? 0.55 + hot * 0.45 : 0), t);
     setBus('arp',   menuMode ? 0.25 : (hot > 0.42 ? 0.55 + hot * 0.45 : 0), t);
     setBus('stab',  boss ? 1 : 0, t);
   }
@@ -302,7 +431,7 @@ const MUSIC = (() => {
       ac = context; out = destination;
       noise = makeNoise();
       bus('pad', 0.55); bus('bass', 0.42); bus('drums', 0.40);
-      bus('arp', 0.30); bus('stab', 0.34);
+      bus('gtr', 0.50); bus('arp', 0.30); bus('stab', 0.34);
     },
     start() {
       if (!ac) return;

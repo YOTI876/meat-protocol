@@ -360,6 +360,45 @@ signed. `lock` names the contract; both gates read the same field.
 > gate (`floor: 3`) is now a second gate behind the first rather than the only
 > one.
 
+## THE FISH, cut down
+
+It was **720 damage a second to every body** inside an 880 x 22px swathe, held
+for seven seconds a magazine. That is not a weapon, it is a button that
+deletes rooms — and it made every other LEGENDARY a worse version of itself.
+
+Four things changed and they work together:
+
+| | was | now |
+|---|---|---|
+| damage | 720 | **300** |
+| beam width | 22px (`girth 11`) | **10px** (`girth 5`) |
+| reach | 880px | **480px** (`reach: 120`) |
+| falloff along the beam | none | **to 55%** at the tip (`falloff: 0.55`) |
+| each body behind the first | full | **1/(1 + 0.5i)** (`spread2: 0.5`) |
+| magazine | 300 @ 42/s = 7.1s | **200 @ 46/s = 4.3s** |
+| reload | 2.6s | **3.4s** |
+
+Measured against the old numbers:
+
+| | before | after | cut |
+|---|---|---|---|
+| single target | 720 dps | 289 | **−60%** |
+| six in a line | 4,320 | 849 | **−80%** |
+| twenty in a line | 13,680 | 1,016 | **−93%** |
+
+The shape of that is the point. Single-target it is still a LEGENDARY — 289
+sustained with no reload between shots, against GOD FINGER's measured 270 —
+but it no longer scales linearly with how many things happen to be standing in
+a row. The `spread2` term is the same idea as
+[[Rendering#Death burst|deathBurst's per-frame budget]], for the same reason:
+without a term like it, one input scales with a number the player did not earn.
+
+> [!note] Verified live, not just on paper
+> Eight bodies strung along the beam at 45px spacing, 40 frames of fire, held
+> in place: **195 / 124 / 89 / 68** damage, ratios **1.00 / 0.64 / 0.46 /
+> 0.35** — within 1% of the model. Four bodies in the beam is **2.44x** what
+> one alone takes, where it used to be 4x.
+
 ## Handling notes
 
 - **Reload** is a 4-stage animation (mag ejects with gravity → new mag slides

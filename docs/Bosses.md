@@ -453,6 +453,32 @@ The shop does not hang off boss kills at all. Clearing **wave 5** or **wave
 10** sets `S.shopDue` and the next door leads sideways — twice a floor, on the
 fives. See [[The Shop#Cadence]].
 
+## They have twice the health now
+
+A floor boss was dying in well under the length of its own pattern set — you
+could put one down before it had shown you the second thing it does, which
+makes a boss a damage check rather than a fight.
+
+`BOSS_HP_MUL = 2.2`, one multiplier rather than nine hand-edited numbers,
+because the **shape** of the curve was never the problem: floor 1 should still
+be the gentlest and the finale should still be the wall. Turn the one constant
+and the whole ladder moves together.
+
+| floor | base was | base now |
+|---|---|---|
+| 1 | 1,350 | **2,970** |
+| 5 | 2,060 | **4,532** |
+| 9 | 2,850 | **6,270** |
+| finale | 4,200 | **9,240** |
+
+> [!warning] These are the base, and the base is multiplied twice more
+> `spawnBoss` takes `bossBudget()` and multiplies by `diff().hp` and
+> again by 1.35, so floor 9 was already **22x** floor 1 in practice before this
+> change. Floor 5 goes from 14,239 effective to **31,311**. Against a bare 270
+> dps that is a two-minute fight — it is only reasonable because a floor-5
+> player has multipliers a floor-1 player does not. **If bosses now feel long
+> rather than dangerous, this multiplier is the one number to turn.**
+
 ## Related
 - [[Floors]] — which floor each of these lands on, and what the room is doing while you fight it
 - [[Enemies]] — the six regular types, and what an elite is made of

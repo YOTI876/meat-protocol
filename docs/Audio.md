@@ -58,6 +58,70 @@ A master gain node feeds the destination; a separate `musicBus` sits between
 [[Music]] and master so **mute covers both**, and `A.duck()` pulls the score
 down under boss roars and explosions without touching SFX volume.
 
+## The guitar layer
+
+The score gained a sixth layer, and it is the loudest thing in it. Three
+voices, because a rhythm guitar is not one sound:
+
+| voice | is |
+|---|---|
+| `vChug` | palm-muted low root on a **gallop** — long, short-short — choked at 55ms so it reads as a hit rather than a note |
+| `vPower` | root, fifth, octave. No third, which is exactly why it fits a scale whose third keeps moving |
+| `vLead` | one voice up top, bent up into the note over 55ms and then vibratoed at 5.6Hz |
+
+It did not have to be bolted on. The score was **already phrygian and
+locrian** — the harmony metal borrowed in the first place — so the guitar
+plays the same scale degrees as the pad and the bass, off the same `nf()`.
+
+Distortion is a **waveshaper**, not a clipped gain, so it saturates instead of
+tearing: a soft asymptotic curve, `(1+k)x / (1+k|x|)`, built once at 8192
+points and shared. Every voice then goes through `cab()` — highpass at
+85Hz, lowpass at 3.9k, and a +5dB peak at 780Hz. Without that last stage a
+distorted saw is a wasp in a jar rather than an amplifier.
+
+> [!note] It arrives before the arp and after the drums
+> The band assembles in the order a band assembles in: pulse, kit, guitar,
+> then everything else. Chug from intensity **0.34**, the power-chord wall at
+> **0.5**, flat-out sixteenths at **0.66**, and the lead last at **0.62** — two
+> bars of eighths every fourth bar, so it stays a hook instead of becoming a
+> drone.
+
+## Volume
+
+0.45 used to be a literal in two places, so the only choice was all or nothing
+and unmuting always went back to whatever the literals said.
+
+| key | does |
+|---|---|
+| `-` / numpad `-` | quieter |
+| `=` / numpad `+` | louder |
+| `M` | mute toggle, unchanged |
+
+Eleven steps, stored under `meat_vol`. The curve to gain is **squared**,
+so the quiet half of the range has somewhere to go instead of being all one
+loudness, and step 0 is silence. The score rides the same master, so turning
+the game down turns the music down with it rather than leaving a band playing
+over nothing.
+
+## The ordinary sounds
+
+Ten events that used to be silent. None is a set piece — they are the noises a
+room makes while you move around in it, and their absence is the sort of thing
+you notice without being able to name.
+
+| sound | fires on |
+|---|---|
+| `levelup` | the hand arriving — an arpeggio up a major triad, the only consonant sound in the game |
+| `cardTake` | a card taken |
+| `ricochet` | a round that hit masonry instead of meat |
+| `thud` | a body meeting a wall, or another body |
+| `click` | the empty-magazine click, distinct from `dryfire`'s whole failed action |
+| `alert` | an enemy noticing you |
+| `floorClear` | the floor going quiet |
+| `lowHealth` | crossing into the red, once per crossing |
+| `stomp` | something big landing |
+| `blip` | the volume keys, so the change is audible at the level you just set |
+
 ## Related
 - [[Music]] — the generative score, a separate always-running system
 - [[Bugs Found]] — the GOROMANIA volume/pitch adjustment pass
