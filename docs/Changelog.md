@@ -875,7 +875,7 @@ Synthesised music is a stand-in for music somebody wrote. The drop-in path in
 answer: name an mp3 or ogg in `audio/tracks.json` and it replaces the synth,
 looped and crossfaded, with the volume keys and the duck already working.
 
-## `PENDING3` — Real music, on three tracks
+## `8c52af9` — Real music, on three tracks
 
 Damjan supplied the tracks, so the game plays them instead of the synth:
 
