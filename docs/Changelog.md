@@ -783,7 +783,7 @@ the burst landed.
 below zero so nothing broke, but a timer that keeps counting past its own end
 is a timer you cannot reason about.
 
-## `650d87c` — Stop leaking the audio graph, and give bosses their own song
+## `f5c11af` — Stop leaking the audio graph, and give bosses their own song
 
 Reported as *"the music is lagging and the sound turns off sometimes"*. It was
 literal: **the audio thread was rendering at 0.167x real time** while a bare
