@@ -917,7 +917,7 @@ Everything rides the same bus the synth did, so the volume keys, mute and
 `A.duck()` all kept working with nothing extra wired up. See
 [[Music#Three recordings]] and `audio/README.md`.
 
-## `PENDING4` — An OPTIONS screen, and a volume for the music alone
+## `2171c05` — An OPTIONS screen, and a volume for the music alone
 
 Two keys with nothing anywhere saying they existed was not a volume control,
 it was a secret. **OPTIONS** now sits on the title screen and on the pause
