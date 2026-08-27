@@ -3,7 +3,7 @@
    ============================================================ */
 const A = (() => {
   let ac = null, master = null, droneGain = null, droneNodes = [], on = false, muted = false;
-  let noise = null, musicBus = null;
+  let noise = null, musicBus = null, musicVolGain = null;
 
   /* ---- volume ----
 
@@ -16,6 +16,27 @@ const A = (() => {
      master with everything else, so turning the whole thing down turns the
      music down with it rather than leaving a band playing over silence. */
   const VOL_KEY = 'meat_vol', VOL_STEPS = 10, MUSIC_MIX = 0.85;
+
+  /* ---- music volume, separate from the master ----
+
+     It needs its own node rather than sharing musicBus, because duck() already
+     animates musicBus every time something roars or explodes. Two things
+     writing ramps to one AudioParam is a fight, and the loser is whichever one
+     scheduled first. So: musicBus does ducking, musicVolGain does volume, and
+     they compose instead of clobbering.
+
+         MUSIC -> musicBus (duck) -> musicVolGain (this) -> master -> out
+
+     Step 7 is unity -- the level the music has always played at -- so the
+     scale runs from silent to a bit over twice as loud, and the default sits
+     where someone who never opens the options screen is unaffected. */
+  const MVOL_KEY = 'meat_musicvol', MVOL_UNITY = 7;
+  const mvolOf = st => Math.pow(st / MVOL_UNITY, 2);
+  let mvolStep = MVOL_UNITY;
+  try {
+    const raw = localStorage.getItem(MVOL_KEY);
+    if (raw !== null) { const v = parseInt(raw, 10); if (v >= 0 && v <= VOL_STEPS) mvolStep = v; }
+  } catch (e) { /* private mode: default and carry on */ }
   let vol = 0.45;
   try {
     const raw = localStorage.getItem(VOL_KEY);
@@ -46,7 +67,10 @@ const A = (() => {
     // both still apply to it.
     musicBus = ac.createGain();
     musicBus.gain.value = MUSIC_MIX;
-    musicBus.connect(master);
+    musicVolGain = ac.createGain();
+    musicVolGain.gain.value = mvolOf(mvolStep);
+    musicBus.connect(musicVolGain);
+    musicVolGain.connect(master);
     if (typeof MUSIC !== 'undefined') MUSIC.attach(ac, musicBus);
   }
 
@@ -177,6 +201,15 @@ const A = (() => {
       return st;
     },
     nudgeVol(d) { return api.setVol(api.vol() + d); },
+    /* The score's own level, on the same 0-10 scale the master uses. */
+    musicVol: () => mvolStep,
+    setMusicVol(step) {
+      mvolStep = Math.max(0, Math.min(VOL_STEPS, Math.round(step)));
+      if (musicVolGain) musicVolGain.gain.setTargetAtTime(mvolOf(mvolStep), ac.currentTime, 0.04);
+      try { localStorage.setItem(MVOL_KEY, String(mvolStep)); } catch (e) {}
+      return mvolStep;
+    },
+    nudgeMusicVol(d) { return api.setMusicVol(mvolStep + d); },
     setDread,
     music: (typeof MUSIC !== 'undefined') ? MUSIC : null,
     /* Ducks the score under a big moment (boss roar, explosion) and lets it back up. */

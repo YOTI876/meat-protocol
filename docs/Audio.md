@@ -107,6 +107,39 @@ loudness, and step 0 is silence. The score rides the same master, so turning
 the game down turns the music down with it rather than leaving a band playing
 over nothing.
 
+## The options screen
+
+Two keys with nothing anywhere to say they existed was not a volume control,
+it was a secret. **OPTIONS** sits on the title screen and on the pause screen,
+and it holds:
+
+| row | does |
+|---|---|
+| **MASTER** | everything — the same value the `-` and `=` keys move |
+| **MUSIC** | the score only. **Step 7 is unity**, the level it has always played at, so the scale runs from silent to a bit over twice as loud and anyone who never opens the screen is unaffected |
+| **MUSIC ON/OFF** | the same switch as `N` |
+| **ALL SOUND** | the same switch as `M` |
+
+It also names the file currently playing, because the one question anybody asks
+of a music setting is whether it is working, and a filename answers it without
+making them guess from the silence.
+
+### Why music volume needed its own node
+
+```
+MUSIC -> musicBus (duck) -> musicVolGain (the slider) -> master -> out
+```
+
+The obvious place to put it is `musicBus`, and that is wrong: `duck()` already
+animates `musicBus.gain` every time something roars or explodes. Two things
+writing ramps to one `AudioParam` is a fight, and the loser is whichever
+scheduled first — the volume would snap back to whatever the duck ramped to and
+stay there. Separate nodes compose instead of clobbering.
+
+Measured with the score switched off, so only sound effects were playing:
+music at step 0 gave RMS 0.0287, music at step 10 gave 0.0282. The slider does
+not touch the effects, which is the entire point of it.
+
 ## The ordinary sounds
 
 Ten events that used to be silent. None is a set piece — they are the noises a

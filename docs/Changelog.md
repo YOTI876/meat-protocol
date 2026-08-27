@@ -917,6 +917,46 @@ Everything rides the same bus the synth did, so the volume keys, mute and
 `A.duck()` all kept working with nothing extra wired up. See
 [[Music#Three recordings]] and `audio/README.md`.
 
+## `PENDING4` — An OPTIONS screen, and a volume for the music alone
+
+Two keys with nothing anywhere saying they existed was not a volume control,
+it was a secret. **OPTIONS** now sits on the title screen and on the pause
+screen, and holds:
+
+| row | does |
+|---|---|
+| **MASTER** | everything — the same value `-` and `=` move |
+| **MUSIC** | the score only. Step **7 is unity**, the level it has always played at, so the scale runs from silent to a bit over twice as loud and anybody who never opens the screen is unaffected |
+| **MUSIC ON/OFF** | the same switch as `N` |
+| **ALL SOUND** | the same switch as `M` |
+
+Both volumes draw as ten segments rather than a number, and the screen names
+the file currently playing — the one question anyone asks of a music setting is
+whether it is working, and a filename answers it without making them guess from
+the silence.
+
+> [!important] Why the music volume needed its own node
+> ```
+> MUSIC -> musicBus (duck) -> musicVolGain (the slider) -> master -> out
+> ```
+> The obvious place for it is `musicBus`, and that is wrong: `duck()` already
+> animates `musicBus.gain` every time something roars or explodes. Two things
+> writing ramps to one `AudioParam` is a fight, and the loser is whichever
+> scheduled first — the volume would snap to whatever the duck last ramped to
+> and stay there. Separate nodes compose instead of clobbering.
+
+Measured with the score switched off, so only effects were playing: music at
+step 0 gave RMS 0.0287, music at step 10 gave 0.0282. **The slider does not
+touch the sound effects**, which is the whole point of it. Music itself moves
+monotonically — step 0 sits at the ambient-drone floor, step 7 at 0.0184, step
+10 at 0.0398 — and nothing clips at any setting.
+
+Turning music on from the title stays silent, because the title is silent on
+purpose: `start()` checks `menuMode` as well as `menu()` does. `startRun()`
+clears it through `setFloor` before it gets there, so a real run is unaffected.
+
+Both settings survive a reload, in `localStorage` beside the existing volume.
+
 ## Related
 - [[Bugs Found]] — the defects behind each fix above, all of them now closed
 - [[Tuning Values]] — where the numbers stand today

@@ -689,7 +689,11 @@ const MUSIC = (() => {
       loadFiles();
     },
     start() {
-      if (!ac || !enabled) return;
+      /* menuMode is checked here as well as in menu(), because the options
+         screen can switch music on while the title is up, and the title is
+         silent on purpose. startRun() clears it via setFloor before it gets
+         here, so a real run is unaffected. */
+      if (!ac || !enabled || menuMode) return;
       stopToken++;                       // cancels any stop still counting down
       if (timer) clearInterval(timer);
       running = true;
@@ -748,6 +752,12 @@ const MUSIC = (() => {
     isRunning() { return running; },
     usingFiles() { return fileMode; },
     isEnabled() { return enabled; },
+    /* Just the filename, for the options screen. debug() would do it, but that
+       builds an object per call and this one is read every frame. */
+    nowPlaying() {
+      const p = fileNow && players[fileNow];
+      return p ? decodeURIComponent(p.el.src.split('/').pop()) : null;
+    },
     setEnabled(v) {
       enabled = !!v;
       try { localStorage.setItem(MUSIC_KEY, enabled ? '1' : '0'); } catch (e) {}

@@ -345,7 +345,7 @@ addEventListener('keydown', e => {
     if (S.mode === 'play') S.mode = 'pause';
     else if (S.mode === 'pause') S.mode = 'play';
     else if (S.mode === 'deck') S.mode = 'pause';
-    else if (S.mode === 'cos' || S.mode === 'contracts') S.mode = S.cosReturn || 'title';
+    else if (S.mode === 'cos' || S.mode === 'contracts' || S.mode === 'options') S.mode = S.cosReturn || 'title';
   }
   /* B toggles the deck. This was two statements with an `else if` chained off
      the Escape line below it, so pressing B in play opened the deck and the
@@ -8562,8 +8562,9 @@ function drawTitle() {
      drawPause. What is left is a poster with one door in it. */
   const tb = [['PLAY', '#e8b25a', () => startRun()],
               ['COSMETICS', '#b558ff', () => { S.cosReturn = 'title'; S.mode = 'cos'; }],
-              ['CONTRACTS', '#f0c65a', () => { S.cosReturn = 'title'; S.mode = 'contracts'; }]];
-  const tbw = 96, tgap = 8, trow = tb.length * tbw + (tb.length - 1) * tgap;
+              ['CONTRACTS', '#f0c65a', () => { S.cosReturn = 'title'; S.mode = 'contracts'; }],
+              ['OPTIONS', '#7fd8e0', () => { S.cosReturn = 'title'; S.mode = 'options'; }]];
+  const tbw = 88, tgap = 8, trow = tb.length * tbw + (tb.length - 1) * tgap;
   tb.forEach((b, i) => uiBtn(W / 2 - trow / 2 + i * (tbw + tgap), 152, tbw, 22, b[0], b[1], b[2]));
   if (S.evo | 0)
     htxt('EVOLUTION ' + (S.evo | 0) + ' / ' + EVO_MAX +
@@ -9392,6 +9393,95 @@ function sectionRule(label, y) {
   ctx.fillRect(30 + lw + 8, y - 3, W - 60 - lw - 8, 1);
 }
 
+/* ============================================================
+   OPTIONS
+
+   Volume used to be two keys with nothing anywhere to tell you they existed,
+   and the score had no level of its own -- turning the music down meant
+   turning the whole game down with it, which is not the same thing when the
+   complaint is that the music is louder than the gunfire.
+
+   So: a screen, reachable from the title and from pause. Every row shows what
+   it is set to rather than only reacting when you poke it, because a settings
+   screen that will not tell you the current setting is a worse version of the
+   two keys it replaced.
+   ============================================================ */
+function volRow(label, y, step, steps, col, dec, inc) {
+  htxt(label, 40, y + 1, '#b9a693', 'left', 9, { track: 0.10 });
+  uiBtn(140, y - 7, 16, 15, '−', col, dec, step <= 0);
+
+  /* Ten segments rather than a number. A bar you can read at a glance is most
+     of the reason to put this on a screen at all. */
+  const bx = 166, seg = 14, gap = 2;
+  for (let i = 0; i < steps; i++) {
+    const on = i < step;
+    ctx.fillStyle = on ? col : 'rgba(88,76,70,0.40)';
+    ctx.globalAlpha = on ? 0.5 + (i / steps) * 0.5 : 1;
+    ctx.fillRect(bx + i * (seg + gap), y - 4, seg, 8);
+  }
+  ctx.globalAlpha = 1;
+
+  const ex = bx + steps * (seg + gap);
+  uiBtn(ex + 4, y - 7, 16, 15, '+', col, inc, step >= steps);
+  htxt(step + ' / ' + steps, ex + 26, y + 1, col, 'left', 8, { track: 0.06, noShadow: true });
+}
+
+function drawOptions() {
+  S.ui = [];
+  ctx.fillStyle = '#0a0610'; ctx.fillRect(0, 0, W, H);
+  const bg = ctx.createRadialGradient(W / 2, 20, 4, W / 2, 20, 170);
+  bg.addColorStop(0, 'rgba(232,178,90,0.15)'); bg.addColorStop(1, 'rgba(232,178,90,0)');
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+
+  htxt('OPTIONS', W / 2, 24, '#e8b25a', 'center', 20,
+       { weight: '700', glow: '#6a4110', glowSize: 18, track: 0.20 });
+
+  sectionRule('SOUND', 54);
+  volRow('MASTER', 74, A.vol(), A.volSteps(), '#e8b25a',
+         () => { A.nudgeVol(-1); A.blip(); }, () => { A.nudgeVol(1); A.blip(); });
+  volRow('MUSIC', 94, A.musicVol(), A.volSteps(), '#7fd8e0',
+         () => { A.nudgeMusicVol(-1); A.blip(); }, () => { A.nudgeMusicVol(1); A.blip(); });
+
+  htxt('MASTER moves everything.  MUSIC moves only the score — 7 is where it has always sat.',
+       W / 2, 114, 'rgba(140,120,106,0.8)', 'center', 7, { track: 0.06, noShadow: true });
+
+  sectionRule('SWITCHES', 138);
+  const on = !!(A.music && A.music.isEnabled());
+  const isMuted = A.isMuted();
+  uiBtn(40, 152, 186, 18, on ? 'MUSIC  —  ON' : 'MUSIC  —  OFF',
+        on ? '#7fd8e0' : '#6b5a4e', () => {
+          if (!A.music) return;
+          A.music.setEnabled(!A.music.isEnabled());
+          A.blip();
+        });
+  uiBtn(254, 152, 186, 18, isMuted ? 'ALL SOUND  —  MUTED' : 'ALL SOUND  —  ON',
+        isMuted ? '#ff6a72' : '#e8b25a', () => { A.toggleMute(); A.blip(); });
+
+  /* What is actually coming out of the speakers, named. The one question a
+     player asks about a music setting is "is it working", and a filename
+     answers it without them having to guess from the silence. */
+  const np = A.music && A.music.nowPlaying ? A.music.nowPlaying() : null;
+  let line, lcol;
+  if (isMuted) { line = 'everything is muted'; lcol = 'rgba(255,106,114,0.85)'; }
+  else if (!on) { line = 'the score is off'; lcol = 'rgba(130,112,104,0.8)'; }
+  else if (np) { line = 'NOW PLAYING   ' + np; lcol = 'rgba(127,216,224,0.9)'; }
+  else { line = 'NOW PLAYING   the synthesised score'; lcol = 'rgba(140,120,106,0.85)'; }
+  htxt(line, W / 2, 184, lcol, 'center', 8, { track: 0.08, noShadow: true });
+
+  htxt('the title screen is silent on purpose', W / 2, 198,
+       'rgba(120,104,94,0.6)', 'center', 7, { track: 0.06, noShadow: true });
+
+  sectionRule('KEYS', 216);
+  htxt('− / =  volume        M  mute        N  music        B  the deck        ESC  pause',
+       W / 2, 232, 'rgba(140,120,106,0.8)', 'center', 7, { track: 0.06, noShadow: true });
+
+  uiBtn(W / 2 - 48, H - 22, 96, 16, 'BACK', '#e8b25a',
+        () => { S.mode = S.cosReturn || 'title'; });
+
+  post();
+  crosshair();
+}
+
 function drawPause() {
   S.ui = []; uiWipe();
   ctx.fillStyle = 'rgba(5,3,8,0.88)'; ctx.fillRect(0, 0, W, H);
@@ -9416,6 +9506,7 @@ function drawPause() {
   const maxed = (S.evo | 0) >= EVO_MAX;
   const btns = [['THE DECK', '#f0c65a', () => { S.mode = 'deck'; }],
                 ['COSMETICS', '#b558ff', () => { S.cosReturn = 'pause'; S.mode = 'cos'; }],
+                ['OPTIONS', '#7fd8e0', () => { S.cosReturn = 'pause'; S.mode = 'options'; }],
                 [maxed ? 'EVOLVE MAX' : 'EVOLVE ' + (S.evo | 0), '#ff4a54', () => evolve(), !canEvolve()]];
   if (S.evo | 0) btns.push(['RESET EVO', '#7fe08a', () => resetEvolution()]);
   btns.push(['MAIN MENU', '#ff6a72', () => quitToTitle()]);
@@ -9552,6 +9643,7 @@ function frame(now) {
   if (S.mode === 'title') drawTitle();
   else if (S.mode === 'cos') drawCosmetics();
   else if (S.mode === 'contracts') drawContracts();
+  else if (S.mode === 'options') drawOptions();
   else {
     _w0 = performance.now();
     drawWorld();      _pbFlush(); _w1 = performance.now();
@@ -10035,7 +10127,7 @@ window.MEAT = { S, startRun, startWave, spawnBoss, spawnEnemy, grantGod, breakSe
                 CONTRACTS, cStat, bump, bumpMax, contractDone, checkContracts,
                 AUGMENTS, ag, dealAugments, openAugments, takeAugment, refuseAugments,
                 spawnMini, MINIS, BOSS_WAVE, MINI_WAVES, miniWaves, isApexFloor, bossIndexFor,
-                ROOMS, FLOORS, isLastFloor, twist, isTwist, rollRoster, updateTwist,
+                drawOptions, ROOMS, FLOORS, isLastFloor, twist, isTwist, rollRoster, updateTwist,
                 BOSS_FINAL, BOSS_HP, BOSS_HP_MUL, FINAL_HP, bossBudget, enterPhase, mortarAt, updateHaz, drawWin,
                 magCap, fireNova, SHOP_WAVES, diff, killEnemy, damageEnemy,
                 angerPaci, hurtStage, bodySprite, legSprite, shred, hurtPlayer, RS, quitToTitle,

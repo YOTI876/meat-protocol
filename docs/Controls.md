@@ -23,6 +23,7 @@ tags: [reference]
 | `M` | mute |
 | `N` | music on / off. On by default — see [[Music#Three recordings]] |
 | `-` / `=` | volume down / up — eleven steps, remembered between runs. Numpad `-` and `+` work too |
+| — | all of the above also live on the **OPTIONS** screen, on the title and on pause — see [[Audio#The options screen]] |
 | `Enter` / click | start a run from the title screen |
 | `R` | retry, on the death screen |
 
