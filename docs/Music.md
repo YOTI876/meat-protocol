@@ -10,27 +10,15 @@ game — not transcriptions or arrangements of anything. Built in the idiom a
 dungeon-crawler roguelike lives in (phrygian and locrian modes, a syncopated
 pulse, circling arpeggios, accumulating percussion) rather than by copying one.
 
-> [!important] The score is off by default
-> Press **N** to turn it on. See [[#The score is off unless you ask for it]].
-> Drop a real recording into `audio/` and the game plays that instead of the
-> synth, looped and crossfaded, with the volume keys and the duck still
-> working — see [[#A real recording, if you have one]].
-
-## The score is off unless you ask for it
-
-`N` toggles it, and the setting sticks in `localStorage` under `meat_music`
-next to the volume. Ships **off**, because synthesised music is a stand-in for
-music somebody wrote, and a stand-in should not be the thing you cannot switch
-off.
-
-Off is genuinely off, not muted: `start()` and `menu()` decline, so there is
-no scheduler, no nodes and no bus. Verified — `liveNodes: 0`, `running: false`,
-and the whole mix peaks at **0.027**, which is the ambient drone in
-[[Audio]] and nothing else.
-
-The [[Audio#The ordinary sounds|sound effects]] are unaffected either way. They
-are a different system on a different bus, and turning the score off does not
-touch them.
+> [!important] The game plays real recordings now
+> Three of them — see [[#Three recordings]]. What follows describes the
+> **synthesised fallback**, which runs only for a track with no file behind
+> it. `N` toggles music on and off.
+>
+> Off is genuinely off, not muted: no scheduler, no nodes, no bus. The whole
+> mix then peaks at **0.027**, which is the ambient drone in [[Audio]] and
+> nothing else. The [[Audio#The ordinary sounds|sound effects]] are a
+> different system on a different bus and are never affected either way.
 
 ## Two pieces, not one
 
@@ -180,35 +168,77 @@ Three things for unease rather than intensity, none of them on the beat grid:
 - **`vScrape`** — irregular filtered noise, like metal being dragged nearby
 - **`vWhine`** — a high sine thread deliberately outside the key
 
-## A real recording, if you have one
+## Three recordings
 
-The score is synthesised because a recording has an owner. Picking one is a
-licensing decision, not a technical one, so the game defers it to you:
+The game plays real tracks. The synthesised score below is the fallback, not
+the default — it runs only for a slot with no file behind it.
 
-1. put the file in `audio/`
-2. name it in `audio/tracks.json`
+| slot | file | plays |
+|---|---|---|
+| `wave` | `feral-angel-waltz.mp3` | the run — every wave, every floor but the last |
+| `boss` | `burn-the-world-waltz.mp3` | boss fights, and an angry PACI |
+| `final` | `mesmerizing-galaxy-loop.mp3` | **the last floor, all of it** — every wave, its boss, and the finale |
 
-```json
-{ "wave": "myband.ogg", "boss": "myband-heavy.ogg" }
+`audio/tracks.json` is the whole configuration; `audio/README.md` is the
+player-facing version of this section.
+
+**The last floor outranks the boss flag.** That is the point of the third slot:
+`wantTrack()` checks `finalFloor` before it checks `boss`, so walking into
+floor 10 starts one piece that runs unbroken until the run ends, and the boss
+fight at the bottom of it does not interrupt itself.
+
+```js
+const k = finalFloor ? 'final' : (boss ? 'boss' : 'wave');
 ```
 
-Either entry may stay `null` — **a track with no file of its own falls back to
-the synth**, so shipping only a boss theme is a supported thing to do. Files
-are looped and crossfaded over ~0.9s on a track change, and they ride the same
-bus the synth does, so [[Audio#Volume|the volume keys]], mute and `A.duck()`
-all keep working with no extra wiring.
+`game.js` passes that in with the floor it already knows:
+`A.music.setFloor(nr, isLastFloor(nr))`.
 
-While a file is playing the synth stops scheduling entirely (`liveNodes: 0`)
-rather than playing underneath it.
+**The title screen is silent**, deliberately. `menu()` stops everything rather
+than falling back to the synth — there is no menu recording and nothing should
+stand in for one. It used to get a sparse pad-and-arp arrangement.
 
-> [!note] Why a manifest and not just looking for `audio/wave.ogg`
-> Probing three extensions × two tracks meant **six failed requests on every
-> load** of a game that ships with no music files. A console full of red 404s
-> is a bad way to say "working as intended". The manifest ships with both
-> entries `null`, so a default checkout makes one request and it succeeds.
+**A boss theme starts at the top**, because that is the point of it arriving.
+The floor track resumes where it left off, so a long run gets through the song
+instead of restarting it after every fight — except at the start of a new run,
+which always begins at the top.
 
-`audio/README.md` has the list of places that hand out music with a licence
-attached.
+Any slot may be `null`, and a slot with no file falls back to the synth rather
+than borrowing another slot's music. While a file plays, the synth stops
+scheduling entirely (`liveNodes: 0`) rather than playing underneath it.
+
+`N` toggles music, on by default, stored in `localStorage` under `meat_music2`.
+
+### Streamed, not decoded
+
+The files are `<audio>` elements routed through `createMediaElementSource`.
+This is the one decision in here worth defending, because buffers are the
+obvious choice and they are wrong for this:
+
+`decodeAudioData()` holds a whole song as float PCM — about **21MB a minute**
+at 44.1kHz stereo. These three are a 13MB download and would sit near **a
+quarter of a gigabyte resident**. An element streams, so the cost is a buffer
+instead of a song.
+
+The trade is that MP3 looping is not perfectly gapless the way a buffer loop
+is. For multi-minute tracks under gunfire that is the right side of the trade.
+A short seamless loop is the one case where decoding to a buffer wins.
+
+Everything rides the same bus the synth does, so
+[[Audio#Volume|the volume keys]], mute and `A.duck()` all keep working with no
+extra wiring.
+
+> [!note] Why a manifest rather than looking for `audio/wave.*`
+> Probing three extensions across three slots would be **nine failed requests
+> on every load** of a checkout with no music in it, and a console full of red
+> 404s is a bad way to say "working as intended".
+
+> [!warning] Check the licences before this ships anywhere
+> The tracks were supplied for this build. If the game is ever published,
+> each one needs its licence checked and whatever credit it asks for — a
+> decision about the project rather than a technical detail, and far easier to
+> settle now than after release. `audio/README.md` lists sources that are
+> unambiguously free to use if replacements are ever needed.
 
 ## Wiring into the game
 

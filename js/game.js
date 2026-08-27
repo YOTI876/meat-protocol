@@ -6333,7 +6333,7 @@ function startRun() {
   if (contractDone('hoard')) { S.coins += 60; persist(); }
   A.init();
   A.setDread(0.2);
-  if (A.music) { A.music.setFloor(0); A.music.setBoss(false); A.music.setIntensity(0.15); A.music.start(); }
+  if (A.music) { A.music.setFloor(0, isLastFloor(0)); A.music.setBoss(false); A.music.setIntensity(0.15); A.music.start(); }
   msg(roomDef(0).name, roomDef(0).sub, 3.4);
   /* Wave 1 is on GAME time, not wall-clock.
      These were two `setTimeout`s, and that was a real defect rather than a
@@ -6381,7 +6381,9 @@ function nextRoom() {
     A.rack(); A.bigpickup();
     msg(R.name, R.sub, 4);
     A.setDread(0.5 + nr * 0.15);
-    if (A.music) { A.music.setFloor(nr); A.music.setBoss(false); A.music.setIntensity(0.2 + nr * 0.16); }
+    /* The last floor gets its own track for the whole of it -- every wave and
+       the finale -- so setFloor is told which floor it is, not just its index. */
+    if (A.music) { A.music.setFloor(nr, isLastFloor(nr)); A.music.setBoss(false); A.music.setIntensity(0.2 + nr * 0.16); }
     persist();
     S.introT = 2.6;              // game time — see startRun()
     // the new floor's rule lands after its name has finished being read

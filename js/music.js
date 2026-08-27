@@ -38,13 +38,14 @@ const MUSIC = (() => {
   let floorIdx = 0, boss = false, menuMode = false;
 
   /* ---- off by default ----
-     Damjan asked for the music to go away unless it is a real recording, and
-     "off" should survive a reload, so it lives in the same save the volume
-     does. N toggles it. Nothing else in here runs while it is off: start()
-     and menu() decline, so there is no scheduler, no nodes and no bus. */
-  const MUSIC_KEY = 'meat_music';
-  let enabled = false;
-  try { enabled = localStorage.getItem(MUSIC_KEY) === '1'; } catch (e) {}
+     On by default now that there are real recordings to play; it was off
+     while the only option was the synth. The key is a new one, so an "off"
+     stored back then does not silence the actual music. N toggles it, and
+     the choice survives a reload. Off is off, not muted: start() declines,
+     so there is no scheduler, no nodes and no bus. */
+  const MUSIC_KEY = 'meat_music2';
+  let enabled = true;
+  try { enabled = localStorage.getItem(MUSIC_KEY) !== '0'; } catch (e) {}
 
   /* ---------- the reaper ----------
 
@@ -543,40 +544,52 @@ const MUSIC = (() => {
     setBus('stab',  q * (boss ? 1 : 0), t);
   }
 
-  /* ---------- a real recording, if you have one ----------
+  /* ---------- the recordings ----------
 
-     Everything above is synthesised, and it is synthesised because I cannot
-     go and take a rock track off the internet and put it in this repository:
-     somebody owns it, and the ones that are genuinely free to use are free
-     under licences that want crediting properly, which is your call to make
-     and not mine.
+     Three of them, named in audio/tracks.json:
 
-     What the game can do is prefer a file when there is one. Drop a track in
-     as audio/wave.* and audio/boss.* — ogg, mp3 or wav — and it plays those
-     instead, looped, crossfading when a boss arrives. Everything else still
-     works, because the file rides the same bus the synth does: the volume
-     keys, mute, and the duck under a boss roar all still apply.
+       wave    the run, every floor but the last
+       boss    a boss fight, and an angry PACI
+       final   the last floor -- ALL of it, waves and boss alike, and the
+               finale. It outranks the other two, so the tenth floor is one
+               unbroken piece from the moment you walk in.
 
-     Either file on its own is fine. If only audio/boss.ogg exists then bosses
-     use it and the rest of the run stays synthesised. See audio/README.md. */
-  const bufs = { wave: null, boss: null };
-  let fileBus = null, fileSrc = null, fileGain = null, fileNow = null;
-  let fileMode = false, filesTried = false;
+     Any entry may be null, and a track with no file of its own falls back to
+     the synthesised score rather than borrowing another track's recording.
+     The menu is deliberately silent -- see menu().
 
-  async function loadTrack(file) {
-    if (!file) return null;
-    try {
-      const r = await fetch('audio/' + file);
-      if (!r.ok) return null;
-      return await ac.decodeAudioData(await r.arrayBuffer());
-    } catch (e) { return null; }   // absent, or not something this browser decodes
+     THESE ARE MEDIA ELEMENTS, NOT DECODED BUFFERS, and that is the important
+     detail. decodeAudioData() holds the whole song as float PCM: at 44.1kHz
+     stereo that is about 21MB a minute, so these three would sit somewhere
+     near a quarter of a gigabyte of resident memory for a 13MB download. An
+     <audio> element streams, so the cost is a buffer instead of a song. The
+     trade is that looping an MP3 is not perfectly gapless the way a buffer
+     loop is -- for a several-minute track under gunfire, that is the right
+     side of the trade.
+
+     They still ride the same bus the synth does, so the volume keys, mute and
+     the duck under a boss roar all apply with nothing extra wired up. */
+  const players = { wave: null, boss: null, final: null };
+  let fileBus = null, fileNow = null, filesTried = false, fileMode = false;
+  let finalFloor = false;
+
+  function makePlayer(file) {
+    const el = new Audio('audio/' + encodeURIComponent(file));
+    el.loop = true; el.preload = 'auto';
+    const p = { el, gain: ac.createGain(), ok: true, pauseT: 0 };
+    p.gain.gain.value = 0.0001;
+    p.gain.connect(fileBus);
+    ac.createMediaElementSource(el).connect(p.gain);
+    /* A named file that is not there, or that this browser will not play,
+       drops that track back to the synth rather than to silence. */
+    el.addEventListener('error', () => { p.ok = false; fileNow = null; syncFile(); });
+    return p;
   }
 
-  /* Named in audio/tracks.json rather than probed for by convention. Probing
-     meant six failed requests on every single load of a game that ships with
-     no music files, and a console full of red 404s is a bad way to say
-     "working as intended". The manifest ships with both entries null, so a
-     default checkout makes exactly one request and it succeeds. */
+  /* Named in a manifest rather than probed for by convention. Probing three
+     extensions across three tracks would mean nine failed requests on every
+     load of a checkout with no music in it, and a console full of red 404s is
+     a bad way to say "working as intended". */
   async function loadFiles() {
     if (filesTried) return;
     filesTried = true;
@@ -584,42 +597,72 @@ const MUSIC = (() => {
     try {
       const r = await fetch('audio/tracks.json');
       if (r.ok) man = await r.json();
-    } catch (e) { /* no manifest: synth only, which is the shipped state */ }
+    } catch (e) { /* no manifest: synth only */ }
     if (!man) return;
-    const [w, b] = await Promise.all([loadTrack(man.wave), loadTrack(man.boss)]);
-    bufs.wave = w; bufs.boss = b;
-    if (w || b) syncFile();
+    for (const k in players) if (man[k]) players[k] = makePlayer(man[k]);
+    syncFile();
   }
 
-  /* Start whichever recording the current track wants, fading the previous
-     one out rather than cutting it. */
-  function syncFile() {
-    if (!ac) return;
-    /* Each track answers for itself. Supplying only one file used to make the
-       other track borrow it, which is not what "drop in a boss theme" means --
-       a track with no file of its own falls back to the synth. */
-    const want = boss ? bufs.boss : bufs.wave;
+  /* The last floor outranks the boss flag, which is the whole point of it. */
+  function wantTrack() {
+    if (menuMode) return null;
+    const k = finalFloor ? 'final' : (boss ? 'boss' : 'wave');
+    const p = players[k];
+    return (p && p.ok) ? k : null;
+  }
+
+  const FADE = 0.34;                       // time constant, so ~1s to settle
+
+  function fadeOut(p) {
+    const t = ac.currentTime;
+    p.gain.gain.cancelScheduledValues(t);
+    p.gain.gain.setValueAtTime(Math.max(0.0001, p.gain.gain.value), t);
+    p.gain.gain.setTargetAtTime(0.0001, t, FADE);
+    clearTimeout(p.pauseT);
+    // pause only once it is actually inaudible, and only if nothing took it back
+    p.pauseT = setTimeout(() => { try { p.el.pause(); } catch (e) {} }, 1500);
+  }
+
+  function fadeIn(p, restart) {
+    clearTimeout(p.pauseT);
+    if (restart) { try { p.el.currentTime = 0; } catch (e) {} }
+    const pr = p.el.play();
+    if (pr && pr.catch) pr.catch(() => {});   // no gesture yet; the next one starts it
+    const t = ac.currentTime;
+    p.gain.gain.cancelScheduledValues(t);
+    p.gain.gain.setValueAtTime(Math.max(0.0001, p.gain.gain.value), t);
+    p.gain.gain.setTargetAtTime(0.9, t, FADE);
+  }
+
+  function syncFile(fromTheTop) {
+    if (!ac || !fileBus) return;
+    const want = enabled ? wantTrack() : null;
     const wasFile = fileMode;
     fileMode = !!want;
-    if (!fileMode && wasFile) nextT = ac.currentTime + 0.1;   // synth picks the bar back up from now
+    if (!fileMode && wasFile) nextT = ac.currentTime + 0.1;  // synth picks the bar up from now
     if (want === fileNow) return;
-    const t = ac.currentTime, FADE = 0.9;
-    if (fileSrc) {
-      const os = fileSrc, og = fileGain;
-      og.gain.setTargetAtTime(0, t, FADE / 3);
-      setTimeout(() => { try { os.stop(); os.disconnect(); og.disconnect(); } catch (e) {} }, (FADE + 0.4) * 1000);
-      fileSrc = null; fileGain = null; fileNow = null;
-    }
-    if (!want) return;
-    fileGain = ac.createGain();
-    fileGain.gain.setValueAtTime(0.0001, t);
-    fileGain.gain.setTargetAtTime(0.9, t, FADE / 3);
-    fileGain.connect(fileBus);
-    fileSrc = ac.createBufferSource();
-    fileSrc.buffer = want; fileSrc.loop = true;
-    fileSrc.connect(fileGain);
-    fileSrc.start(t);
+    if (fileNow && players[fileNow]) fadeOut(players[fileNow]);
     fileNow = want;
+    if (!want) return;
+    /* A boss theme starts at the top, because that is the point of it
+       arriving. The floor track picks up where it left off, so a long run
+       actually gets through the song rather than restarting it after every
+       fight. */
+    fadeIn(players[want], fromTheTop || want !== 'wave');
+  }
+
+  function stopFiles() {
+    for (const k in players) {
+      const p = players[k];
+      if (!p) continue;
+      clearTimeout(p.pauseT);
+      const t = ac.currentTime;
+      p.gain.gain.cancelScheduledValues(t);
+      p.gain.gain.setValueAtTime(Math.max(0.0001, p.gain.gain.value), t);
+      p.gain.gain.setTargetAtTime(0.0001, t, FADE);
+      p.pauseT = setTimeout(() => { try { p.el.pause(); } catch (e) {} }, 1500);
+    }
+    fileNow = null; fileMode = false;
   }
 
   const api = {
@@ -652,27 +695,35 @@ const MUSIC = (() => {
       running = true;
       step = 0; nextT = ac.currentTime + 0.1; lastEase = 0;
       timer = setInterval(tick, TICK_MS);
-      syncFile();
+      /* A new run starts the song at the top. Mid-track is right when you are
+         coming back from a boss fight and wrong when you have just pressed
+         START. */
+      fileNow = null;
+      syncFile(true);
     },
     stop(fade) {
       if (!ac) return;
       const t = ac.currentTime;
       for (const k in busses) busses[k].g.gain.setTargetAtTime(0, t, fade === undefined ? 0.4 : fade);
-      if (fileGain) fileGain.gain.setTargetAtTime(0, t, fade === undefined ? 0.4 : fade);
+      stopFiles();
       const mine = ++stopToken;
       setTimeout(() => {
         if (mine !== stopToken) return;  // something restarted us in the meantime
         running = false;
         if (timer) clearInterval(timer);
         timer = null;
-        if (fileSrc) { try { fileSrc.stop(); fileSrc.disconnect(); } catch (e) {} fileSrc = null; fileNow = null; }
         reap(Infinity);                  // and leave nothing connected behind
       }, 1400);
     },
-    setFloor(i) {
+    /* `last` is what puts the final floor on its own track for its whole
+       length -- every wave, its boss, and the finale -- rather than only for
+       the boss fight at the end of it. */
+    setFloor(i, last) {
       floorIdx = i | 0;
       menuMode = false;
+      finalFloor = !!last;
       bpmTarget = rootOf().bpm * trk().bpmMul;
+      syncFile();
     },
     setIntensity(v) { intenTarget = Math.max(0, Math.min(1, v)); },
     setBoss(b) {
@@ -685,17 +736,14 @@ const MUSIC = (() => {
       bpmTarget = rootOf().bpm * trk().bpmMul;
       syncFile();
     },
+    /* The title screen is silent, by request. It used to get a sparse
+       pad-and-arp version of the synth score; there is no menu recording and
+       nothing should fill in for one. */
     menu() {
-      menuMode = true; boss = false;
+      menuMode = true; boss = false; finalFloor = false;
       floorIdx = 0; bpmTarget = 78; intenTarget = 0.2;
-      if (!ac || !enabled) return;
-      stopToken++;
-      if (timer) clearInterval(timer);
-      running = true;
-      lastEase = 0;
-      nextT = ac.currentTime + 0.1;
-      timer = setInterval(tick, TICK_MS);
-      syncFile();
+      if (!ac) return;
+      api.stop(0.4);
     },
     isRunning() { return running; },
     usingFiles() { return fileMode; },
@@ -704,13 +752,23 @@ const MUSIC = (() => {
       enabled = !!v;
       try { localStorage.setItem(MUSIC_KEY, enabled ? '1' : '0'); } catch (e) {}
       if (enabled) api.start(); else api.stop(0.3);
+      syncFile();
       return enabled;
     },
     debug() {
       return { bpm: Math.round(bpm), inten: +inten.toFixed(2), boss, floorIdx, step,
                menuMode, running, track: boss ? 'boss' : 'wave',
                hot: +(boss ? 1 : (menuMode ? inten : 0.45 + inten * 0.55)).toFixed(2),
-               liveNodes: live.length, fileMode, enabled };
+               liveNodes: live.length, fileMode, playing: fileNow, finalFloor, enabled,
+               files: Object.keys(players).reduce((o, k) => {
+                 const p = players[k];
+                 o[k] = p ? { file: decodeURIComponent(p.el.src.split('/').pop()),
+                              ok: p.ok, playing: !p.el.paused,
+                              at: +p.el.currentTime.toFixed(1),
+                              len: isNaN(p.el.duration) ? null : +p.el.duration.toFixed(1),
+                              gain: +p.gain.gain.value.toFixed(3) } : null;
+                 return o;
+               }, {}) };
     }
   };
   return api;

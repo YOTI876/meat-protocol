@@ -1,4 +1,5 @@
 {
-  "wave": null,
-  "boss": null
+  "wave":  "feral-angel-waltz.mp3",
+  "boss":  "burn-the-world-waltz.mp3",
+  "final": "mesmerizing-galaxy-loop.mp3"
 }

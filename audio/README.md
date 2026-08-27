@@ -1,51 +1,68 @@
-# Putting a real track in
+# The music
 
-The score the game ships with is synthesised — `js/music.js` builds it out of
-oscillators while you play. That is not because a recording would be worse. It
-is because a recording has an owner, and picking one is a licensing decision
-rather than a technical one.
-
-So the game prefers a file when it finds one. Drop a track in here and it
-plays instead of the synth:
+The game plays these three, streamed and looped:
 
 | file | plays |
 |---|---|
-| `audio/wave.ogg` (or `.mp3`, `.wav`) | the whole run — waves, shops, corridors |
-| `audio/boss.ogg` (or `.mp3`, `.wav`) | boss fights and the finale |
+| `feral-angel-waltz.mp3` | **the run** — every wave, every floor but the last |
+| `burn-the-world-waltz.mp3` | **boss fights**, and an angry PACI |
+| `mesmerizing-galaxy-loop.mp3` | **the last floor, all of it** — every wave, its boss, and the finale |
 
-Either one on its own is fine. If only `boss.mp3` is here, bosses use it and
-the rest of the run stays synthesised. Both missing is the current behaviour
-and nothing changes.
+The title screen is deliberately silent.
 
-Tracks are looped, and they crossfade over about a second when a boss starts,
-so pick something that survives being looped — no long intro, no cold ending.
+The last floor outranks everything: once you walk in, it is one unbroken piece
+until the run ends. Boss fights on that floor do not interrupt it.
 
-They ride the same bus the synth does, which means **the volume keys, mute,
-and the duck under a boss roar all still work** without you doing anything.
+## Changing them
 
-## Where to get one you are allowed to use
+`tracks.json` is the whole configuration:
 
-These are the places that hand out music with a licence attached. Read the
-licence — most want a credit line, and a credit line costs you one row in the
-README.
+```json
+{
+  "wave":  "feral-angel-waltz.mp3",
+  "boss":  "burn-the-world-waltz.mp3",
+  "final": "mesmerizing-galaxy-loop.mp3"
+}
+```
 
-- **incompetech.com** — Kevin MacLeod, CC-BY. Enormous, well organised, has a
-  metal/rock section. Credit required.
-- **freemusicarchive.org** — filter by licence. Mixed quality, some excellent.
-- **opengameart.org** — written for games, so already loop-friendly. Licences
-  vary per track, check each one.
-- **patrickdearteaga.com** — CC-BY, game-oriented, several rock tracks.
-- **freesound.org** — more for effects than songs, but worth knowing about.
+Drop a file in this folder, put its name in here, reload. `.mp3`, `.ogg` and
+`.wav` all work — anything the browser plays. Any entry may be `null`, and a
+track set to `null` falls back to the synthesised score rather than borrowing
+another track's music.
 
-If you buy something from a stock library instead, the standard licence
-usually covers a game — check that it covers *distribution*, not just
-"personal projects".
+`N` toggles music on and off in game, and the setting sticks between runs.
 
-## Format
+## How they are played
 
-`.ogg` is tried first, then `.mp3`, then `.wav`. Ogg is the best trade for
-this: it loops without the silent padding an MP3 encoder adds at the start,
-which matters when the track is on repeat for twenty minutes.
+They are `<audio>` elements streamed through Web Audio, **not** decoded into
+buffers. `decodeAudioData()` would hold each whole song as float PCM — roughly
+21MB a minute at 44.1kHz stereo, so these three would sit near a quarter of a
+gigabyte of resident memory for a 13MB download. Streaming costs a buffer
+instead of a song.
 
-Keep them reasonably small. They are fetched and decoded on the first frame of
-audio, and a 40MB wav is a visible pause.
+The trade is that looping an MP3 is not perfectly gapless the way a buffer loop
+is. For multi-minute tracks playing under gunfire, that is the right side of
+the trade. If you ever want a short, seamless loop instead, that is the one
+case where decoding to a buffer is worth it.
+
+They ride the same bus the synth does, so the volume keys, mute, and the duck
+under a boss roar all apply with nothing extra wired up.
+
+## Licensing
+
+These were supplied for this build. **If this game ever gets published or
+distributed, check what each track is licensed for and add the credits it
+asks for** — that is a decision about your project, not a technical detail,
+and it is much easier to sort out now than after release.
+
+If you need replacements that are unambiguously free to use:
+
+- **incompetech.com** — Kevin MacLeod, CC-BY. Large, well organised. Credit required.
+- **freemusicarchive.org** — filter by licence.
+- **opengameart.org** — written for games, so already loop-friendly.
+- **patrickdearteaga.com** — CC-BY, game-oriented.
+
+## Format notes
+
+Keep an eye on file size — they are fetched over the network as the game runs.
+13MB total is fine. A hundred would not be.

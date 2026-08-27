@@ -875,6 +875,48 @@ Synthesised music is a stand-in for music somebody wrote. The drop-in path in
 answer: name an mp3 or ogg in `audio/tracks.json` and it replaces the synth,
 looped and crossfaded, with the volume keys and the duck already working.
 
+## `PENDING3` — Real music, on three tracks
+
+Damjan supplied the tracks, so the game plays them instead of the synth:
+
+| slot | plays |
+|---|---|
+| `wave` | the run — every wave, every floor but the last |
+| `boss` | boss fights, and an angry PACI |
+| `final` | **the last floor, all of it** — every wave, its boss, and the finale |
+
+The third slot is the new idea. `wantTrack()` checks `finalFloor` before it
+checks `boss`, so walking into floor 10 starts one piece that runs unbroken
+until the run ends — the boss fight at the bottom of it does not interrupt
+itself. `game.js` passes the flag in with the floor it already knows:
+`setFloor(nr, isLastFloor(nr))`.
+
+The title screen is silent by request; `menu()` now stops everything rather
+than falling back to the sparse synth arrangement it used to play. A boss theme
+starts at the top, because that is the point of it arriving, while the floor
+track resumes where it left off so a long run gets through the song instead of
+restarting it after every fight.
+
+Music is back **on** by default, on a new `localStorage` key so the "off" from
+the synth-only build does not silence actual music.
+
+> [!important] Streamed, not decoded — and that is the one real decision here
+> `decodeAudioData()` holds a whole song as float PCM, about **21MB a minute**
+> at 44.1kHz stereo. These three are a 13MB download and would have sat near
+> **a quarter of a gigabyte resident**. They are `<audio>` elements through
+> `createMediaElementSource` instead, so the cost is a buffer rather than a
+> song. The trade is that MP3 looping is not perfectly gapless; under gunfire,
+> for multi-minute tracks, that is the right side of it.
+
+Measured, no clipping anywhere: music alone peaks 0.106, music under sustained
+gunfire 0.295, the title screen 0.027 — which is the [[Audio]] drone and
+nothing else. RMS roughly doubles when the shooting starts, so the score sits
+under the effects rather than fighting them.
+
+Everything rides the same bus the synth did, so the volume keys, mute and
+`A.duck()` all kept working with nothing extra wired up. See
+[[Music#Three recordings]] and `audio/README.md`.
+
 ## Related
 - [[Bugs Found]] — the defects behind each fix above, all of them now closed
 - [[Tuning Values]] — where the numbers stand today
