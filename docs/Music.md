@@ -233,12 +233,12 @@ extra wiring.
 > on every load** of a checkout with no music in it, and a console full of red
 > 404s is a bad way to say "working as intended".
 
-> [!warning] Check the licences before this ships anywhere
-> The tracks were supplied for this build. If the game is ever published,
-> each one needs its licence checked and whatever credit it asks for — a
-> decision about the project rather than a technical detail, and far easier to
-> settle now than after release. `audio/README.md` lists sources that are
-> unambiguously free to use if replacements are ever needed.
+> [!note] Licensing
+> All three are royalty-free. Note that royalty-free means no per-use fee, not
+> automatically no attribution — some such licences still want a credit line,
+> and some separate personal from commercial use. Nothing to act on for a
+> project you play with friends; worth reading the actual terms before it goes
+> on a storefront. `audio/README.md` keeps the per-track table.
 
 ## Wiring into the game
 

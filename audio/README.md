@@ -50,12 +50,25 @@ under a boss roar all apply with nothing extra wired up.
 
 ## Licensing
 
-These were supplied for this build. **If this game ever gets published or
-distributed, check what each track is licensed for and add the credits it
-asks for** — that is a decision about your project, not a technical detail,
-and it is much easier to sort out now than after release.
+All three are royalty-free, per the source they came from.
 
-If you need replacements that are unambiguously free to use:
+One thing that is easy to miss: *royalty-free* means there is no per-use fee —
+the part that normally costs money. It does not automatically mean no
+attribution. A good share of royalty-free licences still want a credit line,
+and some separate personal use from commercial. Nothing to do about it while
+this is a project you and your friends play; worth a look at the actual terms
+if it ever gets sold or put on a storefront.
+
+If a credit line is wanted, the tidy place for it is the README, one row per
+track. Leave this list here so future-you knows where they came from:
+
+| track | source | licence |
+|---|---|---|
+| `feral-angel-waltz.mp3` | *(fill in)* | royalty-free |
+| `burn-the-world-waltz.mp3` | *(fill in)* | royalty-free |
+| `mesmerizing-galaxy-loop.mp3` | *(fill in)* | royalty-free |
+
+If you ever want replacements whose terms are spelled out in public:
 
 - **incompetech.com** — Kevin MacLeod, CC-BY. Large, well organised. Credit required.
 - **freemusicarchive.org** — filter by licence.
