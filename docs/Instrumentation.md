@@ -176,6 +176,62 @@ Divide by elapsed seconds. 158 nodes a second, ten of them `WaveShaper`s at
 **Watch the trend, not the value.** 20–60 and flat is healthy; anything that
 climbs and does not come back down is the same bug returning.
 
+## Is the mix actually in range?
+
+A separate question from [[#Is the audio thread keeping up?]], and it needs a
+separate instrument. The graph can be perfectly healthy — right node count,
+clock at 1.0x, nothing leaking — and still be sending a square wave to the
+speakers, which is what
+[[Bugs Found#30. Sharing the guitar amplifier turned the score into a square wave|#30]]
+was.
+
+An `AnalyserNode` costs one node. Tap whatever the game wires to `destination`
+by wrapping `connect` before anything builds a graph:
+
+```js
+const orig = AudioNode.prototype.connect;
+AudioNode.prototype.connect = function (dest, ...rest) {
+  if (dest === ctx.destination) orig.call(this, analyser);   // tee off a copy
+  return orig.call(this, dest, ...rest);
+};
+```
+
+Then poll `getFloatTimeDomainData` and keep three numbers:
+
+| number | means |
+|---|---|
+| **peak** | the largest sample seen. **Over 1.0 is clipping** — the value gets flattened, and flattened is a buzz |
+| **RMS** | how loud it is on average. Tells you whether a fix changed the level or only the peaks |
+| **clipped samples** | how many crossed 1.0. Zero is the only acceptable number |
+
+> [!warning] Poll on a timer, not `requestAnimationFrame`
+> A hidden or non-compositing pane does not run rAF, so an rAF sampler returns
+> nothing and looks like silence. `setInterval` keeps running.
+
+### Bisect it by muting
+
+Once peak is over 1.0, finding the bus is faster than reading code. `menu()`
+forces the guitar and drum busses to zero, so:
+
+```
+full arrangement   peak 1.176
+menu mode          peak 0.057
+```
+
+names the culprit in two readings.
+
+### A/B against the previous commit
+
+The most useful reading is not absolute, it is a diff. Drop the old file in and
+run the identical scenario:
+
+```bash
+git show 9848bb9:js/music.js > js/music.js   # keep a copy of the new one first
+```
+
+0.255 versus 1.176 for the same bars is not an opinion about mixing, it is a
+regression with a commit attached.
+
 ## `MEAT.FX` — one switch per thing a hit does
 
 "It feels laggy" is not one symptom. Real dropped frames and

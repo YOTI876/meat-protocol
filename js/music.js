@@ -37,6 +37,15 @@ const MUSIC = (() => {
   let inten = 0, intenTarget = 0;
   let floorIdx = 0, boss = false, menuMode = false;
 
+  /* ---- off by default ----
+     Damjan asked for the music to go away unless it is a real recording, and
+     "off" should survive a reload, so it lives in the same save the volume
+     does. N toggles it. Nothing else in here runs while it is off: start()
+     and menu() decline, so there is no scheduler, no nodes and no bus. */
+  const MUSIC_KEY = 'meat_music';
+  let enabled = false;
+  try { enabled = localStorage.getItem(MUSIC_KEY) === '1'; } catch (e) {}
+
   /* ---------- the reaper ----------
 
      Every note used to build a little chain of nodes, wire it to a bus and
@@ -335,7 +344,22 @@ const MUSIC = (() => {
   /* A cabinet, roughly: nothing below 85Hz, nothing above 3.9k, and a peak in
      the low mids where a speaker cone lives. Without this a distorted saw is a
      wasp in a jar rather than an amplifier. */
-  function amp(drive, dest) {
+  /* GAIN STAGING, and it is the whole ballgame here.
+
+     A shared amplifier is authentic -- a real one takes all six strings at
+     once -- but it changes the arithmetic completely. When every note had its
+     own chain the envelope sat AFTER the distortion, so a note left the
+     shaper clipped to +/-1 and was then scaled down to its actual volume.
+     Sharing the amp moved the envelope in FRONT of the shaper, which is
+     correct for how hard a note drives the amp and catastrophic for how loud
+     it comes out: the shaper now had several notes summed at drive 14 going
+     in, sat pinned at full scale, and there was nothing after it to bring the
+     level back down. A waveshaper pinned at full scale is a square wave. That
+     is the buzzing. See [[Bugs Found#30]].
+
+     So: a drive small enough that a summed chord is in range rather than
+     welded to the rails, and a trim after the cabinet to set the level. */
+  function amp(drive, trim, dest) {
     const pre = ac.createGain(); pre.gain.value = drive;
     const ws = ac.createWaveShaper();
     if (!distCurve) distCurve = makeDistCurve(28);
@@ -345,7 +369,9 @@ const MUSIC = (() => {
     const mid = ac.createBiquadFilter(); mid.type = 'peaking';
     mid.frequency.value = 780; mid.Q.value = 1.1; mid.gain.value = 5;
     const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 3900; lp.Q.value = 0.7;
-    pre.connect(ws); ws.connect(hp); hp.connect(mid); mid.connect(lp); lp.connect(dest);
+    const post = ac.createGain(); post.gain.value = trim;
+    pre.connect(ws); ws.connect(hp); hp.connect(mid); mid.connect(lp);
+    lp.connect(post); post.connect(dest);
     return pre;
   }
 
@@ -596,23 +622,31 @@ const MUSIC = (() => {
     fileNow = want;
   }
 
-  return {
+  const api = {
     attach(context, destination) {
       if (ac) return;
       ac = context; out = destination;
       noise = makeNoise();
       bus('pad', 0.55); bus('bass', 0.42); bus('drums', 0.40);
       bus('gtr', 0.50); bus('arp', 0.30); bus('stab', 0.34);
+      /* And a limiter across all three, so that however the arrangement
+         stacks up on a given bar the bus cannot leave full scale. Belt and
+         braces: the trims above are what set the level, this is what
+         guarantees it. */
+      const gtrLimit = ac.createDynamicsCompressor();
+      gtrLimit.threshold.value = -10; gtrLimit.knee.value = 4;
+      gtrLimit.ratio.value = 12; gtrLimit.attack.value = 0.003; gtrLimit.release.value = 0.18;
+      gtrLimit.connect(busses.gtr.g);
       amps = {
-        chug:  amp(14, busses.gtr.g),
-        power: amp(9,  busses.gtr.g),
-        lead:  amp(20, busses.gtr.g)
+        chug:  amp(3.0, 0.30, gtrLimit),
+        power: amp(2.2, 0.22, gtrLimit),
+        lead:  amp(4.0, 0.20, gtrLimit)
       };
       fileBus = ac.createGain(); fileBus.gain.value = 1; fileBus.connect(out);
       loadFiles();
     },
     start() {
-      if (!ac) return;
+      if (!ac || !enabled) return;
       stopToken++;                       // cancels any stop still counting down
       if (timer) clearInterval(timer);
       running = true;
@@ -654,7 +688,7 @@ const MUSIC = (() => {
     menu() {
       menuMode = true; boss = false;
       floorIdx = 0; bpmTarget = 78; intenTarget = 0.2;
-      if (!ac) return;
+      if (!ac || !enabled) return;
       stopToken++;
       if (timer) clearInterval(timer);
       running = true;
@@ -665,11 +699,19 @@ const MUSIC = (() => {
     },
     isRunning() { return running; },
     usingFiles() { return fileMode; },
+    isEnabled() { return enabled; },
+    setEnabled(v) {
+      enabled = !!v;
+      try { localStorage.setItem(MUSIC_KEY, enabled ? '1' : '0'); } catch (e) {}
+      if (enabled) api.start(); else api.stop(0.3);
+      return enabled;
+    },
     debug() {
       return { bpm: Math.round(bpm), inten: +inten.toFixed(2), boss, floorIdx, step,
                menuMode, running, track: boss ? 'boss' : 'wave',
                hot: +(boss ? 1 : (menuMode ? inten : 0.45 + inten * 0.55)).toFixed(2),
-               liveNodes: live.length, fileMode };
+               liveNodes: live.length, fileMode, enabled };
     }
   };
+  return api;
 })();

@@ -726,6 +726,86 @@ second layered on top, which is heavier than the game can actually produce.
 
 ---
 
+## 30. Sharing the guitar amplifier turned the score into a square wave
+
+**Reported as:** *"there is no music being heard just a loud buzzing sound kinda
+static"*. A regression, introduced by the fix for
+[[#29. The music was not lagging figuratively — the audio clock was running at a quarter speed|#29]]
+one commit earlier, and audible from the first bar.
+
+### The measurement
+
+Tap the node graph on its way to `destination` with an `AnalyserNode`, then
+check the same scenario against the previous commit's `js/music.js`:
+
+| `js/music.js` | peak | RMS | clipped samples in 2s |
+|---|---|---|---|
+| `9848bb9`, before the fix | 0.255 | 0.041 | **0** |
+| `f5c11af`, after it | **1.176** | 0.201 | **155** |
+
+Anything past 1.0 is off the end of the scale and gets flattened. Muting the
+guitar and drum busses (via `menu()`) dropped the peak from 1.176 to **0.057**,
+which named the bus without needing to read a line of code.
+
+### The cause
+
+Not the sharing itself — a real amplifier takes all six strings at once, and
+summing before the distortion is what makes a chord sound like a chord. The
+defect was **gain staging**, and it came from one detail moving.
+
+When every note built its own chain, the envelope was *after* the distortion:
+
+```
+osc → drive ×14 → shaper (clips to ±1) → envelope ×0.3 → cab → bus
+```
+
+Each note left the shaper pinned at full scale, and was then scaled down to its
+actual volume. Sharing the amp put the envelope *in front* of the shaper:
+
+```
+osc → envelope ×0.3 → [ drive ×14 → shaper → cab ] → bus
+```
+
+which is correct for **how hard a note drives the amp** — that is what a palm
+mute physically is — and catastrophic for how loud it comes out. The shaper now
+saw `0.3 × 14 = 4.2` per note, several notes at once, and **nothing after it
+brought the level back down**. A waveshaper held far past its knee outputs a
+square wave. A square wave that never stops is a buzz.
+
+The comment written at the time said the move was "not a shortcut, it is
+correct". Half of that was true, which is the reason it survived review: the
+reasoning about drive was sound and the arithmetic about level was never done.
+
+### The fix
+
+Keep the shared amp — it is what closes #29 — and stage it properly:
+
+- **drive** from 14/9/20 down to 3.0/2.2/4.0, so a summed chord lands in range
+  rather than welded to the rails
+- a **trim after the cabinet** (0.30/0.22/0.20), which is the stage that went
+  missing when the envelope moved
+- a **limiter across all three amps** into the bus. The trims set the level;
+  this guarantees it, whatever way a given bar happens to stack up.
+
+| | peak | clipped |
+|---|---|---|
+| before the regression | 0.255 | 0 |
+| the regression | 1.176 | 155 |
+| **fixed, wave track** | **0.215** | **0** |
+| **fixed, boss track** | **0.229** | **0** |
+
+Back to the level it used to sit at, with headroom to spare.
+
+> [!note] Why the #29 work did not catch it
+> Every check on #29 was about the *graph*: clock rate, node counts, live
+> nodes, all of which were correct and stayed correct. Not one of them looked
+> at the **signal**. A leak and a level are different questions and they need
+> different instruments — an `AnalyserNode` on the way to `destination` costs
+> one node and would have caught this in the same session that caused it.
+> It is now part of [[Instrumentation#Is the mix actually in range?]].
+
+---
+
 # Open
 
 **None.** Every defect on this list is closed.

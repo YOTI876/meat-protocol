@@ -331,6 +331,13 @@ addEventListener('keydown', e => {
   if (e.code === 'Equal' || e.code === 'NumpadAdd') {
     const v = A.nudgeVol(1); A.blip(); msg('VOLUME', volBar(), 1.0);
   }
+  /* The score is OFF unless you turn it on, and the setting sticks. If you
+     have put a real recording in audio/ this is what starts it. */
+  if (e.code === 'KeyN' && A.music) {
+    const on = A.music.setEnabled(!A.music.isEnabled());
+    if (on && S.mode === 'title') A.music.menu();
+    msg('MUSIC', on ? (A.music.usingFiles() ? 'ON' : 'ON  (synth)') : 'OFF', 1.6);
+  }
   // F3 is the probe. F4 toggles the flush mode it warns about.
   if (e.code === 'F3') { e.preventDefault(); PROBE.on = PROBE.on ? 0 : 1; if (PROBE.on) PROBE.reset(); }
   if (e.code === 'F4' && PROBE.on) { e.preventDefault(); PROBE.drain = PROBE.drain ? 0 : 1; PROBE.reset(); }

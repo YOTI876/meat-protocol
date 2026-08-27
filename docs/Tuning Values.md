@@ -24,6 +24,8 @@ All in `js/game.js` unless noted.
 | boss health | `BOSS_HP_MUL = 2.2` | top of file | scales the whole boss ladder at once. See [[Bosses#They have twice the health now]] |
 | THE FISH | `dmg 300` / `girth 5` / `reach 120` / `falloff 0.55` / `spread2 0.5` | `WEP.omega` + `updateBeam()` | width, length, depth falloff and per-body falloff. See [[Weapons#THE FISH, cut down]] |
 | master volume | 11 steps, squared curve, `meat_vol` | `audio.js` | `-` and `=` step it. See [[Audio#Volume]] |
+| music on/off | `meat_music` in `localStorage`, default **off** | `music.js` | `N` toggles. See [[Music#The score is off unless you ask for it]] |
+| guitar gain staging | drive `3.0 / 2.2 / 4.0`, trim `0.30 / 0.22 / 0.20` | `music.js`, `amp()` | drive is how distorted, trim is how loud. Getting these backwards is [[Bugs Found#30. Sharing the guitar amplifier turned the score into a square wave|defect #30]] |
 | score lookahead | `LOOKAHEAD = 0.75` / `TICK_MS = 50` | `music.js` | how far ahead notes are queued. Below ~0.3 a bad frame opens a hole in the bar. See [[Music#Scheduling]] |
 | band floor | `0.45 + inten * 0.55` | `music.js`, `scheduleStep` | how much band a non-boss wave gets at minimum. Raise it and floor 1 sounds like floor 4. See [[Music#Intensity says how much band, not whether there is one]] |
 | boss track | `bpmMul: 1.14`, locrian, `RIFF_B` | `music.js`, `TRACKS.boss` | everything that makes THE THING a different piece from THE FLOOR. See [[Music#Two pieces, not one]] |

@@ -21,6 +21,7 @@ tags: [reference]
 | `C` | open [[Cosmetics]] — works from title, pause, or the death screen |
 | `Esc` / `P` | pause / resume — and **refuse** TOMCE's offer |
 | `M` | mute |
+| `N` | music on / off. **Off is the default** — see [[Music#The score is off unless you ask for it]] |
 | `-` / `=` | volume down / up — eleven steps, remembered between runs. Numpad `-` and `+` work too |
 | `Enter` / click | start a run from the title screen |
 | `R` | retry, on the death screen |

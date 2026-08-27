@@ -10,10 +10,27 @@ game — not transcriptions or arrangements of anything. Built in the idiom a
 dungeon-crawler roguelike lives in (phrygian and locrian modes, a syncopated
 pulse, circling arpeggios, accumulating percussion) rather than by copying one.
 
-> [!tip] You do not have to use it
-> Drop a real recording into `audio/` and the game plays that instead, looped
-> and crossfaded, with the volume keys and the duck still working. See
-> [[#A real recording, if you have one]].
+> [!important] The score is off by default
+> Press **N** to turn it on. See [[#The score is off unless you ask for it]].
+> Drop a real recording into `audio/` and the game plays that instead of the
+> synth, looped and crossfaded, with the volume keys and the duck still
+> working — see [[#A real recording, if you have one]].
+
+## The score is off unless you ask for it
+
+`N` toggles it, and the setting sticks in `localStorage` under `meat_music`
+next to the volume. Ships **off**, because synthesised music is a stand-in for
+music somebody wrote, and a stand-in should not be the thing you cannot switch
+off.
+
+Off is genuinely off, not muted: `start()` and `menu()` decline, so there is
+no scheduler, no nodes and no bus. Verified — `liveNodes: 0`, `running: false`,
+and the whole mix peaks at **0.027**, which is the ambient drone in
+[[Audio]] and nothing else.
+
+The [[Audio#The ordinary sounds|sound effects]] are unaffected either way. They
+are a different system on a different bus, and turning the score off does not
+touch them.
 
 ## Two pieces, not one
 
@@ -95,10 +112,29 @@ distorted saw is a wasp in a jar rather than an amplifier.
 > They used to be built **per note**: a `WaveShaper` at `oversample: '4x'` plus
 > three biquads, about ten of each a second at full tilt. That is most of
 > [[Bugs Found#29. The music was not lagging figuratively — the audio clock was running at a quarter speed|defect #29]].
-> A note is now two oscillators and an envelope, and the envelope sits *before*
-> the distortion — which is not a shortcut, it is correct: how hard a note
-> drives an amp is how distorted it comes out, and a palm mute is exactly a
-> note that does not drive it hard for long.
+> A note is now two oscillators and an envelope.
+
+### Gain staging, which is the whole ballgame
+
+Sharing an amp is authentic — a real one takes all six strings at once, and
+summing before the distortion is what makes a chord sound like a chord. But it
+moves where the envelope sits, and that changes the arithmetic completely:
+
+| | per-note amps | shared amp |
+|---|---|---|
+| signal path | `osc → drive → shaper → **envelope** → cab` | `osc → **envelope** → drive → shaper → cab → **trim**` |
+| what the shaper sees | one note at full drive | several notes, summed |
+| what sets the level | the envelope, after the clipping | the trim, after the cabinet |
+
+Putting the envelope in front of the shaper is correct for **how hard a note
+drives the amp** — that is what a palm mute physically is. What it is not is a
+volume control, and the first version of this shipped without replacing the one
+it removed. The result peaked at 1.176 and buzzed:
+[[Bugs Found#30. Sharing the guitar amplifier turned the score into a square wave|defect #30]].
+
+Drive is now 3.0 / 2.2 / 4.0 and the trim after each cabinet is 0.30 / 0.22 /
+0.20, with a limiter across all three into the bus. **Drive is how distorted,
+trim is how loud**, and they are not interchangeable.
 
 ## Scheduling
 

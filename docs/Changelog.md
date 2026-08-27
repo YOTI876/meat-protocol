@@ -836,6 +836,45 @@ all still work. Either entry may stay `null`, and a track with no file falls
 back to the synth, so shipping only a boss theme is supported. `audio/README.md`
 lists the places that hand out music with a licence attached.
 
+## `PENDING2` — Fix the buzzing, and ship with the score switched off
+
+Reported as *"there is no music being heard just a loud buzzing sound kinda
+static"*. My regression, one commit old, and audible from the first bar.
+
+Sharing one guitar amplifier instead of building one per note is what closed
+[[Bugs Found#29. The music was not lagging figuratively — the audio clock was running at a quarter speed|#29]],
+and it is authentic — a real amp takes all six strings at once. But it moved
+the envelope from *after* the distortion to *before* it, which is right for how
+hard a note drives an amp and is not a volume control. The shaper saw several
+notes summed at drive 14, sat pinned at full scale, and had nothing after it to
+bring the level back down. A waveshaper held past its knee is a square wave.
+
+| `js/music.js` | peak | clipped samples in 2s |
+|---|---|---|
+| `9848bb9`, before | 0.255 | 0 |
+| `f5c11af`, the regression | **1.176** | **155** |
+| now, wave track | **0.215** | **0** |
+| now, boss track | **0.229** | **0** |
+
+Drive down to 3.0 / 2.2 / 4.0, a trim after each cabinet (0.30 / 0.22 / 0.20)
+to replace the stage that went missing, and a limiter across all three into the
+bus. Full account in
+[[Bugs Found#30. Sharing the guitar amplifier turned the score into a square wave|defect #30]],
+and the instrument that should have caught it in the same session that caused
+it is now [[Instrumentation#Is the mix actually in range?]] — every check on #29
+looked at the *graph*, and not one looked at the *signal*.
+
+**The score now ships off.** `N` toggles it, and the setting sticks in
+`localStorage` beside the volume. Off is genuinely off rather than muted:
+no scheduler, no nodes, no bus, and the whole mix peaks at 0.027, which is the
+[[Audio]] drone and nothing else. Sound effects are unaffected — different
+system, different bus.
+
+Synthesised music is a stand-in for music somebody wrote. The drop-in path in
+[[Music#A real recording, if you have one]] is still there and still the better
+answer: name an mp3 or ogg in `audio/tracks.json` and it replaces the synth,
+looped and crossfaded, with the volume keys and the duck already working.
+
 ## Related
 - [[Bugs Found]] — the defects behind each fix above, all of them now closed
 - [[Tuning Values]] — where the numbers stand today
