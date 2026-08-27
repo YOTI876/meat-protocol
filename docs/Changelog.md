@@ -836,7 +836,7 @@ all still work. Either entry may stay `null`, and a track with no file falls
 back to the synth, so shipping only a boss theme is supported. `audio/README.md`
 lists the places that hand out music with a licence attached.
 
-## `PENDING2` — Fix the buzzing, and ship with the score switched off
+## `232c9e7` — Fix the buzzing, and ship with the score switched off
 
 Reported as *"there is no music being heard just a loud buzzing sound kinda
 static"*. My regression, one commit old, and audible from the first bar.
