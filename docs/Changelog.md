@@ -783,6 +783,59 @@ the burst landed.
 below zero so nothing broke, but a timer that keeps counting past its own end
 is a timer you cannot reason about.
 
+## `650d87c` — Stop leaking the audio graph, and give bosses their own song
+
+Reported as *"the music is lagging and the sound turns off sometimes"*. It was
+literal: **the audio thread was rendering at 0.167x real time** while a bare
+`AudioContext` opened beside it in the same tab held 0.985x. The score really
+was playing slow, and really did go silent when the thread missed its deadline.
+
+Neither audio file contained a single `disconnect()`. Every note and every
+sound effect built a chain of nodes, wired it to a bus and abandoned it — and a
+connected Web Audio node is a *rendered* node whether or not anything feeds it.
+158 a second at full tilt, ten of them `WaveShaper`s at `oversample: '4x'`,
+because `distort()` and `cab()` were called per note.
+
+| | before | after |
+|---|---|---|
+| audio clock at 5s | 0.450x | **0.999x** |
+| audio clock at 30s | 0.270x | **0.999x** |
+| trend | monotonic decay | **flat** |
+| live nodes | unbounded | **34–50, stable** |
+
+Holds at 0.997x with the boss arrangement *and* ~150 sound effects a second on
+top. Full write-up in
+[[Bugs Found#29. The music was not lagging figuratively — the audio clock was running at a quarter speed|defect #29]];
+the method that caught it is
+[[Instrumentation#Is the audio thread keeping up?]], and it generalises — every
+other profiler in this project measures the main thread, and the frames were
+fine the whole time.
+
+Also: three amplifiers for the whole run instead of one per note, `oversample`
+to `'2x'`, `LOOKAHEAD` 0.12s → 0.75s (120ms is less than one bad frame here),
+easing moved onto wall time, and `visibilitychange` resumes a context the
+browser suspended — which was the *other* way the sound stopped.
+
+**[[Music#Two pieces, not one|Two pieces now.]]** THE FLOOR is phrygian and
+runs the whole run; THE THING is locrian, 14% faster, double-kicked, with its
+own riff, its own lead and the stabs. Root and tempo still come from the floor,
+so a boss is a different piece of music on every floor rather than one theme
+played nine times.
+
+And the score stopped waiting to be invited. Wave 1 of floor 1 works out to
+intensity 0.264, which sat under the drum gate, the guitar gate *and* the arp
+gate — a pad and a bass line, which reads as "this game has no music outside
+boss fights". Intensity now says how much band, not whether there is one:
+`hot = 0.45 + inten * 0.55`. The same opening wave is 0.53, with drums, gallop,
+power chords and arp all playing.
+
+Finally, [[Music#A real recording, if you have one|you can use a real track]].
+Name a file in `audio/tracks.json` and it replaces that piece — looped,
+crossfaded on a boss, riding the same bus so the volume keys, mute and the duck
+all still work. Either entry may stay `null`, and a track with no file falls
+back to the synth, so shipping only a boss theme is supported. `audio/README.md`
+lists the places that hand out music with a licence attached.
+
 ## Related
 - [[Bugs Found]] — the defects behind each fix above, all of them now closed
 - [[Tuning Values]] — where the numbers stand today

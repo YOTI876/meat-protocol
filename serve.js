@@ -5,7 +5,8 @@ const path = require('path');
 
 const PORT = 8123;
 const ROOT = __dirname;
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json',
+               '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.md': 'text/markdown' };
 
 http.createServer((req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]);

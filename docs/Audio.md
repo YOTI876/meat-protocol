@@ -60,8 +60,9 @@ down under boss roars and explosions without touching SFX volume.
 
 ## The guitar layer
 
-The score gained a sixth layer, and it is the loudest thing in it. Three
-voices, because a rhythm guitar is not one sound:
+The score gained a sixth layer, and it is the loudest thing in it. It lives in
+[[Music#The guitar, and its three amplifiers|Music]] — this is the short
+version. Three voices, because a rhythm guitar is not one sound:
 
 | voice | is |
 |---|---|
@@ -75,16 +76,19 @@ plays the same scale degrees as the pad and the bass, off the same `nf()`.
 
 Distortion is a **waveshaper**, not a clipped gain, so it saturates instead of
 tearing: a soft asymptotic curve, `(1+k)x / (1+k|x|)`, built once at 8192
-points and shared. Every voice then goes through `cab()` — highpass at
-85Hz, lowpass at 3.9k, and a +5dB peak at 780Hz. Without that last stage a
-distorted saw is a wasp in a jar rather than an amplifier.
+points. Each voice runs into a cabinet — highpass at 85Hz, lowpass at 3.9k, and
+a +5dB peak at 780Hz. Without that last stage a distorted saw is a wasp in a
+jar rather than an amplifier.
 
-> [!note] It arrives before the arp and after the drums
-> The band assembles in the order a band assembles in: pulse, kit, guitar,
-> then everything else. Chug from intensity **0.34**, the power-chord wall at
-> **0.5**, flat-out sixteenths at **0.66**, and the lead last at **0.62** — two
-> bars of eighths every fourth bar, so it stays a hook instead of becoming a
-> drone.
+> [!warning] There are three amplifiers, not one per note
+> They used to be built per note, and that was most of
+> [[Bugs Found#29. The music was not lagging figuratively — the audio clock was running at a quarter speed|defect #29]].
+> A note is two oscillators and an envelope; the amps are built once.
+
+The guitar is no longer gated — it plays from the first wave of the run. What
+intensity moves is how dense it is: the gallop fills in at **0.66**, the
+power-chord wall arrives at **0.5**, the lead at **0.62**. See
+[[Music#Intensity says how much band, not whether there is one]].
 
 ## Volume
 
@@ -121,6 +125,26 @@ you notice without being able to name.
 | `lowHealth` | crossing into the red, once per crossing |
 | `stomp` | something big landing |
 | `blip` | the volume keys, so the change is audible at the level you just set |
+
+## Nothing is left connected
+
+Every sound effect in here goes through `env()`, so `env()` is where the
+clean-up goes: each chain is registered with an end time and disconnected
+once it is past. The sweep is amortised onto the calls themselves, so a quiet
+game keeps no timer alive.
+
+This is not tidiness. **A connected Web Audio node is a rendered node whether
+or not anything is feeding it**, and before this there was not one
+`disconnect()` in either audio file. A firefight is a hundred new nodes a
+second, none of them ever released. See
+[[Bugs Found#29. The music was not lagging figuratively — the audio clock was running at a quarter speed|defect #29]]
+for what it cost and [[Instrumentation#Is the audio thread keeping up?]] for
+how to check it has not come back.
+
+> [!note] A suspended context is silence too
+> Browsers suspend an `AudioContext` when the tab goes away and do not always
+> hand it back. Alt-tabbing out of a fight and back was one of the ways the
+> sound simply stopped; `visibilitychange` now resumes it.
 
 ## Related
 - [[Music]] — the generative score, a separate always-running system

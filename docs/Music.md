@@ -3,73 +3,187 @@ title: Music
 tags: [reference, engine]
 ---
 
-# Music — the generative score
+# Music — the score
 
-`js/music.js`. An **original**, fully synthesized score written specifically
-for this game — not a transcription or arrangement of any existing track.
-Requested to evoke the mood of a dungeon-crawler roguelike OST; built from
-scratch in that idiom (minor/phrygian/locrian modes, syncopated pulse,
-circling arpeggios, accumulating percussion) rather than by copying one.
+`js/music.js`. Two **original**, fully synthesised pieces written for this
+game — not transcriptions or arrangements of anything. Built in the idiom a
+dungeon-crawler roguelike lives in (phrygian and locrian modes, a syncopated
+pulse, circling arpeggios, accumulating percussion) rather than by copying one.
 
-## Scheduling
+> [!tip] You do not have to use it
+> Drop a real recording into `audio/` and the game plays that instead, looped
+> and crossfaded, with the volume keys and the duck still working. See
+> [[#A real recording, if you have one]].
 
-A lookahead scheduler: a 25ms `setInterval` queues notes ~120ms ahead of
-playback against exact `AudioContext` timestamps (`nextT`), so the score
-can't drift or stutter even while the main thread is busy drawing 70+
-enemies. This is the same pattern professional Web Audio sequencers use —
-schedule ahead of the deadline, never against `Date.now()`.
+## Two pieces, not one
 
-## Five layers, gated by intensity
+There used to be one score with a boss flag on it, and the flag only forced
+`intensity` to 1 — same key, same riff, same everything, louder. So a boss did
+not sound like a different thing arriving, it sounded like the same thing
+turned up.
+
+| | **THE FLOOR** | **THE THING** |
+|---|---|---|
+| when | the run — waves, shops, corridors | bosses, the finale, an angry PACI |
+| mode | phrygian | **locrian** — no perfect fifth, nothing resolves |
+| tempo | the floor's | **+14%** |
+| chords | `[0, 1, 0, 6]` | `[0, 4, 1, 5]` |
+| kick | backbeat, doubles when hot | **double time throughout** |
+| chug | gallop | denser, and the hole in it moves |
+| riff | `RIFF` | `RIFF_B` — walks further, lands lower |
+| lead | `LEAD_A` / `LEAD_B` | `LEAD_C` / `LEAD_D`, leaning on the flat 2 |
+| stabs | no | yes |
+| dread | ×1.0 | ×1.35 |
+
+Root and tempo still come from the **floor**, so descending darkens and
+quickens both pieces. Scale and chord movement come from the **track**, which
+means a boss is a different piece of music on every floor rather than one
+boss theme played nine times.
+
+Switching tracks resets `step` to 0, so the new piece starts on a downbeat
+instead of halfway through the bar the last one was in.
+
+## Intensity says how much band, not whether there is one
+
+The gates used to decide whether the music existed. Wave 1 of floor 1 works
+out to `0.12 + (1/5)*0.72 + 0` = **0.264**, which sat under the drum gate
+(0.28), the guitar gate (0.34) and the arp gate (0.42). The answer was a pad
+and a bass line, and it read as "this game has no music outside boss fights."
+
+```js
+const hot = boss ? 1 : (menuMode ? inten : 0.45 + inten * 0.55);
+```
+
+One line. THE FLOOR now runs from a bit over half strength to flat out; it
+never runs from nothing. The same opening wave is `hot = 0.53` — drums,
+gallop, power chords and arp all playing. The title screen still uses raw
+`inten` so the menu stays sparse.
 
 | layer | comes in at | role |
 |---|---|---|
 | **pad** | always | sustained chord tones, the room breathing |
-| **bass** | intensity > 0.10 | syncopated low pulse |
-| **drums** | intensity > 0.28 | kick/snare/hats, pattern thickens with intensity |
-| **arp** | intensity > 0.42 | circling 16th-note runs, reversing direction every 2 bars |
-| **stab** | boss fights only | dissonant minor-2nd hits |
-
-`intensity` is driven by the game: `0.12 + (wave/10)*0.72 + floor*0.16`,
-eased rather than snapped so builds feel musical.
+| **bass** | always | syncopated low pulse |
+| **drums** | always | kick/snare/hats, pattern thickens with `hot` |
+| **gtr** | always | chug always, the power-chord wall from 0.5 |
+| **lead** | `hot` > 0.62 | two bars of eighths every fourth bar |
+| **arp** | `hot` > 0.42 | circling 16ths, reversing every 2 bars |
+| **stab** | THE THING only | dissonant minor-2nd hits |
 
 ## Keys per floor
 
-Every floor is **phrygian or locrian** — modes built around a flat second,
-and the bottom two floors drop the perfect fifth entirely so the harmony
-never fully resolves. Roots and tempo both shift with floor:
-
-| floor | mode | tempo |
+| floor | root | tempo (THE FLOOR / THE THING) |
 |---|---|---|
-| 1 | A phrygian | 82 bpm |
-| 2 | G phrygian | 88 bpm |
-| 3 | F locrian | 94 bpm |
-| 4 | D♯ locrian | 99 bpm |
+| 1 | A | 84 / 96 |
+| 2 | G | 90 / 103 |
+| 3 | F | 96 / 109 |
+| 4+ | D♯ | 101 / 115 |
 
-Boss fights add +12% tempo and switch on the `stab` layer.
+## The guitar, and its three amplifiers
+
+| voice | is |
+|---|---|
+| `vChug` | palm-muted low root on a gallop, choked at 55ms so it reads as a hit |
+| `vPower` | root, fifth, octave. No third, which is why it fits a scale whose third keeps moving |
+| `vLead` | bent up into the note over 55ms, then vibratoed at 5.6Hz |
+
+Distortion is a **waveshaper**, not a clipped gain, so it saturates instead of
+tearing: `(1+k)x / (1+k|x|)`, built once at 8192 points. Each voice runs into a
+cabinet — 85Hz highpass, 3.9k lowpass, +5dB at 780Hz — because without that a
+distorted saw is a wasp in a jar rather than an amplifier.
+
+> [!important] There are exactly three amplifiers for the whole run
+> They used to be built **per note**: a `WaveShaper` at `oversample: '4x'` plus
+> three biquads, about ten of each a second at full tilt. That is most of
+> [[Bugs Found#29. The music was not lagging figuratively — the audio clock was running at a quarter speed|defect #29]].
+> A note is now two oscillators and an envelope, and the envelope sits *before*
+> the distortion — which is not a shortcut, it is correct: how hard a note
+> drives an amp is how distorted it comes out, and a palm mute is exactly a
+> note that does not drive it hard for long.
+
+## Scheduling
+
+A lookahead scheduler: a 50ms `setInterval` queues notes **~750ms** ahead
+against exact `AudioContext` timestamps (`nextT`), never against `Date.now()`.
+
+`LOOKAHEAD` was 0.12s, which is **less than one bad frame in this game** — see
+[[Rendering#The effect ceilings, swept]], where the worst frame is 50ms at
+every setting and 83ms was measured before the light blob was baked. A 130ms
+stall and the queue ran dry mid-bar. The cost of 0.75s is that a change in
+intensity takes up to that long to become audible, and for music that is not a
+cost.
+
+Easing runs on **wall time**, not per tick:
+
+```js
+bpm   += (bpmTarget - bpm)     * Math.min(1, dt * 1.6);
+inten += (intenTarget - inten) * Math.min(1, dt * 1.2);
+```
+
+A per-tick factor silently changes how fast the music responds every time the
+tick rate is touched, and the tick rate has now been touched twice.
+
+## Nothing is left connected
+
+Every voice registers its nodes with an end time; `tick()` disconnects
+anything past it. This is not tidiness — a connected Web Audio node is a
+*rendered* node whether or not anything is feeding it, and the graph used to
+only ever grow. See
+[[Bugs Found#29. The music was not lagging figuratively — the audio clock was running at a quarter speed|#29]]
+for what that actually cost, and
+[[Instrumentation#Is the audio thread keeping up?]] for how to check it.
+
+`MUSIC.debug().liveNodes` is the number in flight. It should sit between about
+20 and 60 and go **flat**, not up.
 
 ## The "creepier" pass
 
-Three additions specifically for unease rather than just intensity:
+Three things for unease rather than intensity, none of them on the beat grid:
 
-- **`vDread`** — a slow tritone smear underneath everything, bending pitch
-  over ~2 bars, rising and sinking back
-- **`vScrape`** — an irregular, randomly-timed filtered noise sweep, like
-  something metal being dragged nearby
-- **`vWhine`** — a high sine thread, deliberately outside the current key,
-  fading in and gliding down
+- **`vDread`** — a slow tritone smear underneath everything, bending over ~2
+  bars. Scaled by the track, so THE THING gets it 35% louder.
+- **`vScrape`** — irregular filtered noise, like metal being dragged nearby
+- **`vWhine`** — a high sine thread deliberately outside the key
 
-None of these are on the beat grid — they're seeded with randomness
-specifically so the gap between them is never predictable.
+## A real recording, if you have one
+
+The score is synthesised because a recording has an owner. Picking one is a
+licensing decision, not a technical one, so the game defers it to you:
+
+1. put the file in `audio/`
+2. name it in `audio/tracks.json`
+
+```json
+{ "wave": "myband.ogg", "boss": "myband-heavy.ogg" }
+```
+
+Either entry may stay `null` — **a track with no file of its own falls back to
+the synth**, so shipping only a boss theme is a supported thing to do. Files
+are looped and crossfaded over ~0.9s on a track change, and they ride the same
+bus the synth does, so [[Audio#Volume|the volume keys]], mute and `A.duck()`
+all keep working with no extra wiring.
+
+While a file is playing the synth stops scheduling entirely (`liveNodes: 0`)
+rather than playing underneath it.
+
+> [!note] Why a manifest and not just looking for `audio/wave.ogg`
+> Probing three extensions × two tracks meant **six failed requests on every
+> load** of a game that ships with no music files. A console full of red 404s
+> is a bad way to say "working as intended". The manifest ships with both
+> entries `null`, so a default checkout makes one request and it succeeds.
+
+`audio/README.md` has the list of places that hand out music with a licence
+attached.
 
 ## Wiring into the game
 
-- `A.music.setFloor(n)` / `setIntensity(v)` / `setBoss(bool)` are called from
-  [[How A Run Goes]]'s wave/floor transitions and [[Bosses]] spawn/death
-- `A.music.menu()` plays a sparse pad+arp theme on the title screen
-- `A.duck()` (shared with [[Audio]]) ducks the score under boss roars and
-  explosions and lets it back up
-- Sits on its own bus under master, so mute covers it
+- `A.music.setFloor(n)` / `setIntensity(v)` / `setBoss(bool)` from
+  [[How A Run Goes]]'s wave and floor transitions and [[Bosses]] spawn/death
+- `A.music.menu()` — sparse pad+arp on the title screen
+- `A.duck()` (shared with [[Audio]]) ducks the score under roars and explosions
+- Its own bus under master, so mute and the volume keys cover it
 
 ## Related
-- [[Audio]] — the separate SFX synthesis system
-- [[Bugs Found]] — a stop/restart race condition found and fixed here
+- [[Audio]] — the SFX synthesis system, which had the same leak
+- [[Instrumentation#Is the audio thread keeping up?]] — how #29 was caught
+- [[Bugs Found#29. The music was not lagging figuratively — the audio clock was running at a quarter speed|Bugs Found #29]]
+- [[Tuning Values]] — `LOOKAHEAD`, the `hot` floor, the track table

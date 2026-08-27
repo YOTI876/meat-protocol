@@ -93,6 +93,89 @@ When the phase split and the frame gap disagree, **the frame gap is right**.
 Probe cost, measured rather than claimed: 11 `performance.now()` calls a frame,
 **~6us**, **0.036%** of a 16.7ms budget.
 
+## Is the audio thread keeping up?
+
+Nothing else on this page can answer that. Frame time, the frame gap, `PROBE`
+and `MEAT.FX` all measure the **main thread**. Web Audio renders on its own
+thread with its own deadline, and it can be drowning while every frame number
+you have looks perfect — which is exactly what
+[[Bugs Found#29. The music was not lagging figuratively — the audio clock was running at a quarter speed|#29]]
+was.
+
+The audio thread has one honest tell: **`ac.currentTime` is not a clock you
+read, it is a report of how many samples have actually been produced.** If it
+falls behind wall time, the thread is not keeping up, and everything you hear
+is slow, glitching, or absent.
+
+```js
+const rate = async (ctx, ms) => {
+  const a = ctx.currentTime, w = performance.now();
+  await new Promise(r => setTimeout(r, ms));
+  return (ctx.currentTime - a) / ((performance.now() - w) / 1000);
+};
+```
+
+A healthy context returns ~1.0.
+
+### Run a known-good copy beside it
+
+A single ratio is not evidence — a throttled tab, a busy machine or a headless
+harness can all drag it down, and this machine's variance is severe
+([[#Two things the timings cannot tell you]]). So open a second, empty
+`AudioContext` in the same tab at the same moment and measure both:
+
+```js
+const bare = new AudioContext();
+const [b, g] = [await rate(bare, 4000), await rate(gameCtx, 4000)];
+bare.close();
+```
+
+Anything affecting the tab, the browser or the machine hits both. A gap between
+them is the graph, and only the graph. The reading that found #29:
+
+```
+bare   0.985x
+game   0.167x
+```
+
+This generalises past audio. It is the same move as
+[[#How to attribute GPU-side cost]]: when you cannot instrument a thing
+directly, put a known-good copy of it next to the suspect and diff.
+
+### Sample it over time, not once
+
+Cost and accumulation look identical in a single reading and completely
+different in six. Take one every five seconds:
+
+- **flat and low** — the graph is genuinely too expensive. Cut work.
+- **falling** — something is being created and never released. Count what.
+
+#29 read 0.450 → 0.418 → 0.345 → 0.315 → 0.284 → 0.270 over thirty seconds.
+Monotonic, so: a leak.
+
+### Counting what leaked
+
+Wrap the factory methods before anything builds a graph, and you get the rate
+and the culprit in one pass:
+
+```js
+['createOscillator', 'createGain', 'createBiquadFilter',
+ 'createWaveShaper', 'createBufferSource'].forEach(k => {
+  const o = AudioContext.prototype[k];
+  AudioContext.prototype[k] = function (...a) {
+    counts[k] = (counts[k] || 0) + 1;
+    return o.apply(this, a);
+  };
+});
+```
+
+Divide by elapsed seconds. 158 nodes a second, ten of them `WaveShaper`s at
+`oversample: '4x'`, is not a mixing decision — it is a defect with a rate.
+
+`MUSIC.debug().liveNodes` reports what the score currently holds connected.
+**Watch the trend, not the value.** 20–60 and flat is healthy; anything that
+climbs and does not come back down is the same bug returning.
+
 ## `MEAT.FX` — one switch per thing a hit does
 
 "It feels laggy" is not one symptom. Real dropped frames and

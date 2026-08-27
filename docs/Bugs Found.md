@@ -620,6 +620,112 @@ where it previously landed one. Which also means the burst budget in
 
 ---
 
+## 29. The music was not lagging figuratively — the audio clock was running at a quarter speed
+
+**Reported as:** *"the music is lagging and the sound turns off sometimes"*.
+
+Which sounded like a scheduling problem, or a main-thread problem, or a figure
+of speech. It was none of those. The audio thread could not render samples fast
+enough to keep up with real time, so the score genuinely played slow — and when
+the thread missed its deadline outright, the output went silent.
+
+### The measurement
+
+One number settles it. Open a second, empty `AudioContext` in the same tab at
+the same moment, and compare how fast each one's clock advances against
+`performance.now()`:
+
+```
+bare AudioContext   0.985x real time
+the game's          0.167x real time
+```
+
+Same browser, same tab, same second. That rules out the harness, the machine
+and page throttling in a single step — see
+[[Instrumentation#Is the audio thread keeping up?]].
+
+Sampled every five seconds with the boss arrangement running, it is not a
+plateau, it is a slide:
+
+| seconds of music | audio clock |
+|---|---|
+| 5 | 0.450x |
+| 10 | 0.418x |
+| 15 | 0.345x |
+| 20 | 0.315x |
+| 25 | 0.284x |
+| 30 | 0.270x |
+
+Monotonic decay is the signature of accumulation, not of cost.
+
+### The cause
+
+```
+$ grep -c disconnect js/music.js js/audio.js
+0
+0
+```
+
+Every voice in both files built a little chain of nodes, wired it to a bus, and
+walked away from it. **A connected Web Audio node is a rendered node whether or
+not anything is feeding it** — the source stopping does not take the filter out
+of the graph. GC reclaims them eventually, if nothing references them and the
+browser gets round to it, and "eventually" is not a rate.
+
+Measured creation rate at full tilt: **158 nodes a second**, of which
+
+| per second | from |
+|---|---|
+| 50 biquads | `cab()`, building a three-filter cabinet per note |
+| 9.5 `WaveShaper`s | `distort()`, each at `oversample: '4x'` |
+| 41 oscillators, 47 gains | the notes themselves |
+
+The waveshapers are the expensive half. `oversample: '4x'` means four times the
+sample rate through the shaping curve, and there were ten new ones a second, all
+still in the graph. Thirty seconds of a boss fight is three hundred
+permanently-running, 4x-oversampled distortion units.
+
+### The fix, in three parts
+
+1. **A reaper.** Everything that gets connected also gets an end time, and the
+   scheduler disconnects it once it is past. `MUSIC.debug().liveNodes` reports
+   the number in flight. In `js/audio.js` the same job goes in `env()`, which is
+   the one function every sound effect passes through, and the sweep is
+   amortised onto the calls themselves so a quiet game keeps no timer alive.
+2. **Three amplifiers, not one per note.** The distortion and cabinet are built
+   once at `attach()`, so a note is two oscillators and an envelope. `oversample`
+   drops to `'2x'` — inaudible here, and a quarter of the work.
+3. **`LOOKAHEAD` 0.12s → 0.75s.** Not a cause of this defect, but 120ms is less
+   than one bad frame in this game and was its own source of gaps.
+
+### After
+
+| | before | after |
+|---|---|---|
+| audio clock at 5s | 0.450x | **0.999x** |
+| audio clock at 30s | 0.270x | **0.999x** |
+| trend | monotonic decay | **flat** |
+| live nodes | unbounded | **34–50, stable** |
+
+Held at 0.997x with the boss arrangement running *and* ~150 sound effects a
+second layered on top, which is heavier than the game can actually produce.
+
+> [!note] Why two cycles of profiling never found it
+> Every performance tool pointed at this game measures the **main thread** —
+> frame time, the frame gap, `PROBE`,
+> [[Instrumentation#`MEAT.FX` — one switch per thing a hit does|`MEAT.FX`]]. The
+> audio render thread is a different thread with a different deadline, and
+> nothing on that list can see it. The frames were fine. They were fine the
+> whole time.
+>
+> [[#26. The probe measured draw calls being ISSUED, not drawing|#26]] was the
+> right instrument pointed at the wrong side of a boundary. This is the right
+> instrument pointed at the wrong **thread**. The reference-context trick is the
+> general answer to both: when you cannot measure a thing directly, run a
+> known-good copy of it beside the suspect and compare.
+
+---
+
 # Open
 
 **None.** Every defect on this list is closed.

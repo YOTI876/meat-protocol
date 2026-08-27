@@ -52,12 +52,46 @@ const A = (() => {
 
   const now = () => ac.currentTime;
 
+  /* Browsers suspend an AudioContext when the tab goes away and do not always
+     hand it back on their own. Alt-tabbing out of a fight and back used to be
+     one of the ways the sound simply stopped. */
+  document.addEventListener('visibilitychange', () => {
+    if (ac && document.visibilityState === 'visible' && ac.state === 'suspended') ac.resume();
+  });
+
+  /* ---- the reaper ----
+
+     Same defect the score had, and for the same reason: every sound effect
+     built a couple of nodes, wired them to the master and walked away. There
+     was no disconnect() anywhere in this file. A connected node is a rendered
+     node whether or not anything is feeding it, and a firefight is a hundred
+     of them a second.
+
+     env() is the one place every effect in here passes through, so it is the
+     one place that needs to know. Each chain gets an end time and is
+     disconnected once it is past. The sweep is amortised onto the calls
+     themselves -- no timer, and nothing to keep alive when the game is quiet. */
+  let live = [], lastReap = 0;
+  function retire(end, ...nodes) { live.push({ end, nodes }); }
+  function reap(t) {
+    if (t - lastReap < 0.25) return;
+    lastReap = t;
+    for (let i = live.length - 1; i >= 0; i--) {
+      if (live[i].end >= t) continue;
+      const a = live[i].nodes;
+      for (let j = 0; j < a.length; j++) { try { a[j].disconnect(); } catch (e) {} }
+      live[i] = live[live.length - 1]; live.pop();
+    }
+  }
+
   function env(node, vol, atk, dec, t0) {
     const g = ac.createGain();
     g.gain.setValueAtTime(0.0001, t0);
     g.gain.exponentialRampToValueAtTime(Math.max(vol, 0.0002), t0 + atk);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + atk + dec);
     node.connect(g); g.connect(master);
+    retire(t0 + atk + dec + 0.1, node, g);
+    reap(ac.currentTime);
     return g;
   }
 
@@ -69,6 +103,7 @@ const A = (() => {
     if (detune) o.detune.value = detune;
     env(o, vol, 0.006, dur, t0);
     o.start(t0); o.stop(t0 + dur + 0.06);
+    retire(t0 + dur + 0.16, o);
     return o;
   }
 
@@ -83,6 +118,7 @@ const A = (() => {
     s.connect(bp);
     env(bp, vol, 0.004, dur, t0);
     s.start(t0); s.stop(t0 + dur + 0.08);
+    retire(t0 + dur + 0.18, s, bp);
   }
 
   /* -------- ambient dread drone -------- */
