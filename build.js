@@ -51,6 +51,41 @@ const DIRS = {
 
 function rmrf(p) { if (fs.existsSync(p)) fs.rmSync(p, { recursive: true, force: true }); }
 
+/* ---- the icon, stamped onto the .exe ourselves ----
+
+   electron-builder will do this, but only as part of "sign and edit
+   executable", which pulls in the winCodeSign toolchain -- and unpacking that
+   creates macOS symlinks, which Windows refuses without Developer Mode. Asking
+   for it does not degrade, it kills the whole package.
+
+   The tool it would have used is rcedit, and rcedit itself extracts fine: the
+   archive only fails on the darwin symlinks, well after rcedit is on disk. So
+   we find it and run it directly, which needs no privilege at all.
+
+   Located by search rather than a fixed path because electron-builder unpacks
+   into a freshly randomised folder name on every run. */
+function findRcedit() {
+  const base = path.join(process.env.LOCALAPPDATA || '', 'electron-builder', 'Cache', 'winCodeSign');
+  if (!fs.existsSync(base)) return null;
+  for (const dir of fs.readdirSync(base)) {
+    const p = path.join(base, dir, 'rcedit-x64.exe');
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+function stampIcon(exe, ico) {
+  const rc = findRcedit();
+  if (!rc) { console.log('  no rcedit found — the exe keeps the default Electron icon'); return false; }
+  try {
+    execFileSync(rc, [exe, '--set-icon', ico], { stdio: ['ignore', 'ignore', 'pipe'] });
+    return true;
+  } catch (e) {
+    console.log('  rcedit failed — the exe keeps the default Electron icon');
+    return false;
+  }
+}
+
 /* Whitespace and syntax only -- NOT identifiers. These are plain scripts, not
    modules: `const MUSIC`, `const A` and the rest are genuine globals that the
    other files reach across for. Renaming them is exactly the kind of build
@@ -149,19 +184,27 @@ if (EXE) {
     console.log('staged dist/ into desktop/game/, packaging…');
     try {
       execSync('npm run pack', { cwd: DESKTOP, stdio: 'inherit' });
-      /* Lift the packaged zip out of desktop/release and put it beside the
-         browser one, so there is exactly one folder to look in. */
-      const built = path.join(DESKTOP, 'release', 'MEAT-PROTOCOL-windows.zip');
-      const dest = path.join(RELEASE, 'MEAT-PROTOCOL-windows.zip');
-      if (fs.existsSync(built)) {
-        fs.mkdirSync(RELEASE, { recursive: true });
-        fs.copyFileSync(built, dest);
+
+      /* electron-builder is set to the "dir" target, so it produces the folder
+         and stops. The icon goes on here, and the zip is made after -- in that
+         order, or the archive carries an exe with the wrong icon in it. */
+      const unpacked = path.join(DESKTOP, 'release', 'win-unpacked');
+      const exe = path.join(unpacked, 'MEAT PROTOCOL.exe');
+      if (!fs.existsSync(exe)) {
         console.log('');
-        console.log('desktop  release/MEAT-PROTOCOL-windows.zip  ' +
-                    (fs.statSync(dest).size / 1048576).toFixed(1) + ' MB');
+        console.log('expected ' + exe + ' and it is not there.');
       } else {
+        if (stampIcon(exe, path.join(DESKTOP, 'icon.ico'))) console.log('  icon stamped onto the exe');
+
+        const dest = path.join(RELEASE, 'MEAT-PROTOCOL-windows.zip');
+        fs.mkdirSync(RELEASE, { recursive: true });
+        rmrf(dest);
+        execFileSync('powershell', ['-NoProfile', '-Command',
+          'Compress-Archive -Path "' + path.join(unpacked, '*') + '" -DestinationPath "' + dest + '" -Force'],
+          { stdio: ['ignore', 'ignore', 'inherit'] });
         console.log('');
-        console.log('expected ' + built + ' and it is not there.');
+        console.log('release/MEAT-PROTOCOL-windows.zip  ' +
+                    (fs.statSync(dest).size / 1048576).toFixed(1) + ' MB');
       }
     } catch (e) {
       console.log('');

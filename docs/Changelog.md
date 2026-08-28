@@ -1265,6 +1265,46 @@ claims the key while fullscreen and releases it on the way out.
 Holding ESC still exits and always will — that is the non-overridable way out
 of a page that has taken the screen, and a game should not fight it.
 
-## Related[[Bugs Found]] — the defects behind each fix above, all of them now closed
+## `PENDING11` — The icon reaches the .exe after all
+
+The previous entry said this needed Developer Mode or a new dependency.
+Neither was true, and the reason is worth writing down.
+
+`rcedit` is the tool electron-builder uses to stamp an icon onto an
+executable, and it ships inside the winCodeSign archive whose extraction was
+failing. But that extraction fails **at the end**, on two macOS `.dylib`
+symlinks Windows will not create without the privilege. `rcedit-x64.exe` is
+unpacked long before it gets there, and it was sitting on disk in every one of
+those cache folders the whole time.
+
+So the fix is to run it directly. No privilege, no Developer Mode, no new
+package — the failure had been read as "the toolchain is unavailable" when it
+was only ever "the last two files in it are".
+
+```
+rcedit-x64.exe "MEAT PROTOCOL.exe" --set-icon icon.ico
+```
+
+### The order is the load-bearing part
+
+electron-builder is on the `dir` target now: it produces the folder and stops.
+`build.js` then stamps the icon, and zips **after** that. Zipping first would
+have shipped an archive containing an exe with the default icon — right on
+disk, wrong in the file people download, and invisible until someone else
+opened it.
+
+`rcedit` is found by searching the cache rather than a fixed path, because
+electron-builder unpacks into a freshly randomised folder name on every run —
+the same thing that defeated an earlier attempt to pre-extract it. If it ever
+goes missing the build says so and continues with the default icon rather than
+failing.
+
+> [!note] Verified out of the zip, not off the disk
+> The icon was read back **out of the exe inside the archive** rather than
+> compared to the source `.ico`, and that copy was then run: `SELFTEST PASS`,
+> `"fullscreen":"toggles"`. rcedit rewrites PE resources, so "it still runs
+> afterwards" is a thing to check rather than assume.
+
+## Related[Bugs Found]] — the defects behind each fix above, all of them now closed
 - [[Tuning Values]] — where the numbers stand today
 - [[Floors]] — the ten of them in full

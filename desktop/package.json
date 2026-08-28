@@ -27,7 +27,7 @@
     ],
     "win": {
       "target": [
-        "zip"
+        "dir"
       ],
       "icon": "icon.ico",
       "signAndEditExecutable": false,
