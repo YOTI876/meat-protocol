@@ -24,13 +24,18 @@
    to 127.0.0.1 does not raise the Windows Firewall dialog that binding to
    0.0.0.0 would.
    ============================================================ */
-const { app, BrowserWindow, Menu, shell } = require('electron');
+const { app, BrowserWindow, Menu, shell, nativeImage } = require('electron');
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, 'game');
 const SELFTEST = process.argv.includes('--selftest');
+/* --shots <dir> drives the game into a few interesting states and captures the
+   window to PNGs. Store pages want screenshots, and the honest way to get them
+   is from the real build rather than a mock-up. */
+const SHOTS = process.argv.indexOf('--shots');
+const SHOTS_DIR = SHOTS >= 0 ? (process.argv[SHOTS + 1] || '.') : null;
 
 const MIME = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
@@ -113,6 +118,50 @@ app.whenReady().then(async () => {
   });
 
   await win.loadURL(url);
+
+  if (SHOTS_DIR) {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const js = code => win.webContents.executeJavaScript(code, true);
+    fs.mkdirSync(SHOTS_DIR, { recursive: true });
+    await wait(1800);
+    await js("document.dispatchEvent(new MouseEvent('click',{bubbles:true})),1");  // past the boot screen
+    await wait(1200);
+
+    /* Each scene sets the game up, lets the real loop render it for a moment,
+       then captures. Nothing is faked -- these are frames the game drew. */
+    const scenes = [
+      ['01-title',  "MEAT.S.mode='title',1", 1400],
+      ['02-floor1', "MEAT.startRun(); MEAT.startWave(2); 1", 2600],
+      ['03-deep',   "MEAT.startRun(); MEAT.S.room=6; MEAT.buildRoom(6); MEAT.startWave(4); 1", 3000],
+      ['04-menu',   "MEAT.S.upgPts=1; MEAT.openLevelUp(); 1", 1600],
+      ['05-boss',   "MEAT.startRun(); MEAT.S.room=4; MEAT.buildRoom(4); MEAT.spawnBoss(); 1", 3000]
+    ];
+    for (const [name, code, settle] of scenes) {
+      try { await js(code); } catch (err) { console.log(name + ': ' + err.message); }
+      await wait(settle);
+      const img = await win.webContents.capturePage();
+      fs.writeFileSync(path.join(SHOTS_DIR, name + '.png'), img.toPNG());
+      console.log('shot ' + name + '  ' + img.getSize().width + 'x' + img.getSize().height);
+    }
+
+    /* itch wants a 630x500 cover, which is 1.26:1 against the game's 16:9 --
+       so crop the middle rather than squash it, then resize. */
+    try {
+      await js("MEAT.startRun(); MEAT.S.room=6; MEAT.buildRoom(6); MEAT.startWave(4); 1");
+      await wait(3000);
+      const full = await win.webContents.capturePage();
+      const sz = full.getSize();
+      const cw = Math.round(sz.height * 1.26);
+      const cover = full.crop({ x: Math.round((sz.width - cw) / 2), y: 0, width: cw, height: sz.height })
+                        .resize({ width: 630, height: 500, quality: 'best' });
+      fs.writeFileSync(path.join(SHOTS_DIR, 'cover.png'), cover.toPNG());
+      console.log('shot cover  630x500');
+    } catch (err) { console.log('cover: ' + err.message); }
+
+    console.log('SHOTS DONE');
+    app.exit(0);
+    return;
+  }
 
   if (SELFTEST) {
     /* Headless check that the packaged game actually runs: globals resolve,
