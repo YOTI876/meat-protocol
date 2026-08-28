@@ -962,14 +962,15 @@ function writeSave(patch) {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch (e) {}
   return s;
 }
-/* Coins, cards and the vault all survive death — the run resets, the wallet doesn't. */
+/* Cards and the vault survive death. Coins do not — every run starts at zero,
+   so there is nothing to save and nothing reads it back. */
 function persist() {
   const s = loadSave();
   writeSave({
     best: Math.max(s.best || 0, S.score),
     deep: Math.max(s.deep || 0, S.room + 1),
     vault: Math.max(s.vault || 0, S.vault),
-    coins: S.coins, cards: S.cards, evo: S.evo | 0,
+    cards: S.cards, evo: S.evo | 0,
     evoGuns: (S.evoGuns || []).slice(), evoCards: (S.evoCards || []).slice(),
     godFound: s.godFound || S.god,
     modagaz: Math.max(s.modagaz || 0, S.modagazFound),
@@ -1221,7 +1222,12 @@ function freshState() {
     boss: null, door: null, secret: null, corner: null,
     cam: { cx: 0, cy: 0, z: 1, punch: 0, sh: 0, shx: 0, shy: 0, shPh: 0, seed: 0 },
     god: false,
-    coins: sv.coins || 0, cards: sv.cards || 0, vault: sv.vault || 0,
+    /* A run starts broke. Coins used to carry over, which meant the wallet you
+       walked in with depended on how the last run went rather than on this
+       one -- and a run you had already given up on was still worth farming.
+       Cards and the vault DO carry over on purpose: cards buy [[Cosmetics]]
+       and the vault is a lifetime total the HOARDER contract reads. */
+    coins: 0, cards: sv.cards || 0, vault: sv.vault || 0,
     evo: sv.evo || 0, modagazFound: sv.modagaz || 0,
     /* The permanent roster. Both survive freshState because both are the
        whole point of evolving — they are wallet, not run state. Guns are

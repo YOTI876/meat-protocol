@@ -1147,7 +1147,40 @@ Verified by extracting the zip and running **that** copy, not the dev one.
 > like a real artifact. It was deleted rather than tested. Maximum
 > compression buys almost nothing on an already-compressed Electron payload.
 
-## Related
-- [[Bugs Found]] — the defects behind each fix above, all of them now closed
+## `PENDING8` — Every run starts broke
+
+Coins carried over between runs. They do not any more: `freshState()` sets
+`coins: 0`, and `persist()` no longer writes them, because after this nothing
+reads them back — a saved field nothing consumes is drift waiting to happen.
+
+One line, one place. `freshState()` line 1224 was the only site that ever read
+a banked coin balance.
+
+The wallet you walk in with is no longer a function of how the last run went,
+and there is no longer a reason to keep farming a run you have already given
+up on.
+
+**HOARDER still pays.** Its stated reward is "start every run holding 60
+coins" and it is now the only way a run begins with anything. Verified: 60
+with the contract signed, 0 without.
+
+[[Economy#Cards|Cards]] and the vault are untouched and still carry over —
+cards buy [[Cosmetics]], the vault is the lifetime total HOARDER reads. They
+are wallet; coins are run state.
+
+> [!warning] The top of the EVOLVE ladder is now much harder
+> The rungs are 150, 350, 600, 900, 1250, 1650, 2100, 2600, 3150, **3750**,
+> and they used to be paid out of coins banked across several runs.
+>
+> A full ten-floor clear is roughly 2,570 kills at COIN_RATE 0.70 — about
+> **1,800 coins**, before anything spent in the shop. That covers rungs 0–5
+> and does not cover 6–9 without a coin build (DEBT ×1.4, CLEARANCE ×2) and
+> buying nothing all run.
+>
+> That may well be the intent — it makes a rung something you play for rather
+> than accumulate. But if the last four turn out to be unreachable in
+> practice, `EVO_COST` is the number to turn, not this one.
+
+## Related- [[Bugs Found]] — the defects behind each fix above, all of them now closed
 - [[Tuning Values]] — where the numbers stand today
 - [[Floors]] — the ten of them in full

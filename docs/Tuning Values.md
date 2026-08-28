@@ -24,6 +24,8 @@ All in `js/game.js` unless noted.
 | boss health | `BOSS_HP_MUL = 2.2` | top of file | scales the whole boss ladder at once. See [[Bosses#They have twice the health now]] |
 | THE FISH | `dmg 300` / `girth 5` / `reach 120` / `falloff 0.55` / `spread2 0.5` | `WEP.omega` + `updateBeam()` | width, length, depth falloff and per-body falloff. See [[Weapons#THE FISH, cut down]] |
 | master volume | 11 steps, squared curve, `meat_vol` | `audio.js` | `-` and `=` step it. See [[Audio#Volume]] |
+| starting coins | `0` every run | `freshState()` | HOARDER adds 60 on top. See [[Economy#Every run starts broke]] |
+| evolve ladder | `EVO_COST = 150 + 175·ev + 25·ev²` | top of file | 150…3750. Now paid out of ONE run, since coins no longer carry over |
 | cosmetic prices | `15 / 45 / 100 / 180 / 320` cards | `COSMETICS`, top of file | paid in cards, not coins. A full clear yields ~40. See [[Cosmetics]] |
 | card drop rate | `0.0112` regular, `0.20` elite, `0.55` boss, `1.0` apex | `killEnemy()` | the supply side of the same economy. See [[Economy#Cards]] |
 | music volume | `meat_musicvol`, 0–10, **7 = unity** | `audio.js`, `mvolOf()` | its own gain node after the duck. See [[Audio#The options screen]] |

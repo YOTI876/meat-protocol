@@ -93,6 +93,37 @@ regular kills at 1.12%, plus twenty elites at 20% and ten bosses at 55%:
 > The dropped card above is **not** the same as a [[The Deck|deck card]].
 > Deck cards are picked on level-up and cost nothing.
 
+## Every run starts broke
+
+Coins used to carry over between runs. They do not any more — `freshState()`
+sets `coins: 0` and `persist()` no longer writes them, because nothing reads
+them back.
+
+The point is that the wallet you walk in with is not a function of how the
+*last* run went. It also removes the incentive to keep farming a run you have
+already given up on.
+
+The one exception is earned: **HOARDER** pays "start every run holding 60
+coins", and that still applies — it is now the only way a run begins with
+anything at all.
+
+[[#Cards|Cards]] and [[#The vault|the vault]] are unaffected and still carry
+over. They are wallet; coins are run state.
+
+> [!warning] This makes the top of the EVOLVE ladder much harder
+> `EVO_COST(ev) = 150 + 175·ev + 25·ev²`, so the rungs are 150, 350, 600, 900,
+> 1250, 1650, 2100, 2600, 3150, **3750** — and they used to be paid for out of
+> coins banked across several runs.
+>
+> A full ten-floor clear is roughly 2,570 kills at [[#Coins|COIN_RATE]] 0.70,
+> so about **1,800 coins**, before anything you spend in [[The Shop|the shop]].
+> That covers rungs 0–5 comfortably and does not cover 6–9 at all without a
+> coin build (DEBT ×1.4, CLEARANCE ×2) and buying nothing.
+>
+> That may be the intent — it makes each rung a run you have to *play for*
+> rather than a total you accumulate. But if the last four rungs turn out to be
+> unreachable in practice, `EVO_COST` is the number to turn, not this one.
+
 ## The vault
 
 A *separate*, coin-fed pool. Every coin you ever pick up adds to it
