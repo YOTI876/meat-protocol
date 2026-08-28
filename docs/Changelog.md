@@ -1181,7 +1181,7 @@ are wallet; coins are run state.
 > than accumulate. But if the last four turn out to be unreachable in
 > practice, `EVO_COST` is the number to turn, not this one.
 
-## `PENDING9` — Fullscreen
+## `cb8631b` — Fullscreen
 
 `F11`, and a third switch on the OPTIONS screen next to MUSIC and SOUND.
 
