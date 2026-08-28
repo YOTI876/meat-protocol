@@ -1213,7 +1213,7 @@ Leaving fullscreen with the OS shortcut instead of ours is caught with
 > a build where fullscreen silently stopped working now fails packaging
 > rather than shipping.
 
-## `PENDING10` — One artifact, an icon, and ESC that pauses
+## `a2587cf` — One artifact, an icon, and ESC that pauses
 
 ### The browser build is gone from the pipeline
 
