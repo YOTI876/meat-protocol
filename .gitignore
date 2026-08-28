@@ -16,3 +16,6 @@ dist/
 desktop/node_modules/
 desktop/game/
 desktop/release/
+
+# the only folder anyone uploads from
+release/

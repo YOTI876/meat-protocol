@@ -92,6 +92,12 @@ app.whenReady().then(async () => {
     minWidth: 640, minHeight: 400,
     backgroundColor: '#05030a',          // matches the page, so no white flash on open
     title: 'DAMJAN: MEAT PROTOCOL',
+    /* Set here as well as in the packaging config. Writing an icon INTO the
+       .exe needs executable-resource editing, which needs the winCodeSign
+       toolchain, which needs symlink privileges Windows withholds without
+       Developer Mode. This path needs none of that and is what the window and
+       the taskbar actually read, so the running game is branded either way. */
+    icon: path.join(__dirname, 'icon.ico'),
     show: false,
     autoHideMenuBar: true,
     webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true }

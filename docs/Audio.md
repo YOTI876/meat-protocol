@@ -145,6 +145,19 @@ Verified in the packaged desktop app against `win.isFullScreen()` from the
 Electron main process, which is what actually happened rather than what the
 page asked for: windowed → F11 → fullscreen → F11 → windowed.
 
+#### ESC pauses, it does not leave
+
+The browser's default is for ESC to exit fullscreen, which in this game means
+you cannot reach the pause menu without also losing the fullscreen you asked
+for. The **Keyboard Lock API** is the sanctioned way to claim a key:
+`navigator.keyboard.lock(['Escape'])` while fullscreen, released on the way
+out. It needs a secure context — localhost, 127.0.0.1 and https all qualify,
+so it covers the desktop app and any hosted build.
+
+**Holding** ESC still exits, in every browser, and cannot be overridden. That
+is deliberate on their part: it is the guaranteed way out of a page that has
+taken over the screen, and a game has no business defeating it.
+
 ### Why music volume needed its own node
 
 ```

@@ -10144,10 +10144,35 @@ function toggleFullscreen() {
   try { localStorage.setItem(FS_KEY, on ? '1' : '0'); } catch (e) {}
   return on;
 }
+/* ESC has a job already -- it pauses -- and the browser's default is to make
+   it leave fullscreen instead, which means in fullscreen you cannot reach the
+   pause menu without also losing the fullscreen you asked for.
+
+   The Keyboard Lock API is the sanctioned way to say "I want that key". While
+   locked, ESC is delivered to the page like any other key. It needs a secure
+   context, which localhost, 127.0.0.1 and https all are -- so it covers the
+   desktop app and itch both -- and it only applies while actually fullscreen.
+
+   HOLDING escape still exits, in every browser, and cannot be overridden. That
+   is deliberate on their part: it is the guaranteed way out of a page that has
+   taken over the screen, and a game should not be trying to defeat it. */
+function lockEscape() {
+  const k = navigator.keyboard;
+  if (!k || !k.lock) return;
+  try { const p = k.lock(['Escape']); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+}
+function unlockEscape() {
+  const k = navigator.keyboard;
+  if (!k || !k.unlock) return;
+  try { k.unlock(); } catch (e) {}
+}
+
 /* Leaving fullscreen with the OS shortcut rather than ours still has to be
    remembered, or the setting lies the next time you look at it. */
 document.addEventListener('fullscreenchange', () => {
-  try { localStorage.setItem(FS_KEY, isFullscreen() ? '1' : '0'); } catch (e) {}
+  const on = isFullscreen();
+  try { localStorage.setItem(FS_KEY, on ? '1' : '0'); } catch (e) {}
+  if (on) lockEscape(); else unlockEscape();
   fitCanvas();
 });
 

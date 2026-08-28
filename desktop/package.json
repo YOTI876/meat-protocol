@@ -22,18 +22,16 @@
     },
     "files": [
       "main.js",
+      "icon.ico",
       "game/**/*"
     ],
     "win": {
       "target": [
-        "zip",
-        "portable"
+        "zip"
       ],
+      "icon": "icon.ico",
       "signAndEditExecutable": false,
-      "artifactName": "MEAT-PROTOCOL-${version}-win.${ext}"
-    },
-    "portable": {
-      "artifactName": "MEAT-PROTOCOL-portable.exe"
+      "artifactName": "MEAT-PROTOCOL-windows.${ext}"
     },
     "compression": "normal"
   }

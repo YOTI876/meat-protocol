@@ -1213,6 +1213,58 @@ Leaving fullscreen with the OS shortcut instead of ours is caught with
 > a build where fullscreen silently stopped working now fails packaging
 > rather than shipping.
 
-## Related [[Bugs Found]] — the defects behind each fix above, all of them now closed
+## `PENDING10` — One artifact, an icon, and ESC that pauses
+
+### The browser build is gone from the pipeline
+
+Damjan is not shipping it, so it is not built by default. `node build.js` now
+produces the desktop app and nothing else, into one folder with one file:
+
+```
+release/MEAT-PROTOCOL-windows.zip
+```
+
+`dist/` survives as an intermediate — it is what the app is assembled from —
+and `--browser` still zips it if it is ever wanted. The portable single-file
+exe is dropped entirely: it was the one Smart App Control refused outright, so
+it was a build output that could not run and a third thing to pick wrong.
+
+Two zips in two trees, one of them four levels down beside a folder called
+`win-unpacked`, was a good way to upload the wrong file. Now there is one.
+
+### An icon
+
+`tools/make-icon.js` writes `desktop/icon.ico` — a red M on near-black, six
+sizes from 16 to 256, generated with nothing but Node stdlib: PNG is deflate
+plus four chunks, ICO is a header and a directory of PNGs. It is a script
+rather than a binary blob, so the shape is four line segments and changing it
+is an edit and a rerun.
+
+> [!warning] It reaches the window, not yet the .exe in Explorer
+> Writing an icon INTO an executable means editing its resources, which
+> electron-builder does with the winCodeSign toolchain, which fails on this
+> machine: unpacking it creates **macOS symlinks** and Windows withholds that
+> privilege without Developer Mode. Asking for it did not merely fail, it took
+> the whole package down and produced no app at all — so `signAndEditExecutable`
+> stays `false`.
+>
+> Pre-extracting the cache by hand does not help either: electron-builder makes
+> a fresh randomly-named folder for it on every run.
+>
+> `BrowserWindow({ icon })` needs none of that and is what the window and the
+> taskbar read, so the running game is branded regardless. The remaining gap is
+> the file icon in Explorer, and the fix is one reversible toggle — Settings →
+> System → For developers → Developer Mode — or wiring `rcedit` in directly.
+
+### ESC pauses in fullscreen
+
+The browser default is for ESC to leave fullscreen, which meant you could not
+open the pause menu without losing the fullscreen you asked for. Keyboard Lock
+claims the key while fullscreen and releases it on the way out.
+
+Holding ESC still exits and always will — that is the non-overridable way out
+of a page that has taken the screen, and a game should not fight it.
+
+## Related[[Bugs Found]] — the defects behind each fix above, all of them now closed
 - [[Tuning Values]] — where the numbers stand today
 - [[Floors]] — the ten of them in full

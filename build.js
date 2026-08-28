@@ -1,20 +1,21 @@
 /* ============================================================
-   Builds dist/ — the game and nothing else — and zips it for itch.io.
+   Builds the desktop app.
 
-     node build.js             copy only
-     node build.js --min       strip comments and whitespace from the JS too
-     node build.js --min --exe ...and package the desktop build as well
+     node build.js              stage the game and package the Windows app
+     node build.js --min        ...stripping comments and whitespace first
+     node build.js --no-exe     stage dist/ only, package nothing
+     node build.js --browser    also zip dist/ as a play-in-page build
 
-   Both targets are built from the SAME dist/. The desktop shell serves it over
-   loopback rather than embedding a second copy of the game, so the .exe and
-   the itch upload are running identical bytes -- there is no version of this
-   where one of them is a build behind.
+   Output lands in ONE place:
 
-   itch.io wants a zip with index.html at its ROOT, which is what this makes.
+     release/MEAT-PROTOCOL-windows.zip     unzip it, run the exe
 
-   What is deliberately left out: docs/, serve.js, README.md, build.js itself,
-   .git, .claude. None of it is needed to run the game, and docs/ in particular
-   is the whole design record — no reason to ship it inside the playable build.
+   dist/ is an intermediate, not a deliverable: it is what the app is
+   assembled from. The browser zip is opt-in because it is not the product.
+
+   What is deliberately left out of the build: docs/, serve.js, build.js
+   itself, README.md, .git. None of it is needed to run the game, and docs/ is
+   the whole design record.
    ============================================================ */
 const fs = require('fs');
 const path = require('path');
@@ -22,9 +23,18 @@ const { execSync, execFileSync } = require('child_process');
 
 const ROOT = __dirname;
 const DIST = path.join(ROOT, 'dist');
-const ZIP = path.join(ROOT, 'meat-protocol-itch.zip');
+/* Everything anyone is meant to upload ends up in ONE folder with names that
+   say what they are. Two zips in two different trees, one of them four levels
+   down next to a folder called win-unpacked, is a good way to upload the wrong
+   file. */
+const RELEASE = path.join(ROOT, 'release');
+const ZIP = path.join(RELEASE, 'MEAT-PROTOCOL-browser.zip');
 const MIN = process.argv.includes('--min');
-const EXE = process.argv.includes('--exe');
+/* The desktop app is the product. The browser zip is off by default now --
+   dist/ is still built, because it is what the app is assembled FROM, but
+   nobody wants a second artifact they are never going to upload. */
+const EXE = !process.argv.includes('--no-exe');
+const BROWSER_ZIP = process.argv.includes('--browser');
 const DESKTOP = path.join(ROOT, 'desktop');
 
 /* Everything the browser actually asks for, and the two licence files that
@@ -105,15 +115,17 @@ console.log('dist/  ' + n + ' files, ' + (bytes / 1048576).toFixed(2) + ' MB' +
 /* Compress-Archive rather than a zip dependency, because this project does not
    have dependencies and is not about to grow one for a build step. */
 rmrf(ZIP);
+if (BROWSER_ZIP) {
+fs.mkdirSync(RELEASE, { recursive: true });
 try {
   execFileSync('powershell', ['-NoProfile', '-Command',
     'Compress-Archive -Path "' + path.join(DIST, '*') + '" -DestinationPath "' + ZIP + '" -Force'],
     { stdio: ['ignore', 'ignore', 'inherit'] });
-  console.log('zip    ' + path.basename(ZIP) + '  ' + (fs.statSync(ZIP).size / 1048576).toFixed(2) + ' MB');
-  console.log('\nUpload that to itch.io and tick "This file will be played in the browser".');
+  console.log('browser  release/' + path.basename(ZIP) + '  ' + (fs.statSync(ZIP).size / 1048576).toFixed(2) + ' MB');
 } catch (e) {
-  console.log('\ndist/ is ready. Could not zip it automatically — zip the CONTENTS');
-  console.log('of dist/ yourself, so that index.html sits at the root of the archive.');
+  console.log('could not zip dist/ — zip its CONTENTS yourself if you want it,');
+  console.log('so that index.html sits at the root of the archive.');
+}
 }
 
 /* ---- the desktop build ----
@@ -137,10 +149,19 @@ if (EXE) {
     console.log('staged dist/ into desktop/game/, packaging…');
     try {
       execSync('npm run pack', { cwd: DESKTOP, stdio: 'inherit' });
-      const exe = path.join(DESKTOP, 'release', 'MEAT-PROTOCOL.exe');
-      if (fs.existsSync(exe)) {
+      /* Lift the packaged zip out of desktop/release and put it beside the
+         browser one, so there is exactly one folder to look in. */
+      const built = path.join(DESKTOP, 'release', 'MEAT-PROTOCOL-windows.zip');
+      const dest = path.join(RELEASE, 'MEAT-PROTOCOL-windows.zip');
+      if (fs.existsSync(built)) {
+        fs.mkdirSync(RELEASE, { recursive: true });
+        fs.copyFileSync(built, dest);
         console.log('');
-        console.log('exe    ' + exe + '  ' + (fs.statSync(exe).size / 1048576).toFixed(1) + ' MB');
+        console.log('desktop  release/MEAT-PROTOCOL-windows.zip  ' +
+                    (fs.statSync(dest).size / 1048576).toFixed(1) + ' MB');
+      } else {
+        console.log('');
+        console.log('expected ' + built + ' and it is not there.');
       }
     } catch (e) {
       console.log('');
