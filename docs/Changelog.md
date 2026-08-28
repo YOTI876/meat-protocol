@@ -1054,7 +1054,7 @@ takes coins from 200 to 0.
 Also corrected [[Pickups]], which had the card drop at 0.8% where the code says
 1.12%.
 
-## `PENDING7` — A desktop build, alongside the browser one
+## `61671e4` — A desktop build, alongside the browser one
 
 Not for protection — an Electron app ships the same readable JavaScript, and
 `npx asar extract` takes it back out in one command. This is a presentation
