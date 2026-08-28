@@ -343,6 +343,8 @@ addEventListener('keydown', e => {
     if (on && S.mode === 'title') A.music.menu();
     msg('MUSIC', on ? (A.music.usingFiles() ? 'ON' : 'ON  (synth)') : 'OFF', 1.6);
   }
+  /* F11, where every game puts it. Also the OPTIONS screen. */
+  if (e.code === 'F11') { e.preventDefault(); const on = toggleFullscreen(); msg('DISPLAY', on ? 'FULLSCREEN' : 'WINDOWED', 1.2); }
   // F3 is the probe. F4 toggles the flush mode it warns about.
   if (e.code === 'F3') { e.preventDefault(); PROBE.on = PROBE.on ? 0 : 1; if (PROBE.on) PROBE.reset(); }
   if (e.code === 'F4' && PROBE.on) { e.preventDefault(); PROBE.drain = PROBE.drain ? 0 : 1; PROBE.reset(); }
@@ -9482,14 +9484,20 @@ function drawOptions() {
   sectionRule('SWITCHES', 138);
   const on = !!(A.music && A.music.isEnabled());
   const isMuted = A.isMuted();
-  uiBtn(40, 152, 186, 18, on ? 'MUSIC  —  ON' : 'MUSIC  —  OFF',
+  /* Three across. FULLSCREEN sits with the other switches rather than in a
+     section of its own, because it is the same kind of thing: one setting,
+     two states, says which one it is in. */
+  const fsOn = isFullscreen();
+  uiBtn(40, 152, 130, 18, on ? 'MUSIC  ON' : 'MUSIC  OFF',
         on ? '#7fd8e0' : '#6b5a4e', () => {
           if (!A.music) return;
           A.music.setEnabled(!A.music.isEnabled());
           A.blip();
         });
-  uiBtn(254, 152, 186, 18, isMuted ? 'ALL SOUND  —  MUTED' : 'ALL SOUND  —  ON',
+  uiBtn(175, 152, 130, 18, isMuted ? 'SOUND  MUTED' : 'SOUND  ON',
         isMuted ? '#ff6a72' : '#e8b25a', () => { A.toggleMute(); A.blip(); });
+  uiBtn(310, 152, 130, 18, fsOn ? 'FULLSCREEN  ON' : 'FULLSCREEN  OFF',
+        fsOn ? '#7fe08a' : '#6b5a4e', () => { toggleFullscreen(); A.blip(); });
 
   /* What is actually coming out of the speakers, named. The one question a
      player asks about a music setting is "is it working", and a filename
@@ -9506,7 +9514,7 @@ function drawOptions() {
        'rgba(120,104,94,0.6)', 'center', 7, { track: 0.06, noShadow: true });
 
   sectionRule('KEYS', 216);
-  htxt('− / =  volume        M  mute        N  music        B  the deck        ESC  pause',
+  htxt('− / =  volume     M  mute     N  music     F11  fullscreen     B  the deck     ESC  pause',
        W / 2, 232, 'rgba(140,120,106,0.8)', 'center', 7, { track: 0.06, noShadow: true });
 
   uiBtn(W / 2 - 48, H - 22, 96, 16, 'BACK', '#e8b25a',
@@ -10099,6 +10107,50 @@ function _soakOnce(opts) {
   return out;
 }
 
+/* ---------- fullscreen ----------
+
+   The standard Fullscreen API rather than anything Electron-specific, because
+   Electron honours it and that means ONE implementation covers the desktop app
+   and the browser build both. No IPC, no preload, nothing for the shell to
+   know about.
+
+   fitCanvas() already fills the limiting axis at a fractional scale, so on a
+   16:9 screen this is edge to edge with no letterboxing.
+
+   The preference is remembered, but it cannot simply be applied on load:
+   entering fullscreen requires a user gesture. The boot screen already demands
+   a click before any audio starts, so that click is where it gets applied. */
+const FS_KEY = 'meat_fullscreen';
+function wantsFullscreen() {
+  try { return localStorage.getItem(FS_KEY) === '1'; } catch (e) { return false; }
+}
+function isFullscreen() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+function goFullscreen() {
+  const el = document.documentElement;
+  const fn = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!fn) return;
+  try { const p = fn.call(el); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+}
+function leaveFullscreen() {
+  const fn = document.exitFullscreen || document.webkitExitFullscreen;
+  if (!fn) return;
+  try { const p = fn.call(document); if (p && p.catch) p.catch(() => {}); } catch (e) {}
+}
+function toggleFullscreen() {
+  const on = !isFullscreen();
+  if (on) goFullscreen(); else leaveFullscreen();
+  try { localStorage.setItem(FS_KEY, on ? '1' : '0'); } catch (e) {}
+  return on;
+}
+/* Leaving fullscreen with the OS shortcut rather than ours still has to be
+   remembered, or the setting lies the next time you look at it. */
+document.addEventListener('fullscreenchange', () => {
+  try { localStorage.setItem(FS_KEY, isFullscreen() ? '1' : '0'); } catch (e) {}
+  fitCanvas();
+});
+
 /* ---------- presentation: never render below 200% ---------- */
 function fitCanvas() {
   const sx = window.innerWidth / W, sy = window.innerHeight / H;
@@ -10130,6 +10182,10 @@ fitCanvas();
 const boot = document.getElementById('boot');
 function wake() {
   boot.classList.add('hidden');
+  /* The click that wakes the audio is also the gesture that buys a fullscreen
+     request, so a remembered preference gets applied exactly here and nowhere
+     else -- on load it would simply be refused. */
+  if (wantsFullscreen()) goFullscreen();
   A.init();
   if (A.music && S.mode === 'title') A.music.menu();   // sparse pad+arp on the title
   removeEventListener('click', wake);

@@ -22,6 +22,7 @@ tags: [reference]
 | `Esc` / `P` | pause / resume — and **refuse** TOMCE's offer |
 | `M` | mute |
 | `N` | music on / off. On by default — see [[Music#Three recordings]] |
+| `F11` | fullscreen. Remembered between runs — see [[Audio#The options screen]] |
 | `-` / `=` | volume down / up — eleven steps, remembered between runs. Numpad `-` and `+` work too |
 | — | all of the above also live on the **OPTIONS** screen, on the title and on pause — see [[Audio#The options screen]] |
 | `Enter` / click | start a run from the title screen |

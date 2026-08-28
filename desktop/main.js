@@ -138,6 +138,27 @@ app.whenReady().then(async () => {
         return JSON.stringify(r);
       })()`);
     } catch (e) { out = 'SELFTEST THREW: ' + e.message; }
+
+    /* Fullscreen, checked against the WINDOW rather than the page. The page
+       can only tell you what it asked for; win.isFullScreen() is what actually
+       happened. executeJavaScript's second argument fakes the user gesture the
+       Fullscreen API insists on. */
+    let fsResult = 'skipped';
+    try {
+      const tap = "document.dispatchEvent(new KeyboardEvent('keydown',{code:'F11',bubbles:true}));" +
+                  "document.dispatchEvent(new KeyboardEvent('keyup',{code:'F11',bubbles:true}));1";
+      const before = win.isFullScreen();
+      await win.webContents.executeJavaScript(tap, true);
+      await wait(1500);
+      const entered = win.isFullScreen();
+      await win.webContents.executeJavaScript(tap, true);
+      await wait(1500);
+      const left = win.isFullScreen();
+      fsResult = (!before && entered && !left) ? 'toggles' :
+                 ('before=' + before + ' entered=' + entered + ' left=' + left);
+    } catch (e) { fsResult = 'THREW: ' + e.message; }
+    out = String(out).replace(/}$/, ',"fullscreen":"' + fsResult + '"}');
+
     console.log('SELFTEST ' + out);
     /* Gate on all three, not only the screens. A build where every screen
        draws but the soak blew its pool caps, or where a named music track
@@ -145,6 +166,7 @@ app.whenReady().then(async () => {
     const t = String(out);
     const pass = t.includes('"screensThatThrew":[]') &&
                  t.includes('"soak":true') &&
+                 t.includes('"fullscreen":"toggles"') &&
                  !t.includes('FAILED');
     console.log(pass ? 'SELFTEST PASS' : 'SELFTEST FAIL');
     app.exit(pass ? 0 : 1);

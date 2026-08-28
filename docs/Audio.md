@@ -118,11 +118,32 @@ and it holds:
 | **MASTER** | everything — the same value the `-` and `=` keys move |
 | **MUSIC** | the score only. **Step 7 is unity**, the level it has always played at, so the scale runs from silent to a bit over twice as loud and anyone who never opens the screen is unaffected |
 | **MUSIC ON/OFF** | the same switch as `N` |
-| **ALL SOUND** | the same switch as `M` |
+| **SOUND** | the same switch as `M` |
+| **FULLSCREEN** | the same switch as `F11` |
 
 It also names the file currently playing, because the one question anybody asks
 of a music setting is whether it is working, and a filename answers it without
 making them guess from the silence.
+
+### Fullscreen
+
+Not audio, but it lives on the same screen. The standard **Fullscreen API**,
+not anything Electron-specific — Electron honours it, so one implementation
+covers the desktop app and the browser build with no IPC and no preload.
+
+[[Rendering|`fitCanvas()`]] already fills the limiting axis at a fractional
+scale, so on a 16:9 screen this is edge to edge with no letterboxing.
+
+The preference is remembered, but it cannot be applied on load: entering
+fullscreen requires a user gesture. The boot screen already demands a click
+before any audio starts, so **that click is where a remembered preference gets
+applied** — anywhere earlier and the browser simply refuses it. Leaving
+fullscreen by the OS shortcut is caught with `fullscreenchange`, so the stored
+setting cannot start lying about the state.
+
+Verified in the packaged desktop app against `win.isFullScreen()` from the
+Electron main process, which is what actually happened rather than what the
+page asked for: windowed → F11 → fullscreen → F11 → windowed.
 
 ### Why music volume needed its own node
 

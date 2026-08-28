@@ -1181,6 +1181,38 @@ are wallet; coins are run state.
 > than accumulate. But if the last four turn out to be unreachable in
 > practice, `EVO_COST` is the number to turn, not this one.
 
-## Related- [[Bugs Found]] — the defects behind each fix above, all of them now closed
+## `PENDING9` — Fullscreen
+
+`F11`, and a third switch on the OPTIONS screen next to MUSIC and SOUND.
+
+The standard **Fullscreen API** rather than anything Electron-specific.
+Electron honours it, so one implementation covers the desktop app and the
+browser build both — no IPC, no preload script, nothing for the shell to know
+about. `fitCanvas()` already fills the limiting axis at a fractional scale, so
+on a 16:9 screen this is edge to edge with no letterboxing.
+
+The preference is remembered, and the interesting part is *where* it gets
+applied. Entering fullscreen requires a user gesture, so doing it on load is
+simply refused. The boot screen already demands a click before any audio
+starts — so that click is the one guaranteed gesture in the whole session, and
+that is where a remembered preference is honoured.
+
+Leaving fullscreen with the OS shortcut instead of ours is caught with
+`fullscreenchange`, so the stored setting cannot start lying about the state.
+
+> [!note] Verified against the window, not the page
+> The page can only report what it *asked for*. The Electron main process can
+> report what happened. The desktop self-test now drives F11 twice and checks
+> `win.isFullScreen()` between them:
+>
+> ```
+> "fullscreen":"toggles"
+> ```
+>
+> windowed → F11 → fullscreen → F11 → windowed. The self-test gates on it, so
+> a build where fullscreen silently stopped working now fails packaging
+> rather than shipping.
+
+## Related [[Bugs Found]] — the defects behind each fix above, all of them now closed
 - [[Tuning Values]] — where the numbers stand today
 - [[Floors]] — the ten of them in full
