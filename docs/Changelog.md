@@ -1010,7 +1010,7 @@ belong in the history.
 The day-to-day workflow is unchanged. There is still no build step for running
 or developing the game.
 
-## `PENDING6` — Cards buy cosmetics
+## `3ba7541` — Cards buy cosmetics
 
 Cards had no sink. They dropped, they counted up in the purse, they persisted
 across death — and they bought nothing. `enterShop` even carried the line
