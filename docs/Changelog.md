@@ -957,7 +957,7 @@ clears it through `setFloor` before it gets there, so a real run is unaffected.
 
 Both settings survive a reload, in `localStorage` beside the existing volume.
 
-## `PENDING5` — A licence, and a build that ships only the game
+## `6e75b32` — A licence, and a build that ships only the game
 
 Groundwork for putting this on itch.io.
 
