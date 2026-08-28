@@ -129,16 +129,26 @@ app.whenReady().then(async () => {
 
     /* Each scene sets the game up, lets the real loop render it for a moment,
        then captures. Nothing is faked -- these are frames the game drew. */
+    /* Damjan cannot fight back while this runs -- there is no input -- so on a
+       deep floor he is swarmed and dead within seconds, and the first attempt
+       captured an empty health bar because of it. Every gameplay scene tops
+       him back up immediately before the shutter. */
+    const HEAL = "MEAT.S.p.hp = MEAT.ST().maxhp; MEAT.S.mode='play'; MEAT.S.upgPts=0; 1";
+
     const scenes = [
-      ['01-title',  "MEAT.S.mode='title',1", 1400],
-      ['02-floor1', "MEAT.startRun(); MEAT.startWave(2); 1", 2600],
-      ['03-deep',   "MEAT.startRun(); MEAT.S.room=6; MEAT.buildRoom(6); MEAT.startWave(4); 1", 3000],
-      ['04-menu',   "MEAT.S.upgPts=1; MEAT.openLevelUp(); 1", 1600],
-      ['05-boss',   "MEAT.startRun(); MEAT.S.room=4; MEAT.buildRoom(4); MEAT.spawnBoss(); 1", 3000]
+      ['01-title',  "MEAT.S.mode='title',1", 1400, false],
+      ['02-floor1', "MEAT.startRun(); MEAT.startWave(2); 1", 2400, true],
+      ['03-deep',   "MEAT.startRun(); MEAT.S.room=6; MEAT.buildRoom(6); MEAT.startWave(4); MEAT.gainXP(26); 1", 2600, true],
+      ['04-menu',   "MEAT.startRun(); MEAT.S.upgPts=1; MEAT.openLevelUp(); 1", 1600, false],
+      /* spawnBoss takes an index -- spawnBoss() with none threw, so the first
+         run never had a boss at all, which is why no name was drawn. The name
+         is a msg() banner, so the capture has to land while it is still up. */
+      ['05-boss',   "MEAT.startRun(); MEAT.S.room=4; MEAT.buildRoom(4); MEAT.spawnBoss(2); 1", 1800, true]
     ];
-    for (const [name, code, settle] of scenes) {
+    for (const [name, code, settle, heal] of scenes) {
       try { await js(code); } catch (err) { console.log(name + ': ' + err.message); }
       await wait(settle);
+      if (heal) { try { await js(HEAL); } catch (err) {} await wait(120); }
       const img = await win.webContents.capturePage();
       fs.writeFileSync(path.join(SHOTS_DIR, name + '.png'), img.toPNG());
       console.log('shot ' + name + '  ' + img.getSize().width + 'x' + img.getSize().height);
@@ -147,8 +157,8 @@ app.whenReady().then(async () => {
     /* itch wants a 630x500 cover, which is 1.26:1 against the game's 16:9 --
        so crop the middle rather than squash it, then resize. */
     try {
-      await js("MEAT.startRun(); MEAT.S.room=6; MEAT.buildRoom(6); MEAT.startWave(4); 1");
-      await wait(3000);
+      await js("MEAT.S.mode='title'; 1");
+      await wait(1500);
       const full = await win.webContents.capturePage();
       const sz = full.getSize();
       const cw = Math.round(sz.height * 1.26);
