@@ -154,19 +154,36 @@ app.whenReady().then(async () => {
       console.log('shot ' + name + '  ' + img.getSize().width + 'x' + img.getSize().height);
     }
 
-    /* itch wants a 630x500 cover, which is 1.26:1 against the game's 16:9 --
-       so crop the middle rather than squash it, then resize. */
+    /* The cover and the banner both come off the title screen.
+
+       The cover is 630x500 (1.26:1). The first version of this took the FULL
+       height of the frame, and it read as a black rectangle: a browse listing
+       gives a cover about 315px wide, and at that size a small wordmark in a
+       lot of empty dark is nothing at all. The crop is deliberately tight --
+       wide enough to hold the wordmark, no taller than that forces -- so the
+       title and Damjan fill the frame. */
     try {
       await js("MEAT.S.mode='title'; 1");
       await wait(1500);
       const full = await win.webContents.capturePage();
       const sz = full.getSize();
-      const cw = Math.round(sz.height * 1.26);
-      const cover = full.crop({ x: Math.round((sz.width - cw) / 2), y: 0, width: cw, height: sz.height })
-                        .resize({ width: 630, height: 500, quality: 'best' });
+
+      const cw = 800, ch = Math.round(cw / 1.26);
+      const cover = full
+        .crop({ x: Math.round((sz.width - cw) / 2), y: 46, width: cw, height: Math.min(ch, sz.height - 46) })
+        .resize({ width: 630, height: 500, quality: 'best' });
       fs.writeFileSync(path.join(SHOTS_DIR, 'cover.png'), cover.toPNG());
       console.log('shot cover  630x500');
-    } catch (err) { console.log('cover: ' + err.message); }
+
+      /* The banner is the strip across the top of an itch page: same frame,
+         much wider crop. */
+      const bh = Math.min(Math.round(sz.width / 2.4), sz.height - 40);
+      const banner = full
+        .crop({ x: 0, y: 40, width: sz.width, height: bh })
+        .resize({ width: 1600, height: Math.round(1600 / 2.4), quality: 'best' });
+      fs.writeFileSync(path.join(SHOTS_DIR, 'banner.png'), banner.toPNG());
+      console.log('shot banner 1600x' + Math.round(1600 / 2.4));
+    } catch (err) { console.log('cover/banner: ' + err.message); }
 
     console.log('SHOTS DONE');
     app.exit(0);
