@@ -1010,6 +1010,50 @@ belong in the history.
 The day-to-day workflow is unchanged. There is still no build step for running
 or developing the game.
 
+## `PENDING6` — Cards buy cosmetics
+
+Cards had no sink. They dropped, they counted up in the purse, they persisted
+across death — and they bought nothing. `enterShop` even carried the line
+`cards: 0, // nothing costs cards any more`, and [[Economy]] had a standing
+warning listing "three ways out, none of them chosen yet". This is one of them.
+
+[[Cosmetics]] cost cards now, and the vault does not buy them any more.
+
+| | was | now |
+|---|---|---|
+| GOLD | 1,000 vault | **15 cards** |
+| TOXIC | 2,500 | **45** |
+| VOID | 5,000 | **100** |
+| BONE MASK | 9,000 | **180** |
+| LIVING FLAME | 15,000 | **320** |
+
+Priced off the game's own numbers rather than a guess. A wave is
+`round((8 + 3n) * (1 + 0.45 * floor))` bodies, so a full ten floors is about
+2,570 regular kills at 1.12% each, plus twenty elites at 20% and ten bosses at
+55% — **~40 cards for a full clear, ~12–15 for a run that dies around floor 5.**
+So GOLD is most of one good run and LIVING FLAME is a long haul.
+
+> [!important] EVOLVE no longer wipes cards
+> It zeroed coins and cards together, as one run wallet. With cards now the
+> cosmetic currency that would have charged you your cosmetic savings for
+> evolving, and nothing on the screen says so. Coins still go to zero; cards
+> are wallet, not run state.
+
+The vault is left in place — the **HOARDER** contract still counts it — but it
+is a scoreboard now rather than a currency. Verified that a 999,999 vault buys
+nothing at all.
+
+The cosmetics screen shows the card sprite and a card balance instead of a coin
+and a vault total, with one line under it saying which currency is which:
+*coins buy guns, cards buy these*.
+
+Verified: a fat vault refuses to buy, 20 cards buys GOLD and leaves 5, 5 refuses
+TOXIC at 45, the purchase survives a reload, and 42 cards survive an EVOLVE that
+takes coins from 200 to 0.
+
+Also corrected [[Pickups]], which had the card drop at 0.8% where the code says
+1.12%.
+
 ## Related
 - [[Bugs Found]] — the defects behind each fix above, all of them now closed
 - [[Tuning Values]] — where the numbers stand today

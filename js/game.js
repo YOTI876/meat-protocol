@@ -899,7 +899,25 @@ const WORDER = ['pistol', 'scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog
    LEGENDARY can never fall out of an evolution rung. */
 const BUYABLE = ['scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot', 'deli', 'rail', 'zap', 'void'];
 
-/* ---- COSMETICS. bought from the vault, kept forever. ----
+/* ---- COSMETICS. bought with CARDS, kept forever. ----
+
+   Cards used to buy nothing. They dropped, they counted up in the corner of
+   the HUD, and there was a comment in enterShop saying "nothing costs cards
+   any more" — a currency with a drop rate, a sprite, a pickup sound and no
+   sink. They are what cosmetics cost now, which gives the rarest drop in the
+   game the one thing it was missing.
+
+   Priced off the game's own numbers rather than a guess. A wave is
+   round((8 + 3n) * (1 + 0.45 * floor)) bodies, so a full ten-floor run is
+   about 2,570 normal kills at 1.12% each, plus twenty elites at 20% and ten
+   bosses at 55%:
+
+       a run that dies around floor 5    ~12-15 cards
+       a full clear                      ~40 cards
+
+   So GOLD is most of one good run and LIVING FLAME is a long-term goal. The
+   vault is untouched — HOARDER still counts it, it just does not buy
+   anything now.
 
    Repointed for the third Damjan. `r`/`R`/`w` were a headband, then a
    neckerchief; they are the WORK SHIRT now — the largest coloured area on him
@@ -919,16 +937,16 @@ const BUYABLE = ['scar', 'saw', 'price', 'nail', 'micro', 'chill', 'hog', 'rot',
 
    Ids are untouched, so every save keeps what it had unlocked and equipped. */
 const COSMETICS = [
-  { id: 'crimson', name: 'CRIMSON',      price: 0,     pal: {},                                                                                    tag: 'the one he showed up in' },
-  { id: 'gold',    name: 'GOLD',         price: 1000,  pal: { r: '#f0c243', R: '#a37c12', w: '#fff3c0' },                                           tag: 'earned, technically' },
-  { id: 'toxic',   name: 'TOXIC',        price: 2500,  pal: { r: '#8ef04a', R: '#3f8a1e', w: '#e8ffcc', u: '#cfe8b4', U: '#93ad7c' },               tag: 'do not lick' },
-  { id: 'void',    name: 'VOID',         price: 5000,  pal: { r: '#2a1030', R: '#140618', w: '#a05cff', u: '#4a3a5e', U: '#2c2138' },               tag: 'he stopped casting a shadow' },
+  { id: 'crimson', name: 'CRIMSON',      price: 0,   pal: {},                                                                                    tag: 'the one he showed up in' },
+  { id: 'gold',    name: 'GOLD',         price: 15,  pal: { r: '#f0c243', R: '#a37c12', w: '#fff3c0' },                                           tag: 'earned, technically' },
+  { id: 'toxic',   name: 'TOXIC',        price: 45,  pal: { r: '#8ef04a', R: '#3f8a1e', w: '#e8ffcc', u: '#cfe8b4', U: '#93ad7c' },               tag: 'do not lick' },
+  { id: 'void',    name: 'VOID',         price: 100, pal: { r: '#2a1030', R: '#140618', w: '#a05cff', u: '#4a3a5e', U: '#2c2138' },               tag: 'he stopped casting a shadow' },
   /* BONE MASK bleaches every scrap of skin he has left — the face and the one
      bare hand — and darkens the shirt and apron so a white head does not swim
      into a white chest. The pupil goes red, because a skull with a brown eye
      in it is a man in makeup and a skull with a red one is not. */
-  { id: 'bone',    name: 'BONE MASK',    price: 9000,  pal: { s: '#e8e2d0', S: '#b0a894', p: '#c02020', r: '#5a5248', R: '#332f2a', u: '#6b6560', U: '#454140' }, tag: 'nobody asked where the face went' },
-  { id: 'flame',   name: 'LIVING FLAME', price: 15000, pal: { r: '#ff8a20', R: '#c02a00', w: '#ffe08a' }, fx: 'fire',                               tag: 'the shirt is on fire. he has not mentioned it.' }
+  { id: 'bone',    name: 'BONE MASK',    price: 180, pal: { s: '#e8e2d0', S: '#b0a894', p: '#c02020', r: '#5a5248', R: '#332f2a', u: '#6b6560', U: '#454140' }, tag: 'nobody asked where the face went' },
+  { id: 'flame',   name: 'LIVING FLAME', price: 320, pal: { r: '#ff8a20', R: '#c02a00', w: '#ffe08a' }, fx: 'fire',                               tag: 'the shirt is on fire. he has not mentioned it.' }
 ];
 
 /* ============================================================
@@ -1100,7 +1118,10 @@ function canEvolve() { return (S.evo | 0) < EVO_MAX && S.coins >= EVO_COST(S.evo
 function evolve() {
   if (!canEvolve()) { A.denied(); return false; }
   S.evo = (S.evo | 0) + 1;
-  S.coins = 0; S.cards = 0;
+  /* Coins are the run's wallet and evolving spends it. Cards are NOT — they
+     buy cosmetics now, and wiping them here would charge you your cosmetic
+     savings for evolving, which nothing tells you and nobody would want. */
+  S.coins = 0;
   persist();
   A.god(); A.roar();
   S.flash = 1.0; S.flashCol = '#b028ff';
@@ -8594,8 +8615,10 @@ function drawCosmetics() {
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
 
   htxt('COSMETICS', W / 2, 24, '#c46bff', 'center', 20, { weight: '700', glow: '#7016b8', glowSize: 20, track: 0.20 });
-  drawSpr(ctx, SPR.coin, W / 2 - 36, 33, 1);
-  htxt('VAULT ' + S.vault, W / 2 - 28, 36, '#f5c518', 'left', 9, { track: 0.08 });
+  drawSpr(ctx, SPR.card, W / 2 - 40, 33, 0.8);
+  htxt('CARDS ' + S.cards, W / 2 - 30, 36, '#d8b8b8', 'left', 9, { track: 0.08 });
+  htxt('cards drop from the dead — coins buy guns, cards buy these',
+       W / 2, 45, 'rgba(140,120,112,0.7)', 'center', 7, { track: 0.06, noShadow: true });
 
   const owned = ownedCos(), eq = equippedCos();
   COSMETICS.forEach((c, i) => {
@@ -8626,15 +8649,15 @@ function drawCosmetics() {
     if (on) htxt('EQUIPPED', x + w - 10, y + 17, '#c46bff', 'right', 9, { glow: t > 0.2 ? '#7016b8' : null, track: 0.12 });
     else if (has) htxt('EQUIP', x + w - 10, y + 17, '#7fe08a', 'right', 9, { glow: t > 0.2 ? '#2e7a38' : null, track: 0.12 });
     else {
-      const ok = S.vault >= c.price;
-      htxt(String(c.price), x + w - 10, y + 17, ok ? '#f5c518' : '#96605e', 'right', 9.5, { track: 0.08 });
-      drawSpr(ctx, SPR.coin, x + w - 14 - htxtWidth(String(c.price), 9.5), y + 14, 0.72);
+      const ok = S.cards >= c.price;
+      htxt(String(c.price), x + w - 10, y + 17, ok ? '#d8b8b8' : '#96605e', 'right', 9.5, { track: 0.08 });
+      drawSpr(ctx, SPR.card, x + w - 15 - htxtWidth(String(c.price), 9.5), y + 14, 0.62);
     }
     S.ui.push({ x, y, w, h, fn: () => {
       if (has) { writeSave({ cosEq: c.id }); A.pickup(); return; }
-      if (S.vault >= c.price) {
-        S.vault -= c.price;
-        writeSave({ vault: S.vault, cosOwned: owned.concat([c.id]), cosEq: c.id });
+      if (S.cards >= c.price) {
+        S.cards -= c.price;
+        writeSave({ cards: S.cards, cosOwned: owned.concat([c.id]), cosEq: c.id });
         A.buy(); S.flash = 0.4; S.flashCol = '#b028ff';
       } else { A.denied(); }
     } });

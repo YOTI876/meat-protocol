@@ -15,7 +15,7 @@ const r = Math.random() / ST().lootMul;
 
 | roll | drop | rarity at ×1 |
 |---|---|---|
-| < 0.008 | [[Economy#Cards\|card]] | 0.8% — genuinely rare |
+| < 0.0112 | [[Economy#Cards\|card]] | 1.12% — genuinely rare, and what [[Cosmetics]] cost |
 | < 0.021 | **NOVA** | 1.3% |
 | < 0.056 | **AEGIS (shield)** | 3.5% |
 | < 0.246 | [[Economy#Coins\|coin]] | **19.0%** |

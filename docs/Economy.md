@@ -56,21 +56,38 @@ Spent on:
 
 ## Cards
 
-Genuinely rare — **0.8%** per regular kill, 20% from an elite, 55% from a
+Genuinely rare — **1.12%** per regular kill, 20% from an elite, 55% from a
 floor boss and **guaranteed** from an APEX. Also awarded by two
 [[Secrets|secrets]]: MODAGAZ (+1, once per floor) and GOROMANIA (+1).
 
-Cards survive death, and are wiped by [[#Evolution|EVOLVE]].
+Cards survive death, and — unlike coins — survive [[#Evolution|EVOLVE]] too.
 
-> [!warning] Cards currently buy nothing
-> Their only sink was the OMEGA BEAM at 50 cards. That gun is now
-> [[Weapons#THE FISH|THE FISH]] and costs **500 coins**, so as of this pass
-> `S.cards` is a counter with no spend attached — it still drops, still
-> persists, still shows in the purse, and does nothing.
->
-> The HUD no longer prints `n/50`, because there is no target to count toward.
-> Three ways out, none of them chosen yet: give cards a new sink, fold them
-> into an existing one, or remove the currency and its drop entirely.
+### Cards buy [[Cosmetics]]
+
+That was the missing half. Their only sink used to be the OMEGA BEAM at 50
+cards; when that became [[Weapons#THE FISH|THE FISH]] at 500 coins, `S.cards`
+was left as a counter with a drop rate, a sprite, a pickup sound and nothing
+to spend it on. `enterShop` even carried the line `cards: 0, // nothing costs
+cards any more`.
+
+Cosmetics cost cards now, and nothing else does. That gives the rarest drop in
+the game a purpose and gives cosmetics a currency you earn by *fighting* rather
+than one that accrues on its own.
+
+**Yield, from the game's own numbers.** A wave is
+`round((8 + 3n) * (1 + 0.45 * floor))` bodies, so ten floors is about 2,570
+regular kills at 1.12%, plus twenty elites at 20% and ten bosses at 55%:
+
+| a run that | yields |
+|---|---|
+| dies around floor 5 | ~12–15 cards |
+| clears all ten floors | ~40 cards |
+
+> [!important] EVOLVE no longer wipes them
+> It used to zero coins *and* cards together, as one run wallet. Now that
+> cards are the cosmetic currency, that would have charged you your cosmetic
+> savings for evolving — with nothing on the screen saying so. Coins still go
+> to zero; cards are wallet, not run state.
 
 > [!warning] Two different things called a card
 > The dropped card above is **not** the same as a [[The Deck|deck card]].
@@ -78,13 +95,14 @@ Cards survive death, and are wiped by [[#Evolution|EVOLVE]].
 
 ## The vault
 
-A *separate*, coin-fed pool used only for [[Cosmetics]]. Every coin you ever
-pick up adds to the vault permanently (`persist()` takes
-`max(vault, S.vault)`), independent of how many you've since spent on guns.
+A *separate*, coin-fed pool. Every coin you ever pick up adds to it
+permanently (`persist()` takes `max(vault, S.vault)`), independent of how many
+you have since spent on guns — it is a running maximum, not a balance.
 
-This is the deliberate design point: **spending coins never costs you
-cosmetic progress**, because the vault tracks the running maximum, not your
-current balance. The **HOARDER** [[Contracts|contract]] reads the same total.
+> [!note] It used to buy cosmetics, and now buys nothing
+> Cosmetics moved to [[#Cards|cards]]. The vault is still tracked and still
+> read by the **HOARDER** [[Contracts|contract]] (bank 12,000), so it is not
+> dead — but it is a scoreboard now rather than a currency.
 
 ## Evolution
 
@@ -107,7 +125,7 @@ one for something that ends — rung 10 would have wanted 51,200 coins, and at
 
 Evolving:
 - requires `coins >= cost` and `evo < EVO_MAX` (`canEvolve()`)
-- **wipes coins and cards to zero**
+- **wipes coins to zero** — but *not* cards, which buy [[Cosmetics]]
 - opens the **pick screen** below, and restarts the run on the way out
 - permanently raises `S.evo`, feeding [[Difficulty Scaling]]:
   - +46% enemy HP, +30% damage, +6% speed, +50% score, +15% spawn count

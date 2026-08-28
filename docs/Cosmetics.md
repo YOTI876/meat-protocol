@@ -5,18 +5,26 @@ tags: [reference, systems]
 
 # Cosmetics
 
-Bought with the [[Economy#The vault|vault]], not run coins — so cosmetic
-progress is permanent and unaffected by what you spend mid-run. Reachable any
-time from title, pause, death or the win screen, by button or the **C** key.
+Bought with [[Economy#Cards|cards]] — the rare drop, not coins. Cards survive
+death and survive EVOLVE, so cosmetic progress is permanent and unaffected by
+what you spend mid-run. Reachable any time from title, pause, death or the win
+screen, by button or the **C** key.
+
+> [!note] This is what cards are for
+> They had no sink at all before this — see
+> [[Economy#Cards buy Cosmetics]]. Coins buy guns; cards buy these.
 
 | cosmetic | price | look |
 |---|---|---|
 | **CRIMSON** | free | the default — *"the one he showed up in"* |
-| **GOLD** | 1,000 | gold work shirt |
-| **TOXIC** | 2,500 | sickly green, and it takes the apron with it |
-| **VOID** | 5,000 | near-black, purple accents — *"stopped casting a shadow"* |
-| **BONE MASK** | 9,000 | the face bleached to a skull with a red eye, shirt and apron to slate |
-| **LIVING FLAME** | 15,000 | orange and red, **and the shirt is actually on fire** (`fx: 'fire'`) |
+| **GOLD** | 15 cards | gold work shirt |
+| **TOXIC** | 45 cards | sickly green, and it takes the apron with it |
+| **VOID** | 100 cards | near-black, purple accents — *"stopped casting a shadow"* |
+| **BONE MASK** | 180 cards | the face bleached to a skull with a red eye, shirt and apron to slate |
+| **LIVING FLAME** | 320 cards | orange and red, **and the shirt is actually on fire** (`fx: 'fire'`) |
+
+A full ten-floor clear yields roughly 40 cards, a run that dies around floor 5
+about 12–15. So GOLD is most of one good run and LIVING FLAME is a long haul.
 
 Each is a palette swap over the base Damjan sprite (`COSMETICS[i].pal`, applied
 via `variant()` in `js/sprites.js` — a cached palette-remap of the same pixel
