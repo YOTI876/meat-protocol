@@ -1265,7 +1265,7 @@ claims the key while fullscreen and releases it on the way out.
 Holding ESC still exits and always will — that is the non-overridable way out
 of a page that has taken the screen, and a game should not fight it.
 
-## `PENDING11` — The icon reaches the .exe after all
+## `67cf715` — The icon reaches the .exe after all
 
 The previous entry said this needed Developer Mode or a new dependency.
 Neither was true, and the reason is worth writing down.
