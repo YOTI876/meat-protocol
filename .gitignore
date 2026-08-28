@@ -7,3 +7,7 @@ Thumbs.db
 
 # Obsidian per-machine UI state (pane layout, open files)
 docs/.obsidian/workspace.json
+
+# build output — never commit the zip, it is 13MB of audio
+dist/
+*.zip

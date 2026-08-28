@@ -1,0 +1,53 @@
+DAMJAN: MEAT PROTOCOL
+Copyright (c) 2026 Damjan Janev and Aleksandar Trajkovski.
+All rights reserved.
+
+This game and its source code are made publicly readable so that people can
+play it, read it, and learn from it. That is not the same as putting it in the
+public domain, and no licence to reuse it is granted here.
+
+WHAT YOU MAY DO
+
+  - Play the game.
+  - Read the source and the documentation.
+  - Study how it works and apply what you learn to your own original work.
+  - Quote short excerpts with attribution, for review, teaching or discussion.
+
+WHAT YOU MAY NOT DO WITHOUT WRITTEN PERMISSION
+
+  - Redistribute, republish or re-upload the game, in whole or in substantial
+    part, anywhere — including reskinned, renamed or modified versions.
+  - Sell it, or include it in anything sold.
+  - Use the name "MEAT PROTOCOL", "DAMJAN: MEAT PROTOCOL", the characters, the
+    artwork or the sprites in your own project.
+  - Copy substantial portions of the source into another project.
+
+To ask for permission, open an issue at
+https://github.com/YOTI876/meat-protocol
+
+THIRD-PARTY MATERIAL — NOT COVERED BY THE ABOVE
+
+The copyright above covers the game's own code, artwork and documentation. It
+does NOT cover material that came from elsewhere, which the authors do not own
+and cannot license to you:
+
+  Fonts
+    VT323 is Copyright 2011 The VT323 Project Authors and is licensed under
+    the SIL Open Font License 1.1. The full licence is in OFL.txt. Any other
+    typeface referenced by name in index.html belongs to its own author under
+    its own terms.
+
+  Music
+    The tracks named in audio/tracks.json are third-party recordings, used
+    here as royalty-free material. They are the property of their respective
+    creators under their own licences and are NOT licensed to you by this
+    file. See audio/README.md.
+
+NO WARRANTY
+
+This software is provided "as is", without warranty of any kind, express or
+implied, including but not limited to the warranties of merchantability,
+fitness for a particular purpose and non-infringement. In no event shall the
+authors be liable for any claim, damages or other liability, whether in an
+action of contract, tort or otherwise, arising from, out of or in connection
+with the software or the use or other dealings in the software.

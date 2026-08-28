@@ -1,3 +1,8 @@
+/*! DAMJAN: MEAT PROTOCOL
+ *  Copyright (c) 2026 Damjan Janev and Aleksandar Trajkovski. All rights reserved.
+ *  Readable, not reusable. See LICENSE. Fonts and music are third party.
+ *  https://github.com/YOTI876/meat-protocol
+ */
 /* ============================================================
    MEAT PROTOCOL - the typefaces.
 

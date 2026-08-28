@@ -20,6 +20,36 @@ node serve.js
 Then open http://localhost:8123. It works over `file://` too — no build step,
 no dependencies — but fonts in `fonts/` won't load that way.
 
+## Publish it
+
+```bash
+node build.js --min
+```
+
+Writes `dist/` and `meat-protocol-itch.zip` — the game and nothing else. Upload
+the zip to itch.io and tick **"This file will be played in the browser"**;
+`index.html` sits at the root of the archive, which is what itch expects.
+
+Left out of the build: `docs/`, `serve.js`, `build.js`, `README.md`, `.git`.
+None of it is needed to run the game.
+
+`--min` strips comments and whitespace from the JS (`game.js` 505KB → 230KB).
+It does **not** rename identifiers, deliberately: these are plain scripts, not
+modules, so `MUSIC`, `A` and `MEAT` are real globals that the files reach
+across for. Renaming them produces a build that loads and then throws.
+
+The day-to-day workflow is unchanged — there is still no build step for
+running or developing the game.
+
+## Licence
+
+Copyright (c) 2026 Damjan Janev and Aleksandar Trajkovski. **All rights
+reserved** — readable, not reusable. See [LICENSE](LICENSE).
+
+Fonts and music are third party and are **not** covered by that: the font is
+under the SIL Open Font License (see `OFL.txt`) and the tracks belong to their
+own creators (see `audio/README.md`).
+
 ## Controls
 
 | key | does |

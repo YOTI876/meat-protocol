@@ -957,6 +957,59 @@ clears it through `setFloor` before it gets there, so a real run is unaffected.
 
 Both settings survive a reload, in `localStorage` beside the existing volume.
 
+## `PENDING5` — A licence, and a build that ships only the game
+
+Groundwork for putting this on itch.io.
+
+A browser game cannot hide its source — the browser has to run it — and the
+repository has been **public** the whole time anyway, docs and all. So the
+answer is not obfuscation, which raises the cost of copying from five seconds
+to an afternoon and stops nobody. The answer is saying what the terms are.
+
+**`LICENSE`** — copyright to both authors (`git log` says Damjan 46 commits,
+Aleksandar 12), all rights reserved, with the permissions people actually want
+spelled out: play it, read it, learn from it, quote it with attribution. What
+is not allowed is redistribution and reskinning.
+
+> [!warning] Two carve-outs, and they matter more than the rest of the file
+> The licence explicitly does **not** cover the font (SIL OFL, see `OFL.txt`)
+> or the three music tracks, which belong to their own creators. Claiming "all
+> rights reserved" over a directory containing somebody else's music would be
+> asserting ownership of something we do not own — the opposite of the problem
+> the file is there to solve.
+
+A `/*!` copyright header now sits at the top of `index.html` and all five JS
+files, so it travels with the code even in a copied build. It is a legal
+comment, so the minifier keeps it.
+
+**`build.js`** writes `dist/` and `meat-protocol-itch.zip`:
+
+```bash
+node build.js --min
+```
+
+Twelve files, 13.3MB, `index.html` at the root of the archive because that is
+what itch wants. `docs/`, `serve.js`, `build.js` and `README.md` are left out —
+none of it is needed to run the game, and `docs/` is the entire design record.
+
+`--min` strips comments and whitespace (`game.js` 505KB → 230KB) but
+**deliberately does not rename identifiers**. These are plain scripts, not
+modules, so `MUSIC`, `A` and `MEAT` are genuine globals the files reach across
+for; renaming them produces a build that loads and then throws. Comments were
+the thing worth removing and `--minify-whitespace` removes them.
+
+The build verifies its own output — a minify that "succeeded" without shrinking
+the file is treated as a failure and the original is copied instead, because
+the alternative is finding out from a blank page on itch.
+
+Verified by serving the built `dist/` and running against it, not the source:
+all four cross-file globals resolve, all twelve screens render, `soak` passes,
+all three tracks load. `dist/` and `*.zip` are gitignored — a 13MB zip does not
+belong in the history.
+
+The day-to-day workflow is unchanged. There is still no build step for running
+or developing the game.
+
 ## Related
 - [[Bugs Found]] — the defects behind each fix above, all of them now closed
 - [[Tuning Values]] — where the numbers stand today
