@@ -1147,7 +1147,7 @@ Verified by extracting the zip and running **that** copy, not the dev one.
 > like a real artifact. It was deleted rather than tested. Maximum
 > compression buys almost nothing on an already-compressed Electron payload.
 
-## `PENDING8` — Every run starts broke
+## `636fc03` — Every run starts broke
 
 Coins carried over between runs. They do not any more: `freshState()` sets
 `coins: 0`, and `persist()` no longer writes them, because after this nothing
