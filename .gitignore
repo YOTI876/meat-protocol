@@ -11,3 +11,8 @@ docs/.obsidian/workspace.json
 # build output — never commit the zip, it is 13MB of audio
 dist/
 *.zip
+
+# desktop wrapper: deps, the staged copy of the game, and the packaged exe
+desktop/node_modules/
+desktop/game/
+desktop/release/

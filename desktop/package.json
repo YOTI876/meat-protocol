@@ -1,0 +1,40 @@
+{
+  "name": "meat-protocol-desktop",
+  "version": "1.0.0",
+  "description": "DAMJAN: MEAT PROTOCOL",
+  "main": "main.js",
+  "author": "Damjan Janev and Aleksandar Trajkovski",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "selftest": "electron . --selftest",
+    "pack": "electron-builder --win --publish never"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.meatprotocol.game",
+    "productName": "MEAT PROTOCOL",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "game/**/*"
+    ],
+    "win": {
+      "target": [
+        "zip",
+        "portable"
+      ],
+      "signAndEditExecutable": false,
+      "artifactName": "MEAT-PROTOCOL-${version}-win.${ext}"
+    },
+    "portable": {
+      "artifactName": "MEAT-PROTOCOL-portable.exe"
+    },
+    "compression": "normal"
+  }
+}

@@ -1,8 +1,14 @@
 /* ============================================================
    Builds dist/ — the game and nothing else — and zips it for itch.io.
 
-     node build.js            copy only
-     node build.js --min      strip comments and whitespace from the JS too
+     node build.js             copy only
+     node build.js --min       strip comments and whitespace from the JS too
+     node build.js --min --exe ...and package the desktop build as well
+
+   Both targets are built from the SAME dist/. The desktop shell serves it over
+   loopback rather than embedding a second copy of the game, so the .exe and
+   the itch upload are running identical bytes -- there is no version of this
+   where one of them is a build behind.
 
    itch.io wants a zip with index.html at its ROOT, which is what this makes.
 
@@ -18,6 +24,8 @@ const ROOT = __dirname;
 const DIST = path.join(ROOT, 'dist');
 const ZIP = path.join(ROOT, 'meat-protocol-itch.zip');
 const MIN = process.argv.includes('--min');
+const EXE = process.argv.includes('--exe');
+const DESKTOP = path.join(ROOT, 'desktop');
 
 /* Everything the browser actually asks for, and the two licence files that
    have to travel with it. */
@@ -106,4 +114,37 @@ try {
 } catch (e) {
   console.log('\ndist/ is ready. Could not zip it automatically — zip the CONTENTS');
   console.log('of dist/ yourself, so that index.html sits at the root of the archive.');
+}
+
+/* ---- the desktop build ----
+   Stages dist/ into desktop/game/ and lets electron-builder wrap it. Skipped
+   unless asked for, because it needs desktop/node_modules and takes minutes,
+   and most builds are only the browser one.
+
+   Both targets come from the SAME dist/, and the desktop shell serves that
+   copy over loopback rather than embedding a second one -- so the .exe and
+   the itch upload are running identical bytes. There is no version of this
+   where one of them is a build behind the other. */
+if (EXE) {
+  if (!fs.existsSync(path.join(DESKTOP, 'node_modules'))) {
+    console.log('');
+    console.log('desktop/node_modules is missing — run "npm install" inside desktop/ first.');
+  } else {
+    const stage = path.join(DESKTOP, 'game');
+    rmrf(stage);
+    fs.cpSync(DIST, stage, { recursive: true });
+    console.log('');
+    console.log('staged dist/ into desktop/game/, packaging…');
+    try {
+      execSync('npm run pack', { cwd: DESKTOP, stdio: 'inherit' });
+      const exe = path.join(DESKTOP, 'release', 'MEAT-PROTOCOL.exe');
+      if (fs.existsSync(exe)) {
+        console.log('');
+        console.log('exe    ' + exe + '  ' + (fs.statSync(exe).size / 1048576).toFixed(1) + ' MB');
+      }
+    } catch (e) {
+      console.log('');
+      console.log('packaging failed — dist/ and the browser zip are still good.');
+    }
+  }
 }

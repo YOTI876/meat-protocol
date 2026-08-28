@@ -1054,6 +1054,99 @@ takes coins from 200 to 0.
 Also corrected [[Pickups]], which had the card drop at 0.8% where the code says
 1.12%.
 
+## `PENDING7` — A desktop build, alongside the browser one
+
+Not for protection — an Electron app ships the same readable JavaScript, and
+`npx asar extract` takes it back out in one command. This is a presentation
+decision: a download reads as a finished thing in a way a browser tab does not.
+The browser build stays, because it is the one where a curious stranger is
+playing before they have finished reading your post.
+
+```bash
+cd desktop && npm install     # once, ~100MB of Electron
+cd .. && node build.js --min --exe
+```
+
+Out comes `desktop/release/MEAT-PROTOCOL.exe` — one portable file, no
+installer. **Both targets are built from the same `dist/`,** and the shell
+serves that copy rather than embedding a second one, so the exe and the itch
+upload run identical bytes. Neither can drift behind the other.
+
+### The shell runs an HTTP server, and it has to
+
+`win.loadFile()` is the obvious approach and it silently breaks the music:
+`file://` blocks `fetch`, so `audio/tracks.json` fails and all three tracks
+fall back to the synthesised score without a word. A custom `app://` protocol
+fixes the fetch and then breaks `<audio loop>`, which wants HTTP **range
+requests**.
+
+So the shell starts a real server on `127.0.0.1` on an ephemeral port. Loopback
+only — unreachable from the network, and it does not raise the Windows Firewall
+dialog that binding to `0.0.0.0` would. The desktop build and the browser build
+are then running the same bytes over the same semantics rather than two things
+that are nearly the same.
+
+> [!warning] `file://` stopped working for the game generally
+> Same root cause, and [[Deployment]] said the opposite until now. Opening
+> `index.html` directly still plays — with **no music**, silently. Use
+> `node serve.js`.
+
+### It checks itself
+
+```bash
+cd desktop && npm run selftest
+```
+
+Launches the packaged game headless, draws all thirteen screens, runs the soak,
+and confirms all three tracks loaded over the loopback server:
+
+```
+SELFTEST {"globals":"object,object,object,object","screensThatThrew":[],
+          "soak":true,"music":{"fileMode":true,"playing":"wave","tracks":"ok,ok,ok"}}
+SELFTEST PASS
+```
+
+Exits non-zero on failure, so "the exe works" is checked rather than assumed.
+
+> [!note] The first version of that test lied
+> It reported `tracks: "none,none,none"` and looked like a real defect. It was
+> not: `A.init()` only runs inside `startRun()`, so the manifest fetch had not
+> been *started* when the check read it, let alone finished. Start the run,
+> wait, then look. The gate also now covers the soak and the tracks — the first
+> cut only checked that screens drew, so a build with blown pool caps or a dead
+> music file would have exited 0.
+
+> [!warning] Unsigned, and Windows says so
+> SmartScreen shows *"Windows protected your PC"* for any executable without a
+> code-signing certificate; players must click **More info → Run anyway**.
+> Certificates cost money annually. Worth saying plainly on the itch page, and
+> worth keeping the browser build up for the people who would rather not.
+
+### Ship the folder, not the single file
+
+Both get built. Only one is verified, and the difference is not the game.
+
+| artifact | under Smart App Control |
+|---|---|
+| `MEAT-PROTOCOL-1.0.0-win.zip` (folder) | **runs — SELFTEST PASS** |
+| `MEAT-PROTOCOL-portable.exe` (single file) | **blocked outright** |
+
+This machine has Smart App Control enforced (`VerifiedAndReputablePolicyState
+= 1`), which refuses unsigned executables rather than warning about them —
+there is no *Run anyway*. The NSIS self-extracting wrapper is what trips it;
+the same Electron build in a plain folder runs fine. So the zip is the
+artifact to publish, and it is also the ordinary shape for an itch download.
+
+Verified by extracting the zip and running **that** copy, not the dev one.
+
+> [!note] Two of the build settings were wrong first
+> The `pack` script passed `--win portable` on the command line, which
+> silently overrode the target list in the config — the zip target was being
+> ignored entirely. And `"compression": "maximum"` made 7-zip slow enough to
+> hit a timeout and exit 143, leaving a **truncated** 89MB zip that looked
+> like a real artifact. It was deleted rather than tested. Maximum
+> compression buys almost nothing on an already-compressed Electron payload.
+
 ## Related
 - [[Bugs Found]] — the defects behind each fix above, all of them now closed
 - [[Tuning Values]] — where the numbers stand today

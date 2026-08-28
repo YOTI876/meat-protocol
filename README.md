@@ -41,6 +41,41 @@ across for. Renaming them produces a build that loads and then throws.
 The day-to-day workflow is unchanged — there is still no build step for
 running or developing the game.
 
+## The desktop build
+
+```bash
+cd desktop && npm install     # once — pulls Electron, about 100MB
+cd .. && node build.js --min --exe
+```
+
+Produces `desktop/release/MEAT-PROTOCOL.exe` — one portable file, no
+installer, nothing to unpack. Upload it to itch alongside the browser zip and
+people can choose.
+
+**Both targets are built from the same `dist/`.** The shell serves that copy
+over loopback rather than embedding a second one, so the .exe and the browser
+upload run identical bytes — there is no version of this where one of them is a
+build behind.
+
+> [!note] Why a loopback server and not `loadFile()`
+> `file://` blocks `fetch`, so `audio/tracks.json` would fail and every track
+> would silently fall back to the synthesised score. A custom protocol fixes
+> the fetch and then breaks `<audio>` looping, which needs HTTP range
+> requests. A real server on 127.0.0.1 does both, and is not reachable from
+> the network.
+
+`npm run selftest` inside `desktop/` launches the packaged game headless,
+draws every screen, runs the soak and checks all three music tracks load, then
+prints one line and exits — so "the .exe works" is something the build checks
+rather than something anybody assumes.
+
+> [!warning] It will be flagged as unsigned
+> Windows SmartScreen shows *"Windows protected your PC"* for any executable
+> without a code-signing certificate, and players have to click **More info →
+> Run anyway**. That is not a bug in the build; certificates cost money per
+> year. Say so on the itch page, and keep the browser version up for the
+> people who would rather not.
+
 ## Licence
 
 Copyright (c) 2026 Damjan Janev and Aleksandar Trajkovski. **All rights
