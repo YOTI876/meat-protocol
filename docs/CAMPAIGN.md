@@ -38,9 +38,10 @@ tags: [plan, art, state]
 > **WHAT IS LEFT IN PASS 2 — the animation half, and none of it is started:**
 > 1. **hurt frames (2, ~6–8 frames total)** — nothing in the game has one.
 > 2. **death frames (3, 14–18 frames)** — a collapse, not a fade. Nothing has one.
-> 3. **the body must move in the walk cycle.** Every creature still animates
->    LEGS ONLY over a static body, which is the "no weight" problem in the
->    review. Bob or squash the body too.
+> 3. ~~the body must move in the walk cycle~~ **DONE.** A FOOTFALL squash was
+>    added to drawEnemy, scaled by travel speed, twice per cycle. Note the
+>    review overstated this one: breath, lean and impact-squash already
+>    existed — what was missing was only the weight of the step landing.
 >
 > Do those three across all six, then Pass 2 is done.
 >

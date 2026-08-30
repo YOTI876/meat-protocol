@@ -8067,10 +8067,18 @@ function drawEnemy(e) {
      weight — nothing in here is ever perfectly still or perfectly upright. */
   const breath = 1 + Math.sin(e.bob * 0.5) * (e.boss ? 0.035 : 0.05);
   const lean = clamp(e.vx * 0.0012, -0.13, 0.13);
+  /* FOOTFALL. Breath is idle motion and it runs whether or not the thing is
+     going anywhere; this is the weight of a step LANDING, so it is scaled by
+     how fast the creature is actually travelling. Without it the walk cycle
+     is legs moving under a body that floats -- the frames carry the gait and
+     nothing carries the mass. Twice per cycle, because two feet. */
+  const moving = Math.min(1, Math.hypot(e.vx, e.vy) / 42);
+  const foot = Math.abs(Math.sin(e.anim * Math.PI)) * moving * (e.boss ? 0.045 : 0.075);
   ctx.save();
   ctx.translate(e.x + (e.twx || 0), e.y + (e.twy || 0) + bob - lift);
   ctx.rotate(lean);
-  ctx.scale((1 + e.sq * 0.3) / breath, (1 - e.sq * 0.25) * breath);   // squash on impact
+  // squash on impact, and again on every footfall
+  ctx.scale((1 + e.sq * 0.3 + foot) / breath, (1 - e.sq * 0.25 - foot) * breath);
   drawSpr(ctx, spr, 0, 0, sc, e.flip, 1, tint);
   ctx.restore();
 
