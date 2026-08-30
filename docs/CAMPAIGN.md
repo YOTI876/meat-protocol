@@ -20,7 +20,34 @@ tags: [plan, art, state]
 
 ## CURRENT POSITION
 
-**Last updated:** 2026-08-30, after Pass 1.
+**Last updated:** 2026-08-30, after Pass 1 and Pass 2a/2b.
+
+> [!important] PICK UP EXACTLY HERE
+> **Pass 2 is HALF DONE.** Four of the six enemies now have B silhouettes.
+> **The next two jobs are the SHRIEKER and the STALKER**, and they are the
+> only creatures still reading as the old dome-with-legs.
+>
+> | creature | state | the rule it must meet |
+> |---|---|---|
+> | crawler | **done** | tray of mince: flat-topped rectangle, tag on one corner |
+> | bloater | **done** | convex: one unbroken swollen curve |
+> | husk | **done** | concave: the only inward silhouette |
+> | cyst | **done** | rooted: wider at the floor than the top |
+> | **shrieker** | **TODO** | a hanging pack: high, narrow, **punched header card at the top**, taper below, asymmetric mass |
+> | **stalker** | **TODO** | shrink-wrapped: jointed, upright, **more negative space than solid**, never a filled blob |
+>
+> Then the animation work in the pass spec — walk (4) with the **body** moving
+> and not just legs, pose, **hurt (2 frames, new)**, **death (3 frames, new)**.
+> None of the six has hurt or death frames yet.
+>
+> Two rules learned the hard way while doing the four:
+> 1. **Author in global `PAL` keys and pass `null` as the bank palette.** The
+>    old creatures declare local hex and route around the palette, which is
+>    the thing Pass 1 exists to stop. `husk`, `cyst` and `crawler` are the
+>    worked examples — copy their shape.
+> 2. **Check every key a walk tail uses against global `PAL` first.** The
+>    crawler's legs were authored in a local `E`; global `E` is freezer-burn
+>    white, so they came out glowing.
 
 **Just finished: PASS 1 — DOCTRINE. The game no longer looks like itself.**
 
@@ -44,10 +71,15 @@ tags: [plan, art, state]
 **Verified:** 87 enemies on floor 9 — findable in under a second. `--selftest`
 passes, `MEAT.soak` verified, light pass 0.218 ms/frame, avg 3.14.
 
-**Next pass:** **Pass 2 — the three that share a body.** bloater / husk / cyst,
-[[Bugs Found#31]]. Convex / concave / rooted, provable with no colour at all.
+**Then PASS 2a:** `husk` and `cyst` stopped being the bloater re-tinted
+([[Bugs Found#31]]). Convex / concave / rooted, verified at 5x filled pure
+black — three different shapes with no colour information at all.
 
-**Half-done:** nothing.
+**Then PASS 2b (part):** the `crawler` became a tray of mince — flat-topped
+hard rectangle, wider than tall, price tag on one corner. It is the first
+creature a player meets, so it is the one that teaches the shape language.
+
+**Half-done: PASS 2. See the box at the top — shrieker and stalker are next.**
 
 > [!warning] A real bug came out of Pass 1 and is worth knowing about
 > **The lightmap canvas was never cleared.** `drawLight()` laid its darkness

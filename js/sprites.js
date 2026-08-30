@@ -1102,41 +1102,51 @@ SPR.anim = {};
    set too far apart and a mouth that opens the wrong way — sideways, all
    the way across, because there is nothing holding the jaw together. */
 {
-  const pal = { L: '#d9a9a9', f: '#bb8b8b', F: '#8b6161', E: '#553a3c', k: '#2f1719', x: '#ff5252',
-                '9': '#f4dcd6', X: '#ffe6d2', ',': '#3a1e22', ';': '#ffd6cc' };
-  const map = { L: ['9', 'f'], f: ['L', 'F'], F: ['f', 'E'], E: ['F', 'k'], k: ['E', 'k'] };
+  /* No local hex. Global PAL keys, and the material map only remaps those --
+     u/+ for the pale tray rim, v/V for the meat in it, K for the price tag.
+     That is what makes the doctrine bind and keeps cosmetics working. */
+  const map = { u: ['+', 'U'], U: ['u', 'F'], v: ['f', 'V'], V: ['v', 'k'],
+                f: ['u', 'F'], F: ['f', 'k'], k: ['F', 'd'], K: ['+', 'L'], L: ['K', 'k'] };
+  /* A TRAY OF MINCE WITH LEGS. Wider than it is tall, flat-topped, hard
+     rectangle -- and the price tag sits on ONE corner, because nothing in
+     this direction is mirror-symmetric and the tag is where the asymmetry
+     lives. It is the first creature the player meets, so it is the one that
+     teaches the whole shape language. */
   const body = [
-    '.....oooooo.....',
-    '...ooLLLLLLoo...',
-    '..oLLffffffLLo..',
-    '.oLLffffffffLLo.',
-    '.oLffxffffxffLo.',
-    '.offfffffffffFo.',
-    '.oFkLLLLLLLLkFo.',
-    '.oFkkkkkkkkkkFo.',
-    '.oFLkLkLkLkLkFo.'
+    '..............KK',
+    '.ooooooooooooKKK',
+    '.ouuuuuuuuuuuuuo',
+    '.ouvvvvvvvvvvvuo',
+    '.ouvvvvvvvvvvvuo',
+    '.ouvvvvvvvvvvvuo',
+    '.ouuuuuuuuuuuuuo',
+    '.oUUUUUUUUUUUUUo',
+    '.oooooooooooooo.'
   ];
   /* the eyes sit at different heights and the grin runs off both edges */
-  const face = { x: 0, y: 6, rows: [
-    '     ,EEEE,         ,EE,        ',
-    '    ,EkkkkkE,      ,EkkkE,      ',
-    '    EkxXXXxkE      EkxXxkE      ',
-    '    EkXX;XXkE      EkX;XkE      ',
-    '    EkxXXXxkE      EkxxXkE      ',
-    '     ,EkkkE,   ~~   ,EkkE,      ',
-    '   %   ,,,    ~~~~   ,,,   %    ',
-    '   %kk!kk!kk!kkkk!kk!kk!kk%&    ',
-    '   kk!kk!kk!kk!kk!kk!kk!kkk%    ',
-    '   &%%kkkkkkkkkkkkkkkkkk%%&     '
+  const face = { x: 0, y: 7, rows: [
+    '    ,kkkk,         ,kk,         ',
+    '   ,kkkkkkk,      ,kkkk,        ',
+    '   kkx++++xkk     kkx++xk       ',
+    '   kk++;+++kk     kk+;++k       ',
+    '   ,kkx++xkk,     ,kkxxkk,      ',
+    '    ,kkkkk,   ~~   ,kkkk,       ',
+    '  %   ,,,    ~~~~   ,,,   %     ',
+    '  %kk!kk!kk!kkkk!kk!kk!kk%&     ',
+    '  kk!kk!kk!kk!kk!kk!kk!kkk%     ',
+    '  &%%kkkkkkkkkkkkkkkkkk%%&      '
   ] };
   const t = t1 => shade(up2(t1), map);
-  SPR.anim.crawler = BANK(pal, CREATURE(map, body, face), [
-    t(['..oFFffffffFFo..', '..oFEFffffFEFo..', '.oEo.oFFFFo.oEo.', '.oEo..oEEo..oEo.', '..o....oo....o..']),
-    t(['..oFFffffffFFo..', '.oFEFFffffFFEFo.', 'oEo..oFFFFo..oEo', 'oEo...oEEo...oEo', 'oo.....oo.....oo']),
-    t(['..oFFffffffFFo..', '..oFEFffffFEFo..', '..oEooFFFFooEo..', '..oEo.oEEo.oEo..', '...o...oo...o...']),
-    t(['..oFFffffffFFo..', '.oFEFFffffFFEFo.', 'oEo...oFFo...oEo', 'oEo..oEEEEo..oEo', 'oo....o..o....oo'])
-  ], // coiled to spring
-    t(['..oFFffffffFFo..', '..oFFFffffFFFo..', '..oEEoFFFFoEEo..', '...oEoEEEEoEo...', '....o.o..o.o....']),
+  SPR.anim.crawler = BANK(null, CREATURE(map, body, face), [
+    /* Legs in global keys. They were authored in a local `E` that does not
+       exist in PAL -- global `E` is freezer-burn white, so the legs would
+       have come out glowing. */
+    t(['.oUUUUUUUUUUUUo.', '.oUkUffffffUkUo.', '.oko.oUUUUo.oko.', '.oko..okko..oko.', '..o....oo....o..']),
+    t(['.oUUUUUUUUUUUUo.', 'oUkUUffffffUUkUo', 'oko..oUUUUo..oko', 'oko...okko...oko', 'oo.....oo.....oo']),
+    t(['.oUUUUUUUUUUUUo.', '.oUkUffffffUkUo.', '..okooUUUUooko..', '..oko.okko.oko..', '...o...oo...o...']),
+    t(['.oUUUUUUUUUUUUo.', 'oUkUUffffffUUkUo', 'oko...oUUo...oko', 'oko..okkkko..oko', 'oo....o..o....oo'])
+  ], // coiled to spring — the tray tips forward
+    t(['.oUUUUUUUUUUUUo.', '.oUUUffffffUUUo.', '..okkoUUUUokko..', '...okokkkkoko...', '....o.o..o.o....']),
     { y: -2.5, sep: 2.5 }, { ss: 2 });
 }
 
