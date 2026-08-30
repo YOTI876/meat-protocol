@@ -174,7 +174,7 @@ rather than a pile.
 
 | item | pass | what is weak | status |
 |---|---|---|---|
-| *(none yet)* | | | |
+| **HUSK** body | 2 | Silhouette is provably concave and provably distinct, which is what the rule asked for. It still reads more like a moth or a bow tie than a crushed carton. Three iterations got the mass right and the *character* wrong. | open |
 
 ### Pass 3 — Damjan + player priority
 Damjan to doctrine, plus whatever makes the player never lost in a crowd — rim

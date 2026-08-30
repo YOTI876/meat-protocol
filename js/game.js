@@ -545,10 +545,11 @@ const ETYPE = {
      kill it carelessly and you have two more problems. The CYST does not come
      to you at all: it sits where it landed and hatches, and either you cross
      the room to burst it or the wave never thins. */
-  husk:     { bank: SPR.anim.bloater,  hp: 62,  spd: 36, dmg: 22, r: 8, score: 30, gib: '#b8b0a0', name: 'HUSK',
-              tint: 'rgba(216,210,196,0.45)', scale: 0.85, split: 2 },
-  cyst:     { bank: SPR.anim.bloater,  hp: 170, spd: 0,  dmg: 18, r: 10, score: 55, gib: '#8fae4a', name: 'CYST',
-              tint: 'rgba(150,210,70,0.42)', scale: 1.12, nest: 1 },
+  husk:     { bank: SPR.anim.husk,     hp: 62,  spd: 36, dmg: 22, r: 8, score: 30, gib: '#b8b0a0', name: 'HUSK',
+              /* no tint, no rescale -- it has its own body now. Bugs Found #31 */
+              split: 2 },
+  cyst:     { bank: SPR.anim.cyst,     hp: 170, spd: 0,  dmg: 18, r: 10, score: 55, gib: '#8fae4a', name: 'CYST',
+              nest: 1 },
   /* ---- THE DEEP ROSTER ----
      Everything above is unlocked by floor 3, so floors 4 to 10 used to show
      you nothing you had not already learned to kill. These three arrive later

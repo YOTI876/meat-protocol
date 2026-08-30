@@ -1280,6 +1280,126 @@ SPR.anim = {};
 }
 
 /* ============================================================
+   HUSK and CYST — bodies of their own at last
+
+   Both of these were the BLOATER's bank with a tint and a scale on it, which
+   is the practice this project already decided was wrong, in writing, and
+   then enforced on the ten bosses a run meets nine times instead of the six
+   enemies it meets thousands of times. See Bugs Found #31.
+
+   They are three different instructions and they now have three different
+   outlines, provable with no colour information at all:
+
+     BLOATER   CONVEX   one unbroken swollen curve      kill it at range
+     HUSK      CONCAVE  collapsed, a hollow in the top  do NOT splash it
+     CYST      ROOTED   wider at the floor than the top go to it
+
+   Neither declares a single local hex. They are authored in the global PAL
+   keys and their material maps only remap those, which is what makes the
+   palette doctrine actually bind and keeps cosmetics working.
+   ============================================================ */
+
+/* ---------- HUSK 18x16 — a crushed carton ----------
+   A bloater that dried out and caved in. The silhouette is the ONLY inward
+   one in the game: two surviving corners with a collapse between them, and
+   the left corner stands higher than the right because nothing in this
+   direction is mirror-symmetric. Splash it and you get two crawlers, so the
+   shape has to say "already broken" before the player commits the shot. */
+{
+  const map = { f: ['u', 'F'], F: ['f', 'k'], k: ['F', 'd'], u: ['+', 'U'], U: ['u', 'F'] };
+  /* The collapse is a NOTCH, not a pinch. Cut all the way through and the
+     outline reads as a bow tie -- two lumps rather than one caved-in body,
+     and the creature loses the mass that says it used to be a bloater. The
+     dip stops at row 4 and the belly below it stays whole. */
+  /* The collapse is a NOTCH, not a pinch. Cut it deep and the outline reads
+     as a bow tie -- two lumps rather than one caved-in body -- and the
+     creature loses the mass that says it used to be a bloater. The dip is
+     shallow, it closes a third of the way down, and the belly below it is
+     the widest thing on the sprite. Corners stubby, left one higher: nothing
+     in this direction is mirror-symmetric. */
+  const body = [
+    '..ooo.........oo..',
+    '..offo.......offo.',
+    '..offfoo...offffo.',
+    '.offffffo.offffffo',
+    '.offffffffffffffo.',
+    '.offffffffffffffo.',
+    '.oFffffffffffffFo.',
+    'oFFffffffffffffFFo',
+    'oFFFFFFFFFFFFFFFFo'
+  ];
+  /* sunken sockets set at different heights, and the split across the belly
+     that the two crawlers come out of */
+  const face = { x: 0, y: 10, rows: [
+    '      ,kk,        ,kk,      ',
+    '      kxxk        kxxk      ',
+    '      ,kk,        ,kk,      ',
+    '                            ',
+    '   ,kkkkkkkkkkkkkkkkkkkk,   ',
+    '   kk~~%%%%%%%%%%%%~~kkkk   ',
+    '   ,kkk~~~~~~~~~~~~kkkk,    '
+  ] };
+  const t = t1 => shade(up2(t1), map);
+  /* it does not walk so much as SETTLE -- the collapse works itself deeper */
+  SPR.anim.husk = BANK(null, CREATURE(map, body, face), [
+    t(['oFFffffffffffffFFo', '.oFFffffffffffFFo.', '..oFFo......oFFo..', '..ooo........ooo..']),
+    t(['oFFffffffffffffFFo', '.oFFffffffffffFFo.', '..oFo........oFFo.', '..oo..........ooo.']),
+    t(['oFFffffffffffffFFo', '.oFFffffffffffFFo.', '..oFFo......oFo...', '..ooo........oo...']),
+    t(['oFFffffffffffffFFo', '.oFFffffffffffFFo.', '..oFFo......oFFo..', '..ooo........ooo..'])
+  ],
+    t(['oFFffffffffffffFFo', 'oFFffffffffffffFFo', '.oFFo........oFFo.', '.ooo..........ooo.']),
+    { y: -3.5, sep: 3.2 }, { ss: 2 });
+}
+
+/* ---------- CYST 18x16 — a display pyramid ----------
+   It never comes to you: it sits where the wave dropped it, swells, and
+   hatches. So the silhouette had to say ROOTED before anything else -- it is
+   the only creature in the game wider at the floor than at the top, and the
+   only one with no gap under it at all. You cannot kite a thing that was
+   never chasing you, and the shape is what tells you that.
+
+   Banded in PRODUCT green, because a stack of identical product IS the joke
+   and green is the shelf-edge colour. The green is a MARKING on an ORGANIC
+   body, which is the one place the PRODUCT band is allowed on a creature. */
+{
+  const map = { f: ['u', 'F'], F: ['f', 'k'], k: ['F', 'd'], c: ['+', 'C'], C: ['c', 'k'], u: ['+', 'U'] };
+  const body = [
+    '........oo........',
+    '.......offo.......',
+    '......offffo......',
+    '.....occcccco.....',
+    '....offffffffo....',
+    '...offffffffffo...',
+    '..occcccccccccco..',
+    '.offffffffffffffo.',
+    'offffffffffffffffo'
+  ];
+  /* the eyes sit low and wide, near the base, so it reads as looking UP at
+     you -- it is the one thing in the game you have to walk over to */
+  const face = { x: 0, y: 12, rows: [
+    '     ,kk,          ,kk,     ',
+    '     kxxk          kxxk     ',
+    '     ,kk,          ,kk,     ',
+    '                            ',
+    '  ,kkkkkkkkkkkkkkkkkkkkkk,  ',
+    '  kk!kk!kk!kk!kk!kk!kk!kkk  '
+  ] };
+  const t = t1 => shade(up2(t1), map);
+  /* it does not have a walk. It SWELLS -- the base spreads and settles back,
+     and that is the only motion, because motion it does not have is the
+     whole point of the creature. */
+  SPR.anim.cyst = BANK(null, CREATURE(map, body, face), [
+    t(['offffffffffffffffo', 'oFFffffffffffffFFo', 'ooFFFFFFFFFFFFFFoo']),
+    t(['offffffffffffffffo', 'oFffffffffffffffFo', 'ooFFFFFFFFFFFFFFoo']),
+    t(['offffffffffffffffo', 'oFFffffffffffffFFo', 'ooFFFFFFFFFFFFFFoo']),
+    t(['offffffffffffffffo', 'oFffffffffffffffFo', 'ooFFFFFFFFFFFFFFoo'])
+  ],
+    // about to hatch: it draws itself up and the base tightens
+    t(['occcccccccccccccco', 'oFFffffffffffffFFo', 'ooFFFFFFFFFFFFFFoo']),
+    { y: -2.5, sep: 4.2 }, { ss: 2 });
+}
+
+/* ============================================================
    THE DEEP ROSTER
 
    Everything above is unlocked by floor 3, which meant floors 4 to 10 never
@@ -2142,6 +2262,8 @@ SPR.crawler  = SPR.anim.crawler.walk[0];
 SPR.shrieker = SPR.anim.shrieker.walk[0];
 SPR.stalker  = SPR.anim.stalker.walk[0];
 SPR.bloater  = SPR.anim.bloater.walk[0];
+SPR.husk     = SPR.anim.husk.walk[0];
+SPR.cyst     = SPR.anim.cyst.walk[0];
 SPR.bossA    = SPR.anim.bossA.walk[0];
 SPR.bossB    = SPR.anim.bossB.walk[0];
 
