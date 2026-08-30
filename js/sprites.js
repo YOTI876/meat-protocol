@@ -1154,95 +1154,114 @@ SPR.anim = {};
    Blind. The eyes went milky a long time ago and the film over them has
    split. It finds you by the noise you make and answers with its own. */
 {
-  const pal = { L: '#c4dda6', c: '#9dbd7e', C: '#6b8a52', D: '#42582f', k: '#1d1010', x: '#ff3b3b',
-                '9': '#e6f6cd', X: '#3a0c0c', ',': '#2c3a1e', ';': '#f2ffe0' };
-  const map = { L: ['9', 'c'], c: ['L', 'C'], C: ['c', 'D'], D: ['C', 'k'], k: ['D', 'k'] };
+  /* No local hex — global PAL keys only, so the palette doctrine binds and
+     cosmetics keep working. c/C are PRODUCT fluorescent green, used as the
+     MARKING on the header card; the body under it is ORGANIC f/F/k. */
+  const map = { c: ['+', 'C'], C: ['c', 'k'], f: ['u', 'F'], F: ['f', 'k'],
+                k: ['F', 'd'], u: ['+', 'U'], U: ['u', 'F'] };
+  /* A HANGING PACK. The read is the PUNCHED HEADER CARD at the top — a flat
+     card with a hole in it, the thing a pack hangs off a rail by — and then
+     a taper down into the body. Tall and narrow where the crawler is low and
+     wide, and the hole is off-centre because nothing here is symmetrical. */
   const body = [
-    '....oooooooo....',
-    '..ooLLccccLLoo..',
-    '.oLLccccccccLLo.',
-    '.oLccccccccccLo.',
-    '.oLccxccccxccLo.',
-    '.occcccccccccco.',
-    '.occcccccccccco.',
-    '.oCccccccccccCo.',
-    '.oCccccccccccCo.',
-    '.occcccccccccco.'
+    '...oooooooooo...',
+    '...occcccccco...',
+    '...occoooccco...',
+    '...occo.occco...',
+    '...occoooccco...',
+    '...occcccccco...',
+    '..ooffffffffoo..',
+    '.offffffffffffo.',
+    '.offffffffffffo.',
+    '.oFffffffffffFo.',
+    '..oFfffffffffo..',
+    '..oFFfffffffFo..'
   ];
-  const face = { x: 0, y: 6, rows: [
-    '     ,DDDD,      ,DDDD,         ',
-    '    ,DkkkkkD,   ,DkkkkkD,       ',
-    '    Dk+!!!+kD   Dk+!!!+kD       ',
-    '    Dk!+XX+!D   Dk!+XX+!D       ',
-    '    Dk+!!!+kD   Dk!+X+!kD       ',
-    '     ,Dkkkk,     ,Dkkkk,        ',
+  /* the blind milky eyes sit BELOW the header card, on the body */
+  const face = { x: 0, y: 14, rows: [
+    '     ,kkkk,      ,kkkk,         ',
+    '    ,kkkkkkk,   ,kkkkkkk,       ',
+    '    kk+!!!+kk   kk+!!!+kk       ',
+    '    kk!+ff+!k   kk!+ff+!k       ',
+    '    kk+!!!+kk   kk!+f+!kk       ',
+    '     ,kkkkk,     ,kkkkk,        ',
     '       %%           %%          ',
     '        %            %%         '
   ] };
   const t = t1 => shade(up2(t1), map);
   /* the scream: the whole front of the head hinges open */
-  const scream = stamp(t(['.oCkkkkkkkkkkCo.', '.ockkkkkkkkkkco.', '.ockkkkkkkkkkco.', '.oCckkkkkkkkcCo.',
-                          '..oCDDccccDDCo..', '...oCo....oCo...', '...oCo....oCo...', '...ooo....ooo...']),
+  /* the scream: the whole front of the pack splits open down the seam.
+     Authored in ORGANIC keys — the old version used `D`, which in the global
+     palette is freezer-burn blue, so the maw would have glowed. */
+  const scream = stamp(t(['..oFkkkkkkkkFo..', '.oFkkkkkkkkkkFo.', '.oFkkkkkkkkkkFo.',
+                          '..oFkkkkkkkkFo..', '...oFo....oFo...', '...ooo....ooo...']),
     0, 0, [
-    '    ,Dk!k!k!k!k!k!k!k!k!kD,     ',
-    '    Dk!kkkkkkkkkkkkkkkkk!kD     ',
-    '    Dkkkk~~~~~~~~~~~~~~kkkD     ',
-    '    Dkkk~~%%%%%%%%%%%%~~kkD     ',
-    '    ,Dkk~~%%########%%~~kD,     ',
-    '     Dkk~~%%########%%~~kD      ',
-    '     ,Dkk~~%%######%%~~kD,      ',
-    '      Dk!kk~~%%%%%%~~kk!kD      ',
-    '      ,Dk!k!k!k!k!k!k!kD,       '
+    '   ,k!k!k!k!k!k!k!k!k!k!k,      ',
+    '   k!kkkkkkkkkkkkkkkkkkk!k      ',
+    '   kkkk~~~~~~~~~~~~~~~kkkk      ',
+    '   kkk~~%%%%%%%%%%%%%~~kkk      ',
+    '   ,kk~~%%##########%%~~kk,     ',
+    '    kk~~%%##########%%~~kk      ',
+    '    ,kk~~%%########%%~~kk,      ',
+    '     k!kk~~%%%%%%%%~~kk!k       ',
+    '     ,k!k!k!k!k!k!k!k!k,        '
   ]);
-  SPR.anim.shrieker = BANK(pal, CREATURE(map, body, face), [
-    t(['.oCcccckkccccCo.', '.oCcccckkccccCo.', '.occcccckccccco.', '.oCccccccccccCo.', '..oCDDccccDDCo..', '...oCo....oCo...', '...oCo....oCo...', '...ooo....ooo...']),
-    t(['.oCccckkkkcccCo.', '.oCcckkkkkkccCo.', '.occcckkkkcccco.', '.oCccccccccccCo.', '..oCDDccccDDCo..', '..oCo......oCo..', '..oCo......oCo..', '..ooo......ooo..']),
-    t(['.oCcccckkccccCo.', '.oCcccckkccccCo.', '.occcccckccccco.', '.oCccccccccccCo.', '..oCDDccccDDCo..', '....oCCCCCCo....', '....oCccccCo....', '....oooooooo....']),
-    t(['.oCccckkkkcccCo.', '.oCcckkkkkkccCo.', '.occcckkkkcccco.', '.oCccccccccccCo.', '..oCDDccccDDCo..', '..oCo......oCo..', '..oCo......oCo..', '..ooo......ooo..'])
-  ], scream, { y: -4.5, sep: 2.5 }, { ss: 2 });
+  SPR.anim.shrieker = BANK(null, CREATURE(map, body, face), [
+    t(['..oFFfffffffFo..', '...oFfffffffo...', '....oFo..oFo....', '....oFo..oFo....', '....ooo..ooo....']),
+    t(['..oFFfffffffFo..', '...oFfffffffo...', '...oFo....oFo...', '...oFo....oFo...', '...ooo....ooo...']),
+    t(['..oFFfffffffFo..', '...oFfffffffo...', '....oFo..oFo....', '.....oFooFo.....', '.....ooooo......']),
+    t(['..oFFfffffffFo..', '...oFfffffffo...', '...oFo....oFo...', '..oFo......oFo..', '..ooo......ooo..'])
+  ], scream, { y: -7.5, sep: 2.5 }, { ss: 2 });
 }
 
 /* ---------- STALKER 14x18 — tall, gaunt, long stride ----------
    Skull-faced, and the skin was pulled back over it and stitched shut in a
    hurry. What is left of the mouth cannot close over the teeth. */
 {
-  const pal = { L: '#f0e9d4', u: '#d5cdb6', U: '#9a927e', E: '#5f5847', k: '#241d18', x: '#ff2020',
-                X: '#ff6a4a', ',': '#403829', ';': '#fffbe8' };
-  const map = { L: ['+', 'u'], u: ['L', 'U'], U: ['u', 'E'], E: ['U', 'k'], k: ['E', 'k'] };
+  /* Global PAL keys only. u/U/+ are ORGANIC bone, K the PRODUCT tag. */
+  const map = { u: ['+', 'U'], U: ['u', 'F'], F: ['u', 'k'], k: ['F', 'd'],
+                K: ['+', 'L'], L: ['K', 'k'] };
+  /* SHRINK-WRAPPED, LIMBS BOUND. The rule for this one is MORE NEGATIVE SPACE
+     THAN SOLID — it is the only creature in the game you can see the floor
+     through, which is what separates it from the shrieker at a glance when
+     both are upright with two legs. The arms are strapped to the body and the
+     gaps between them are the read. Tag on the left shoulder only. */
   const body = [
-    '.....oooo.....',
-    '...ooLLLLoo...',
-    '..oLLuuuuLLo..',
-    '..oLuuuuuuLo..',
-    '..oLuxuuxuLo..',
-    '..oUukkkkuUo..',
+    '....oooooo....',
     '...oUuuuuUo...',
-    '....oUUUUo....',
-    '..ooLuuuuLoo..',
-    '.oLuuuuuuuuLo.'
+    '...oUuuuuUo...',
+    'KK.oUuuuuUo...',
+    'KKooUuuuuUoo..',
+    'oUo.oUuuuUo.oU',
+    'oUo.oUuuuUo.oU',
+    'oUo.oUuuuUo.oU',
+    '.o..oUuuuUo..o',
+    '....oUUUUUo...'
   ];
-  const face = { x: 0, y: 6, rows: [
-    '    ,EEEEE,,EEEEE,          ',
-    '   ,EkkkkkEEkkkkkE,         ',
-    '   EkkxXxkkEkkxXxkkE        ',
-    '   EkkXXXkkEkkXXXkkE        ',
-    '   ,Ekkxkk,,Ekkxkk,E        ',
-    '    ,EEkEE,,EEkEE,          ',
-    '      %%      %%            ',
-    '   ,EkkkkkkkkkkkkkkE,       ',
-    '   Ek!k!k!k!k!k!k!kE        ',
-    '   ,EkkkkkkkkkkkkkkE,       ',
-    '     ,%EEEEEEEE%,           '
+  const face = { x: 0, y: 3, rows: [
+    '     ,kkkk,,kkkk,           ',
+    '    ,kkkkkkkkkkkk,          ',
+    '    kkxx!xkkkx!xxkk         ',
+    '    kk!!!kkkk!!!kk          ',
+    '    ,kkxkk,,kkxkk,          ',
+    '     ,kkkkkkkkkk,           ',
+    '       %%    %%             ',
+    '    ,kkkkkkkkkkkkk,         ',
+    '    k!k!k!k!k!k!k!k         ',
+    '    ,kkkkkkkkkkkkk,         '
   ] };
   const t = t1 => shade(up2(t1), map);
-  SPR.anim.stalker = BANK(pal, CREATURE(map, body, face), [
-    t(['.oUuuuuuuuuUo.', '.oUuEuuuuEuUo.', '..oUuuuuuuUo..', '..oEUuuuuUEo..', '..oUUo..oUUo..', '..ouuo..ouuo..', '..oUo....oUo..', '..ooo....ooo..']),
-    t(['.oUuuuuuuuuUo.', '.oUuEuuuuEuUo.', '..oUuuuuuuUo..', '.oEUuuuuuuUEo.', '.oUUo....oUUo.', 'oUUo......oUUo', 'oUo........oUo', 'ooo........ooo']),
-    t(['.oUuuuuuuuuUo.', '.oUuEuuuuEuUo.', '..oUuuuuuuUo..', '..oEUuuuuUEo..', '...oUUUUUUo...', '...ouuuuuuo...', '....oUUUUo....', '....oooooo....']),
-    t(['.oUuuuuuuuuUo.', '.oUuEuuuuEuUo.', '..oUuuuuuuUo..', '.oEUuuuuuuUEo.', 'oUUo......oUUo', '.oUUo....oUUo.', '..oUo....oUo..', '..ooo....ooo..'])
-  ], // coiled, about to blink
-    t(['.oUuuuuuuuuUo.', '.oUEEuuuuEEUo.', '..oUEuuuuEUo..', '..oEEuuuuEEo..', '...oUUUUUUo...', '...oEEuuEEo...', '...oUo..oUo...', '...ooo..ooo...']),
-    { y: -4.5, sep: 1.5 }, { ss: 2 });
+  SPR.anim.stalker = BANK(null, CREATURE(map, body, face), [
+    /* Legs keep the gap open: this creature is read by the floor showing
+       THROUGH it, so the stride never closes the negative space. Rewritten
+       off the old local `E`, which in the global palette is freezer white. */
+    t(['....oUuuuUo...', '....oUuuuUo...', '...oUo...oUo..', '...oUo...oUo..', '...ooo...ooo..']),
+    t(['....oUuuuUo...', '....oUuuuUo...', '..oUo.....oUo.', '..oUo.....oUo.', '..ooo.....ooo.']),
+    t(['....oUuuuUo...', '....oUuuuUo...', '...oUo...oUo..', '....oUo.oUo...', '....ooo.ooo...']),
+    t(['....oUuuuUo...', '....oUuuuUo...', '.oUo.......oUo', '.oUo.......oUo', '.ooo.......ooo'])
+  ], // coiled, about to blink — it draws itself in and the gaps close up
+    t(['....oUuuuUo...', '....oUUUUUo...', '....oUo.oUo...', '....oUo.oUo...', '....ooo.ooo...']),
+    { y: -6.5, sep: 1.5 }, { ss: 2 });
 }
 
 /* ---------- BLOATER 20x18 — a pulsing sack with ribs showing ----------

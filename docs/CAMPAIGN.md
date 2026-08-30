@@ -23,31 +23,37 @@ tags: [plan, art, state]
 **Last updated:** 2026-08-30, after Pass 1 and Pass 2a/2b.
 
 > [!important] PICK UP EXACTLY HERE
-> **Pass 2 is HALF DONE.** Four of the six enemies now have B silhouettes.
-> **The next two jobs are the SHRIEKER and the STALKER**, and they are the
-> only creatures still reading as the old dome-with-legs.
+> **All six enemy SILHOUETTES are done.** Every one meets its rule and all six
+> are distinguishable at 4x filled pure black, with no colour information:
 >
-> | creature | state | the rule it must meet |
+> | creature | silhouette | verified |
 > |---|---|---|
-> | crawler | **done** | tray of mince: flat-topped rectangle, tag on one corner |
-> | bloater | **done** | convex: one unbroken swollen curve |
-> | husk | **done** | concave: the only inward silhouette |
-> | cyst | **done** | rooted: wider at the floor than the top |
-> | **shrieker** | **TODO** | a hanging pack: high, narrow, **punched header card at the top**, taper below, asymmetric mass |
-> | **stalker** | **TODO** | shrink-wrapped: jointed, upright, **more negative space than solid**, never a filled blob |
+> | crawler | tray of mince — flat-topped rectangle, tag on one corner | yes |
+> | shrieker | hanging pack — punched header card, taper below | yes |
+> | stalker | shrink-wrapped — arms off the torso, floor visible through it | yes |
+> | bloater | convex — one unbroken swollen curve | yes |
+> | husk | concave — the only inward silhouette in the game | yes |
+> | cyst | rooted — wider at the floor than the top | yes |
 >
-> Then the animation work in the pass spec — walk (4) with the **body** moving
-> and not just legs, pose, **hurt (2 frames, new)**, **death (3 frames, new)**.
-> None of the six has hurt or death frames yet.
+> **WHAT IS LEFT IN PASS 2 — the animation half, and none of it is started:**
+> 1. **hurt frames (2, ~6–8 frames total)** — nothing in the game has one.
+> 2. **death frames (3, 14–18 frames)** — a collapse, not a fade. Nothing has one.
+> 3. **the body must move in the walk cycle.** Every creature still animates
+>    LEGS ONLY over a static body, which is the "no weight" problem in the
+>    review. Bob or squash the body too.
 >
-> Two rules learned the hard way while doing the four:
-> 1. **Author in global `PAL` keys and pass `null` as the bank palette.** The
->    old creatures declare local hex and route around the palette, which is
->    the thing Pass 1 exists to stop. `husk`, `cyst` and `crawler` are the
->    worked examples — copy their shape.
+> Do those three across all six, then Pass 2 is done.
+>
+> Three rules learned the hard way — follow them or repeat the mistakes:
+> 1. **Author in global `PAL` keys and pass `null` as the bank palette.** All
+>    six enemies now do this; the ten bosses still declare local hex and are
+>    the remaining violation (Passes 8–9).
 > 2. **Check every key a walk tail uses against global `PAL` first.** The
->    crawler's legs were authored in a local `E`; global `E` is freezer-burn
->    white, so they came out glowing.
+>    crawler's legs were a local `E`; global `E` is freezer-burn white, so
+>    they came out as glowing sticks. The shrieker and stalker had the same
+>    trap in their tails and scream/coil poses.
+> 3. **A silhouette rule is only proven with the colour thrown away.** Use the
+>    black-fill recipe in the skill every time, not the coloured sprite.
 
 **Just finished: PASS 1 — DOCTRINE. The game no longer looks like itself.**
 
@@ -79,7 +85,7 @@ black — three different shapes with no colour information at all.
 hard rectangle, wider than tall, price tag on one corner. It is the first
 creature a player meets, so it is the one that teaches the shape language.
 
-**Half-done: PASS 2. See the box at the top — shrieker and stalker are next.**
+**Half-done: PASS 2 — the silhouettes are done, the ANIMATION is not. See the box at the top.**
 
 > [!warning] A real bug came out of Pass 1 and is worth knowing about
 > **The lightmap canvas was never cleared.** `drawLight()` laid its darkness
