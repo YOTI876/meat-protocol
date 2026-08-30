@@ -1,6 +1,11 @@
 node_modules/
 .vercel/
-.claude/
+# Machine-local Claude state stays out, but the SKILLS must ship: the art
+# bible is what stops floor 9 belonging to a different game than floor 1, and
+# a campaign that assumes every session is a stranger cannot keep its own
+# rulebook in an ignored folder.
+.claude/*
+!.claude/skills/
 .DS_Store
 Thumbs.db
 *.log

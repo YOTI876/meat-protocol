@@ -804,11 +804,84 @@ Back to the level it used to sit at, with headroom to spare.
 > one node and would have caught this in the same session that caused it.
 > It is now part of [[Instrumentation#Is the mix actually in range?]].
 
+## 31. Half the enemy roster is one sprite with a tint on it
+
+**Found:** the art-direction audit, by reading `SPR.anim` rather than looking
+at the game — which is exactly why it survived from the first commit. On
+screen it looks like three enemies. In the table it is one.
+
+`SPR.anim` has no `husk` and no `cyst`. Both are **the bloater's bank**, told
+apart by a tint and a scale multiplier:
+
+| type | bank | scale | tint |
+|---|---|---|---|
+| bloater | `bloater` | 1.00 | — |
+| **husk** | **`bloater`** | 0.85 | `rgba(216,210,196,0.45)` |
+| **cyst** | **`bloater`** | 1.12 | `rgba(150,210,70,0.42)` |
+
+This is filed as a defect and not as a wishlist item because the codebase
+already **decided this was wrong, in writing, and then only fixed half of
+it.** [[Bosses#The look of them]] says:
+
+> *All ten used to share two sprite banks and tell themselves apart with a
+> colour wash. A tint is not a design — it says "this is the green one", and
+> at twenty-six pixels across, colour is the first thing a dark room takes
+> away from you.*
+
+That reasoning was applied to the ten bosses, which a run meets **nine
+times**, and never applied to the six enemies, which a run meets **thousands**
+of times. The rule is right and it was enforced on the rarest thing in the
+game instead of the commonest.
+
+### Why it is a gameplay defect, not a cosmetic one
+
+The three share a sprite and share nothing else. They are three different
+decisions:
+
+| type | what you are supposed to do |
+|---|---|
+| **bloater** | kill it at range — it bursts into 10 acid projectiles on death |
+| **husk** | do **not** splash it — `e.split = 2`, it dies into two crawlers |
+| **cyst** | leave the kiting pattern and cross the room to it — it never comes to you |
+
+[[Enemies#The two late arrivals]] is explicit that HUSK and CYST exist to
+punish two specific degenerate strategies: careless AoE, and circle-kiting.
+**Neither punishment can land if the player cannot see which one they are
+looking at.** A tell the player cannot read is not a tell; it is a dice roll
+that the design believes is a lesson.
+
+And the one channel carrying the difference is the one the game takes away:
+floors run at 0.74–0.86 darkness, floor 2 is `dark`, floor 7 is `blackout`.
+The tints are 0.42 and 0.45 alpha. Under the lamp falloff there is no visible
+difference at all between a husk and a bloater.
+
+### Not fixed yet — deliberately
+
+The fix is three real bodies, and it is the **first creature work of the art
+campaign** rather than a patch, because drawing them before the silhouette
+rules exist would mean drawing them twice. See
+[[CAMPAIGN#Pass 2 — the three that share a body]] and the family rules in
+`.claude/skills/art-bible/`.
+
+Verified separation is the acceptance test: rendered at 4x as pure black,
+bloater / husk / cyst must be three different outlines — convex, concave and
+rooted respectively — with no colour information at all.
+
+> [!note] The lesson is about where a rule gets enforced
+> The tint rule was written down, argued well, and then applied to the part of
+> the game that shows it off rather than the part that needed it. When a
+> principle is worth writing in a doc, the next question is *where does this
+> bind*, and the answer is usually "the thing on screen most often", which is
+> almost never the thing you were looking at when you thought of it.
+
 ---
 
 # Open
 
-**None.** Every defect on this list is closed.
+**One.** [[#31. Half the enemy roster is one sprite with a tint on it|#31]] is
+open by choice — it is the first creature pass of the art campaign rather
+than a patch, because fixing it before the silhouette rules exist would mean
+drawing it twice. Everything else on this list is closed.
 
 **THE FULL MENU** (previously B) closed without a fix — the contract it lived
 in no longer exists. See [[Contracts#CLOSING TIME replaced THE FULL MENU]].
