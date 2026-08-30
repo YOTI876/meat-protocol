@@ -18,6 +18,36 @@
    `up2()` lifts an old 1x grid to 2x with EPX/Scale2x, so hand-drawn 2x
    detail and generated 2x detail can live in the same character grid.
    ============================================================ */
+/* ============================================================
+   THE PALETTE — B · THE PRICE TAG
+
+   "A supermarket that never closed, lit by the products it is still trying
+   to sell you."
+
+   Every key belongs to exactly ONE band, and a band is a JOB, not a hue.
+   This is the fix for the thing that actually made the game look styleless:
+   PAL was a good palette that nothing obeyed, because every creature declared
+   its own local hex and routed around it.
+
+     RETAIL NEUTRAL   floors, walls, props, shelving, steel, cardboard.
+                      Deliberately, aggressively boring. Never on a creature.
+     PRODUCT          signage, labels, stickers, packaging, creature markings,
+                      hazards, UI. The ONLY saturated colour in the game, and
+                      never a large field -- it is an accent.
+     ORGANIC          creature bodies, the player, gore. Greyed under
+                      fluorescent, because that is what fluorescent does.
+
+   The reason this survives 95 enemies on screen: the world is desaturated, so
+   ANYTHING SATURATED IS INFORMATION. The player learns that on floor 1 and can
+   trust it on floor 10.
+
+   Blood is the one exception -- it is allowed in every band, because it is the
+   connective tissue of the whole game.
+
+   Rules in .claude/skills/art-bible/SKILL.md. Do not add a local hex to a
+   creature: remap an existing key instead, or the cosmetics palette-swap
+   breaks and the doctrine stops binding.
+   ============================================================ */
 const PAL = {
   '.': null,
   'o': '#0a0609',   // universal outline
@@ -25,45 +55,69 @@ const PAL = {
      so the art picks its outline by which way the surface is facing: `o` for
      the shadow side and the silhouette, `,` where the form turns away from
      the eye but still catches the room, `;` for the rim the lamp clips. */
-  ',': '#241a1f', ';': '#6e5a52',
+  ',': '#1e2228', ';': '#7a8088',
   'd': '#0d0a0f',                       // deepest occlusion — under overhangs
-  /* Blood, in four states: dried, fresh, wet, and the highlight on wet. Kept
-     global because everything in this building eventually wears some. */
+
+  /* ---------- ORGANIC — creatures, the player, gore ----------
+     Fluorescent light is unflattering and that is the point: meat goes
+     grey-green in the midtones, bone yellows, and nothing wet shines. A wet
+     specular on meat is direction A and is on the rejected list — under a
+     tube, the only thing that shines is packaging. */
+  /* Blood, in four states: dried, fresh, wet, and the highlight on wet. The
+     one thing allowed in every band, because everything in this building
+     eventually wears some. */
   '#': '#4a0d13', '%': '#8c141d', '&': '#c81f26', '*': '#ff5b5b',
   '~': '#6d2230',                       // viscera / exposed muscle
-  '+': '#f4eede', '!': '#cfc6ae',       // bone highlight / teeth
-  '=': '#9aa2ae',                       // metal highlight
-  /* A neutral value ramp for dithering any surface toward light or dark
-     without inventing a new hue for it. */
-  '1': '#141218', '2': '#201d25', '3': '#2e2a33', '4': '#3f3a45',
-  '5': '#524c58', '6': '#68616d', '7': '#807885', '8': '#9a929e', '9': '#b5adb8',
-  'h': '#2b1a13', 'H': '#3d2718',      // hair
-  'r': '#c9232c', 'R': '#7c1219', 'w': '#e8dcc8',  // HEADBAND
-  's': '#c9926a', 'S': '#a06f4a',      // skin
+  '+': '#f4ecc8', '!': '#cfc49a',       // bone highlight / teeth — yellowed
+  'u': '#ded2a8', 'U': '#a89e78',      // bone
+  'v': '#74504e', 'V': '#43292c',      // meat, greyed under the tube
+  'f': '#b09a98', 'F': '#7e6a6a', 'k': '#40302f',  // pale flesh
+  's': '#aa9a76', 'S': '#7d7052',      // skin — Damjan looks ill, deliberately
   'e': '#efe6d4', 'p': '#0f0a0d',      // eye / pupil
   'm': '#5e2626',
-  'j': '#31483a', 'J': '#1d2c24',      // jacket
-  'b': '#4a3421',                       // strap
+  'h': '#2b1a13', 'H': '#3d2718',      // hair
+  'j': '#35443c', 'J': '#1f2a25',      // jacket
   'n': '#242833', 'N': '#171a23',      // pants
   't': '#120f10',                       // boots
-  'g': '#565c66', 'G': '#31363d',      // gunmetal
-  'y': '#f2d14a', 'Y': '#b2911f',      // brass / banana
-  'l': '#ff2b2b',
-  'f': '#c09292', 'F': '#8e6666', 'k': '#4a2a2a',  // pale flesh
-  'v': '#8a3540', 'V': '#4e1e26',      // meat red
-  'c': '#9fb08a', 'C': '#68785a',      // sick green
-  'u': '#ded8c6', 'U': '#a8a294',      // bone
-  'x': '#ff4242',                       // glow eye
-  'q': '#1a1c22',
-  'B': '#2e2013',                       // dark wood
-  'z': '#4fd6e8', 'Z': '#1c7f92',      // plasma
+
+  /* ---------- RETAIL NEUTRAL — the building ----------
+     Lino, shelving, steel, cardboard. This band is boring on purpose: it is
+     the silence that makes the PRODUCT band audible. Never on a creature. */
+  /* A neutral value ramp for dithering any surface toward light or dark
+     without inventing a new hue for it. Cool retail grey — the old ramp was
+     violet, which quietly tinted every wall in the game. */
+  '1': '#14161a', '2': '#1e2126', '3': '#2b2f35', '4': '#3b4048',
+  '5': '#4e535c', '6': '#646a74', '7': '#7c828c', '8': '#969ca6', '9': '#b2b8c2',
+  '=': '#a5acb6',                       // metal highlight
+  'g': '#5a616b', 'G': '#343a42',      // gunmetal
+  'T': '#8d949e', 'X': '#ccd2da',      // bright steel / shelving
+  'q': '#1a1d22',
+  'B': '#6b5636',                       // cardboard
+  'b': '#7a6242',                       // strap / carton band
+
+  /* ---------- PRODUCT — the only saturated colour in the game ----------
+     Signage, labels, stickers, packaging, creature markings, hazards, UI.
+     An accent, never a field. If it is bright and saturated it is either
+     dangerous, useful, or light — and the player must be able to trust that
+     from floor 1 to floor 10. */
+  'c': '#6ee68a', 'C': '#2f9a52',      // fluorescent green — the shelf-edge colour
+  'y': '#ffd21e', 'Y': '#b8901a',      // sale yellow
+  'K': '#ff4ab0', 'L': '#a01a68',      // price-tag magenta
+  'z': '#4fd6e8', 'Z': '#1c7f92',      // packaging cyan / plasma
   'i': '#a8e8ff',                       // rail glow
   'M': '#c05cff', 'W': '#6a2aa8',      // omega
   'O': '#ff9a3a', 'A': '#b04408',      // rotisserie fire
   'E': '#e8f8ff', 'D': '#4f9ec8',      // freezer burn
-  'K': '#ff4ab0', 'L': '#a01a68',      // price-tag magenta
-  'T': '#8a8f98', 'X': '#c8ccd4'       // bright steel
+  'l': '#ff2b2b',                       // alert
+  'x': '#ff4242',                       // glow eye
+  'r': '#c9232c', 'R': '#7c1219', 'w': '#e8dcc8'   // HEADBAND
 };
+
+/* RESERVED. drawLight() gives Damjan the only warm light in the building, and
+   nothing else in the game may use this temperature — it is what makes him
+   findable in a seventy-body room by colour rather than by luck. If you are
+   about to paint something warm-orange, it belongs to him. */
+const LAMP_WARM = '#ffba68';
 
 /* opt: { ss: sub-samples per game pixel (default 1), aa: soften diagonal steps } */
 function SPRITE(rows, pal, opt) {

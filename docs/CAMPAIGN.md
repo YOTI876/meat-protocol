@@ -20,19 +20,45 @@ tags: [plan, art, state]
 
 ## CURRENT POSITION
 
-**Last updated:** 2026-08-30, end of the planning session.
+**Last updated:** 2026-08-30, after Pass 1.
 
-**Just finished:** planning. The direction is chosen and both blocking
-decisions are answered. These exist and nothing has been built yet:
-- [[Art Review]] — the audit, with evidence
-- [[Art Direction]] — the three directions; **B was chosen**
-- [[Bugs Found#31]] — the husk/cyst/bloater shared-sprite defect
-- this file, and `.claude/skills/art-bible/SKILL.md`
+**Just finished: PASS 1 — DOCTRINE. The game no longer looks like itself.**
 
-**Next pass:** **Pass 1 — Doctrine.** Nothing blocks it. Read the art-bible
-skill first; the direction and darkness spec are filled in there.
+- `PAL` regrouped into the three B bands with a comment per band saying what
+  it is *for*. All 68 keys kept, none duplicated. The neutral ramp was violet
+  and is now cool retail grey, which was quietly tinting every wall.
+- All ten floors re-palettised to RETAIL NEUTRAL, **value-differentiated**,
+  with a saturated PRODUCT `vat` accent each. PACI's back room deliberately
+  keeps its own violet — he is not in the building.
+- Darkness band opened to the per-floor spec: **0.15 → 0.88**, was 0.74–0.86.
+- Fluorescent model: **dead tubes** as hard rectangular patches on a
+  deterministic per-floor grid, so a floor's dark spots are in the same places
+  every run and can be learned. Replaces the vignette as the source of dark.
+- The lamp carve and the `post()` vignette now **scale with the floor's
+  darkness** — at full strength on a bright floor they put a torchlit-dungeon
+  spotlight in the middle of a lit room, which is direction A's logic.
+- **Damjan is out of the depth sort** and draws last, unconditionally, with a
+  reserved warm lamp (`LAMP_WARM`) and a hard contact ring. Two channels:
+  warmth carries him on dark floors, the ring carries him on bright ones.
+
+**Verified:** 87 enemies on floor 9 — findable in under a second. `--selftest`
+passes, `MEAT.soak` verified, light pass 0.218 ms/frame, avg 3.14.
+
+**Next pass:** **Pass 2 — the three that share a body.** bloater / husk / cyst,
+[[Bugs Found#31]]. Convex / concave / rooted, provable with no colour at all.
 
 **Half-done:** nothing.
+
+> [!warning] A real bug came out of Pass 1 and is worth knowing about
+> **The lightmap canvas was never cleared.** `drawLight()` laid its darkness
+> fill straight over the previous frame's, so darkness *accumulated* — alpha
+> 0.30 a frame reaches 0.97 in ten frames. It was invisible for the whole
+> project because every floor ran at 0.76–0.86, which saturates on frame one
+> and looks identical either way. The moment a floor asked to be genuinely
+> bright it surfaced: a room set to `dark: 0` still rendered black.
+>
+> Fixed with a `'copy'` composite on the fill. **If a future pass finds a
+> floor refusing to get brighter, look here first.**
 
 **Do not relitigate:**
 - The pipeline stays — grids, `up2`/`shade`/`stamp`, the 68-key palette
@@ -83,8 +109,8 @@ first four are front-loaded so the game looks transformed early.
 
 | # | pass | status | depends on | frame risk | effort |
 |---|---|---|---|---|---|
-| 1 | **Doctrine** — palette bands, material maps, lighting model | NOT STARTED | decisions 005 + 006 | **high** | 1 session |
-| 2 | **The six enemies** | NOT STARTED | 1 | low | 2 sessions |
+| 1 | **Doctrine** — palette bands, material maps, lighting model | **DONE** | decisions 005 + 006 | **high** | 1 session |
+| 2 | **The six enemies** | **IN PROGRESS** | 1 | low | 2 sessions |
 | 3 | **Damjan + player priority** | NOT STARTED | 1 | med | 1 session |
 | 4 | **HUD** | NOT STARTED | 1 | low | 1 session |
 | 5 | **ACT ONE — floors 1–3** | NOT STARTED | 1 | med | 1–2 sessions |
