@@ -20,6 +20,22 @@ three-phase fight you can actually beat.
 
 ---
 
+> [!important] There is an art campaign in progress — read this before touching any art
+> The game is mid-conversion to a chosen art direction. **If you are a new
+> session doing anything visual, start at [[CAMPAIGN]]** — its CURRENT
+> POSITION section says where the work is, and the `art-bible` skill carries
+> the rules.
+>
+> - [[CAMPAIGN]] — the plan, the state, and the message to paste to resume
+> - [[Art Review]] — what was wrong, with the evidence
+> - [[Art Direction]] — the three directions, and why **B · THE PRICE TAG** won
+>
+> Do not redraw, recolour or relight anything without reading those first.
+> The whole point of the campaign is that floor 9 must not end up belonging to
+> a different game than floor 1.
+
+---
+
 ## Start here
 
 - [[Controls]] — every key and button
