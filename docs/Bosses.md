@@ -83,7 +83,7 @@ into. No two share a pair.
 | 4 | **THE COURIER** | `circle` | `mines` | 4 (stalker×2 + crawler) / 6.8s | *IT HAS BEEN CIRCLING FOR HOURS* |
 | 5 | **THE FISHWIFE** | `sweep` | `blink` | 4 (shrieker + crawler + husk) / 5.4s | *SHE HAS BEEN ON ICE SINCE FRIDAY* |
 | 6 | **THE TRIMMINGS** | `spawner` | `rush` | 5 (crawler + husk×2) / 3.6s | *IT IS EVERY PART THEY DID NOT SELL* |
-| 7 | **SUNDAY ROAST** | `charge` | `spiral` | 4 (bloater + crawler + shrieker) / 5.8s | *IT HAS BEEN IN THERE SINCE SUNDAY* |
+| 7 | **SUNDAY ROAST** | `roast` | `done` | 4 (bloater + crawler + shrieker) / 5.8s | *IT HAS BEEN IN THERE SINCE SUNDAY* |
 | 8 | **THE NIGHT SHELF** | `mines` | `curtain` | 5 (stalker×2 + husk) / 6.2s | *IT ONLY RESTOCKS AFTER CLOSING* |
 | 9 | **THE BEST BEFORE** | `brood` | `sweep` | 5 (bloater + cyst + husk) / 5.0s | *THE DATE PASSED AND IT KEPT GOING* |
 
@@ -122,7 +122,7 @@ from the outline before any hue arrives, and **not one carries a tint**.
 
 ## Patterns
 
-Fourteen of them. The first eight came with the original roster; the six
+Sixteen of them. The first eight came with the original roster; the six
 below the line were written so that "a different boss" means a different
 fight rather than a different sprite tint.
 
@@ -177,6 +177,37 @@ you have to choose between the boss and the room.
   you leave. It winds up as a harmless sighting line for 0.9s first, and the
   spin direction **flips between casts**, because a beam that always turns the
   same way is one you solve once.
+### The trigger pair — SUNDAY ROAST
+
+The first fight in the game that runs on the **player's input** rather than on
+a timer. See [[Boss Designs#7 · SUNDAY ROAST — it cooks on your trigger]] for
+the design and [[Boss Audit]] for why it was built first.
+
+- **roast** — heat rises with every trigger pull and falls whenever you hold
+  fire; at full it **vents** a ring. Heat is *pulled* from `S.shotN` and
+  `p.beamT`, both of which already existed for other reasons, so no weapon
+  code knows bosses exist. It also throws burning fat (`BASTE`) above half
+  heat and sweeps its own long axis (`TURN`).
+- **done** — heat stops decaying and only climbs, but the boss takes **2x
+  damage while venting**. The correct play inverts: p1 pays you for trigger
+  discipline, p2 charges you for it.
+
+> [!note] Heat is capped per second, not only priced per pull
+> Priced only per pull, THE HOG at 33 pulls/s reached a vent roughly every
+> second — measured at **20 vents and 647 rounds in the air inside 80
+> frames**. `HEAT_MAX = 0.22/s` plus a hard **2.2s floor** on the vent
+> interval is what turns it from a strobe into a rhythm. Fast guns still heat
+> it fastest; they just cannot break it. Verified by `--bossprobe`: one vent
+> per ~6s of continuous maximum fire, 44 rounds in the air.
+
+> [!note] The telegraph is emissive, and that is the point
+> A held pose is invisible behind sixty adds in a `blackout`. `drawLight()`
+> reads `b.heat` and the boss **lifts the darkness around itself** as it
+> ramps, bone → amber → white, with `A.railcharge()` re-struck on each
+> quarter. Light and sound are the two channels darkness cannot take, and
+> every future fight should use them. See
+> [[Boss Audit#The finding nobody asked for: telegraph blindness]].
+
 - **mines** — *THE COURIER, THE NIGHT SHELF.* Orbits at speed and leaves
   **armed mines** behind it, so the floor it has already crossed is floor you
   cannot use. The arena shrinks over the fight instead of the boss getting

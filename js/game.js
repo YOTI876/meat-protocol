@@ -652,7 +652,7 @@ const BOSSES = [
   { key: 'courier', name: 'THE COURIER',      bank: SPR.anim.courier, tint: null,                   bulk: 0.92, spd: 62, r: 15, item: 'bike',    pat: 'circle',  pat2: 'mines',   addT: 6.8, addN: 4, adds: ['stalker', 'stalker', 'crawler'],  cry: 'IT HAS BEEN CIRCLING FOR HOURS',      cry2: 'THE ROUND IS OVER. DELIVERY.' },
   { key: 'fishwife',name: 'THE FISHWIFE',     bank: SPR.anim.fishwife, tint: null,                  bulk: 1.00, spd: 38, r: 15, item: 'coolade', pat: 'sweep',   pat2: 'blink',   addT: 5.4, addN: 4, adds: ['shrieker', 'crawler', 'husk'],    cry: 'SHE HAS BEEN ON ICE SINCE FRIDAY',    cry2: 'SHE HAS THAWED ALL THE WAY THROUGH' },
   { key: 'trim',    name: 'THE TRIMMINGS',    bank: SPR.anim.trimmings, tint: null,                 bulk: 1.08, spd: 30, r: 15, item: 'melon',   pat: 'spawner', pat2: 'rush',    addT: 3.6, addN: 5, adds: ['crawler', 'husk', 'husk'],        cry: 'IT IS EVERY PART THEY DID NOT SELL',  cry2: 'ALL OF IT AT ONCE, THEN' },
-  { key: 'roast',   name: 'SUNDAY ROAST',     bank: SPR.anim.roast, tint: null,                     bulk: 1.04, spd: 34, r: 15, item: 'banana',  pat: 'charge',  pat2: 'spiral',  addT: 5.8, addN: 4, adds: ['bloater', 'crawler', 'shrieker'], cry: 'IT HAS BEEN IN THERE SINCE SUNDAY',   cry2: 'IT IS DONE. IT IS VERY DONE.' },
+  { key: 'roast',   name: 'SUNDAY ROAST',     bank: SPR.anim.roast, tint: null,                     bulk: 1.04, spd: 34, r: 15, item: 'banana',  pat: 'roast',   pat2: 'done',    addT: 5.8, addN: 4, adds: ['bloater', 'crawler', 'shrieker'], cry: 'IT HAS BEEN IN THERE SINCE SUNDAY',   cry2: 'IT IS DONE. IT IS VERY DONE.' },
   { key: 'shelf',   name: 'THE NIGHT SHELF',  bank: SPR.anim.shelf, tint: null,                     bulk: 0.96, spd: 54, r: 15, item: 'glock',   pat: 'mines',   pat2: 'curtain', addT: 6.2, addN: 5, adds: ['stalker', 'stalker', 'husk'],     cry: 'IT ONLY RESTOCKS AFTER CLOSING',      cry2: 'IT IS PUTTING YOU OUT ON THE FRONT' },
   { key: 'bestby',  name: 'THE BEST BEFORE',  bank: SPR.anim.bestby, tint: null,                    bulk: 1.02, spd: 44, r: 15, item: 'bike',    pat: 'brood',   pat2: 'sweep',   addT: 5.0, addN: 5, adds: ['bloater', 'cyst', 'husk'],        cry: 'THE DATE PASSED AND IT KEPT GOING',   cry2: 'THERE IS NO DATE LEFT TO PASS' }
 ];
@@ -3574,6 +3574,10 @@ function damageEnemy(e, dmg, fromBullet, ang, noRoll, forceCrit) {
   if (e.dead) return 0;
   const st = ST();
   let crit = false;
+  /* SUNDAY ROAST's second phase opens itself on the vent. Heat you refuse to
+     build is a damage window you refuse to open, which is what inverts the
+     fight: p1 pays you for trigger discipline and p2 charges you for it. */
+  if (e.ventT > 0) dmg *= 2;
   /* PLATED FRONT. The TROLLEY faces where it is going, so anything arriving
      inside `armArc` radians of its heading hits the plate and mostly does not
      count. It is not a damage sponge — from behind it takes everything — it is
@@ -5652,6 +5656,11 @@ function enterPhase(b) {
   for (let i = S.haz.length - 1; i >= 0; i--) if (S.haz[i].b === b) S.haz.splice(i, 1);
   b.vx = b.vy = 0;                        // knockRoom shoves everything, itself included
   b.beam = null; b.hooked = 0;
+  /* The vent window must not survive the break — a 2x damage flag left set
+     across a phase change is a boss that dies in its own rear-up. Heat itself
+     DOES carry: SUNDAY ROAST comes into its second phase as hot as you left
+     it, which is the player's own doing and reads as one continuous cook. */
+  b.ventT = 0; b.heatStep = 0;
   ring(b.x, b.y, 120, '#ff2b2b', 0.7, 3);
   ring(b.x, b.y, 70, '#ffffff', 0.45, 2);
   part(b.x, b.y, '#ff5a48', 46, 190, 0.8, 2);
@@ -6074,6 +6083,136 @@ function updateBoss(b, dt) {
         S.eb.push({ x: b.x, y: b.y, vx: Math.cos(aa + k * 0.20) * 150, vy: Math.sin(aa + k * 0.20) * 150,
                     r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.4, life: 2.2, col: '#8a6aff' });
       A.nailgun();
+    }
+
+  /* ==========================================================
+     SUNDAY ROAST — the fight that reads your trigger.
+
+     Every other boss in the game runs on a timer. This one runs on YOU: heat
+     rises with every shot the player takes and falls whenever they hold fire,
+     so the threat level is an output of the player's own input. It is the
+     first boss whose counterplay is "stop doing the thing the whole game has
+     trained you to do".
+
+     Heat is PULLED, never pushed. `S.shotN` already counts trigger pulls in
+     emit(), and `p.beamT` already counts continuous fire in updateBeam() —
+     so the boss reads two numbers that exist for other reasons and the
+     weapon code never learns that bosses exist. Nothing outside this branch
+     and the roster entry had to change.
+
+     Note S.shotN counts PULLS, not projectiles: THE MEAT SPLITTER's nine
+     pellets are one pull. That is the metric the fight wants — damage per
+     trigger pull is exactly what it is measuring you on.
+     ========================================================== */
+  } else if (pat === 'roast' || pat === 'done') {
+    const cooking = pat === 'done';
+    if (b.heat === undefined) { b.heat = 0; b.shotMark = S.shotN | 0; b.ventN = 0; }
+
+    /* ---- the heat itself ---- */
+    const pulls = Math.max(0, (S.shotN | 0) - b.shotMark);
+    b.shotMark = S.shotN | 0;
+    const beaming = S.p.beamT > 0;
+    /* Heat gain is CAPPED PER SECOND, not just priced per pull. Priced only
+       per pull, THE HOG (33 pulls/s) reached a vent roughly every second and
+       the fight became a strobe — measured at 20 vents and 647 rounds in the
+       air inside 80 frames. The cap is what makes the ladder legible: a slow
+       gun still heats it, a fast gun heats it faster, and nothing heats it
+       faster than HEAT_MAX, so the fight has a floor on how bad it can get.
+
+       Fast guns are still punished — they hit the cap and hold it, while a
+       sidearm never does — but the punishment is a shorter fuse, not chaos. */
+    const HEAT_MAX = 0.22;                 // per second, any weapon
+    const gain = pulls * 0.02 + (beaming ? dt * 0.62 : 0);
+    b.heat += Math.min(gain, HEAT_MAX * dt);
+    /* p1 lets it cool, and cools it FASTER while the trigger is up — that
+       differential is the whole lesson. p2 never cools: see the phase note. */
+    if (!cooking) b.heat -= dt * (pulls || beaming ? 0.05 : 0.16);
+    else          b.heat += dt * 0.085;          // it is done. it only goes up.
+    b.heat = clamp(b.heat, 0, 1);
+
+    /* ---- it closes, slowly, and never charges ---- */
+    const want = 108;
+    const push = clamp((d - want) / 130, -0.8, 1);
+    b.vx = lerp(b.vx, dx / d * b.spd * push, 1 - Math.pow(0.12, dt));
+    b.vy = lerp(b.vy, dy / d * b.spd * push, 1 - Math.pow(0.12, dt));
+
+    /* ---- the telegraph is EMISSIVE, not positional ----
+       A held pose is invisible behind sixty adds in a blackout. A body that
+       lights the room around it is not. drawLight() reads b.heat, so the
+       boss physically brightens the lightmap as it ramps — bone to amber to
+       white — and that read survives darkness, distance and a full screen. */
+    const hot = b.heat;
+    if (hot > 0.34 && Math.random() < dt * (10 + hot * 90)) {
+      const c = hot > 0.82 ? '#fff4d0' : hot > 0.6 ? '#ffb03a' : '#e8dcc8';
+      part(b.x, b.y + rnd(-8, 8), c, 1, 20 + hot * 60, 0.3 + hot * 0.4);
+    }
+    /* the rising sizzle, re-struck as it crosses each quarter so the ramp is
+       audible as well as visible — the one channel a blackout cannot take */
+    const step = Math.floor(hot * 4);
+    if (step !== (b.heatStep | 0) && step > (b.heatStep | 0) && step >= 2) A.railcharge();
+    b.heatStep = step;
+
+    /* ---- THE ROAST: the vent ----
+       The cooldown is a hard floor on the interval, independent of heat. Two
+       vents on top of each other is not a harder fight, it is an unreadable
+       one — the second ring arrives while the first is still crossing you,
+       and there is no gap to be in. */
+    b.ventCd = (b.ventCd || 0) - dt;
+    if (hot >= 1 && b.ventCd <= 0) {
+      b.ventCd = 2.2;
+      b.heat = cooking ? 0.55 : 0;
+      b.ventN = (b.ventN | 0) + 1;
+      b.poseT = 0.7;
+      /* p2 opens itself up on the vent: heat you refuse to build is a damage
+         window you refuse to open, so the correct play inverts from trigger
+         discipline to dumping everything you have. */
+      if (cooking) b.ventT = 1.5;
+      const n = 22 + S.room * 2;
+      for (let i = 0; i < n; i++) {
+        const a = i / n * TAU + (b.ventN & 1 ? Math.PI / n : 0);
+        S.eb.push({ x: b.x, y: b.y, vx: Math.cos(a) * 128, vy: Math.sin(a) * 128,
+                    r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.5, life: 2.6, col: '#ffb03a' });
+      }
+      ring(b.x, b.y, 96, '#fff4d0', 0.5, 3);
+      ring(b.x, b.y, 52, '#ffb03a', 0.35, 2);
+      part(b.x, b.y, '#ffb03a', 34, 190, 0.7, 2);
+      A.burn(); A.boom(); shake(9); punch(0.035);
+    }
+    if (b.ventT > 0) b.ventT -= dt;
+
+    /* ---- BASTE: burning fat on the floor at half heat ----
+       Pre-drawn ground marks, so the one attack that is not the vent still
+       obeys the telegraph rule. */
+    b.basteT = (b.basteT || 0) - dt;
+    if (hot > 0.5 && b.basteT <= 0) {
+      b.basteT = rnd(2.4, 3.4);
+      b.poseT = 0.4;
+      for (let k = 0; k < 3; k++) {
+        const a = Math.random() * TAU, rr = rnd(30, 105);
+        const ex = clamp(p.x + Math.cos(a) * rr, 40, S.aw - 40);
+        const ey = clamp(p.y + Math.sin(a) * rr, 40, S.ah - 40);
+        if (pointInWall(ex, ey)) continue;
+        mortarAt(ex, ey, 26, b.dmg * 0.45, 0.85, '#ffb03a');
+      }
+      A.burn();
+    }
+
+    /* ---- TURN: the spit sweeps its own long axis ----
+       The only rotation in the roster, so the silhouette turning IS the
+       telegraph — legible at 26px with no particle budget at all. */
+    if (b.pt <= 0) {
+      b.pt = rnd(3.2, 4.4);
+      b.poseT = 0.5;
+      b.turnA = Math.atan2(dy, dx);
+      const a = b.turnA;
+      for (let k = -5; k <= 5; k++) {
+        const off = k * 13;
+        S.eb.push({ x: b.x + Math.cos(a + Math.PI / 2) * off, y: b.y + Math.sin(a + Math.PI / 2) * off,
+                    vx: Math.cos(a) * 118, vy: Math.sin(a) * 118,
+                    r: 4, bob: rnd(0, TAU), dmg: b.dmg * 0.34, life: 2.4, col: '#ff8a2b' });
+      }
+      ring(b.x, b.y, 46, '#ff8a2b', 0.3, 2);
+      A.ram();
     }
 
   /* ==========================================================
@@ -8032,7 +8171,14 @@ function drawLight() {
       ? 1 + Math.sin(S.t * 6 + w.x) * 0.09 : 1;
     blob(w.x + w.w / 2, w.y + w.h / 2, r * flick, 0.55);
   }
-  if (FX.lights) for (const e of S.en) blob(e.x, e.y, e.boss ? 40 : 15, 0.42);
+  /* A heating SUNDAY ROAST lights the room it is standing in. This is the
+     whole telegraph: a held pose is invisible behind sixty adds in a
+     blackout, but a body that lifts the darkness around itself is not, and
+     it reads the same at any distance and through any amount of clutter. */
+  if (FX.lights) for (const e of S.en) {
+    const h = e.boss && e.heat > 0 ? e.heat : 0;
+    blob(e.x, e.y, (e.boss ? 40 : 15) + h * 78, 0.42 + h * 0.5);
+  }
   // incoming fire lights its own way in, so a dark room can't hide it
   for (const b of S.eb) blob(b.x, b.y, 26, 0.75);
   if (FX.lights) for (const r of S.rings) blob(r.x, r.y, r.r1 * 0.8, clamp(r.life / r.max, 0, 1) * 0.8);

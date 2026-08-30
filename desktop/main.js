@@ -31,6 +31,9 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, 'game');
 const SELFTEST = process.argv.includes('--selftest');
+/* --bossprobe drives one boss and measures it. The selftest soak never meets
+   a boss, so it can only prove the build runs, not that a fight works. */
+const BOSSPROBE = process.argv.includes('--bossprobe');
 /* --shots <dir> drives the game into a few interesting states and captures the
    window to PNGs. Store pages want screenshots, and the honest way to get them
    is from the real build rather than a mock-up. */
@@ -187,6 +190,101 @@ app.whenReady().then(async () => {
 
     console.log('SHOTS DONE');
     app.exit(0);
+    return;
+  }
+
+  if (BOSSPROBE) {
+    /* Drives one named boss and reports what it actually did, because the
+       --selftest soak runs on floor 6 wave 3 and never meets a boss at all:
+       it proves the build is not broken, not that a fight works.
+
+       Everything here is measurement. It steps the real update loop, pokes
+       the same globals a player's input would, and reads the boss back. */
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    await wait(2000);
+    let out;
+    try {
+      out = await win.webContents.executeJavaScript(`(() => {
+        const S = MEAT.S, r = {};
+        MEAT.startRun();
+        S.room = 5; MEAT.buildRoom();
+        /* index 7 is SUNDAY ROAST. spawnBoss goes through the roster, so
+           force the slot rather than hoping the shuffle lands on it. */
+        S.roster = [0,1,2,3,4,5,6,7,8,9];
+        S.en.length = 0; S.eb.length = 0; S.haz.length = 0;
+        MEAT.spawnBoss(7);
+        const b = S.en.find(e => e.boss);
+        r.spawned = !!b;
+        r.name = b && b.name;
+        r.pat = b && b.def.pat;
+        r.pat2 = b && b.def.pat2;
+        S.god = true;                     // measure the boss, not the player
+
+        /* The clock must ADVANCE across calls. frame() derives dt from the
+           timestamp it is handed, so re-passing performance.now() every call
+           steps the game with dt ~ 0 and nothing time-scaled ever moves —
+           which silently reported "it never vents" when the truth was "no
+           time passed". One monotonic virtual clock, 60fps. */
+        let T = performance.now();
+        const step = n => { for (let i = 0; i < n; i++) { T += 16.7; MEAT.frame(T); } };
+        const fire = (pulls, frames) => { S.shotN = (S.shotN|0) + pulls; step(frames); };
+        /* The branch latches b.shotMark on its FIRST frame, so a boss never
+           bills you for shots fired before it existed. Step once to get past
+           that latch before measuring anything. */
+        step(2);
+
+        // heat is pulled from S.shotN, so faking trigger pulls must raise it
+        const h0 = b.heat || 0;
+        for (let k = 0; k < 12; k++) fire(4, 1);
+        r.heatRoseOnFire = (b.heat || 0) > h0;
+        r.heatAfterFire = +(b.heat || 0).toFixed(3);
+
+        // and holding fire must cool it back down
+        const h1 = b.heat || 0;
+        step(90);
+        r.heatFellOnHold = (b.heat || 0) < h1;
+        r.heatAfterHold = +(b.heat || 0).toFixed(3);
+
+        /* Sustained fire must vent, and the per-second cap plus the cooldown
+           must keep it to a rhythm rather than a strobe. 600 frames is 10
+           seconds; at a 2.2s floor that is at most 4 vents. */
+        const vents0 = b.ventN | 0;
+        S.eb.length = 0;
+        for (let k = 0; k < 600; k++) fire(3, 1);
+        r.vented = (b.ventN | 0) > vents0;
+        r.ventsIn10s = (b.ventN | 0) - vents0;
+        r.ventRhythmSane = r.ventsIn10s > 0 && r.ventsIn10s <= 6;
+        r.bulletsInAir = S.eb.length;
+        r.bulletsSane = S.eb.length < 260;
+        r.heatLightsRoom = (b.heat || 0) > 0;
+
+        // break it, and confirm phase 2 is a different pattern that heats unaided
+        if (b.ph < 2) { b.hp = b.max * 0.4; step(2); }
+        r.phase = b.ph;
+        r.p2pat = b.ph >= 2 ? b.def.pat2 : null;
+        r.brokeToDone = b.ph >= 2 && b.def.pat2 === 'done';
+        r.ventTclearedOnBreak = !(b.ventT > 0);
+        step(90);                          // ride out the rear-up
+        const h2 = b.heat || 0, v2 = b.ventN | 0;
+        step(240);                         // four seconds, no shots fired at all
+        r.p2HeatsWithoutFiring = (b.heat || 0) > h2 || (b.ventN|0) > v2;
+        r.errors = [];
+        return JSON.stringify(r);
+      })()`);
+    } catch (e) { out = 'BOSSPROBE THREW: ' + e.message; }
+    console.log('BOSSPROBE ' + out);
+    const t = String(out);
+    const pass = t.includes('"heatRoseOnFire":true') &&
+                 t.includes('"heatFellOnHold":true') &&
+                 t.includes('"vented":true') &&
+                 t.includes('"p2HeatsWithoutFiring":true') &&
+                 t.includes('"ventRhythmSane":true') &&
+                 t.includes('"bulletsSane":true') &&
+                 t.includes('"brokeToDone":true') &&
+                 t.includes('"ventTclearedOnBreak":true') &&
+                 !t.includes('THREW');
+    console.log(pass ? 'BOSSPROBE PASS' : 'BOSSPROBE FAIL');
+    app.exit(pass ? 0 : 1);
     return;
   }
 
