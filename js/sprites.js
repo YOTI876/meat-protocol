@@ -18,36 +18,6 @@
    `up2()` lifts an old 1x grid to 2x with EPX/Scale2x, so hand-drawn 2x
    detail and generated 2x detail can live in the same character grid.
    ============================================================ */
-/* ============================================================
-   THE PALETTE — B · THE PRICE TAG
-
-   "A supermarket that never closed, lit by the products it is still trying
-   to sell you."
-
-   Every key belongs to exactly ONE band, and a band is a JOB, not a hue.
-   This is the fix for the thing that actually made the game look styleless:
-   PAL was a good palette that nothing obeyed, because every creature declared
-   its own local hex and routed around it.
-
-     RETAIL NEUTRAL   floors, walls, props, shelving, steel, cardboard.
-                      Deliberately, aggressively boring. Never on a creature.
-     PRODUCT          signage, labels, stickers, packaging, creature markings,
-                      hazards, UI. The ONLY saturated colour in the game, and
-                      never a large field -- it is an accent.
-     ORGANIC          creature bodies, the player, gore. Greyed under
-                      fluorescent, because that is what fluorescent does.
-
-   The reason this survives 95 enemies on screen: the world is desaturated, so
-   ANYTHING SATURATED IS INFORMATION. The player learns that on floor 1 and can
-   trust it on floor 10.
-
-   Blood is the one exception -- it is allowed in every band, because it is the
-   connective tissue of the whole game.
-
-   Rules in .claude/skills/art-bible/SKILL.md. Do not add a local hex to a
-   creature: remap an existing key instead, or the cosmetics palette-swap
-   breaks and the doctrine stops binding.
-   ============================================================ */
 const PAL = {
   '.': null,
   'o': '#0a0609',   // universal outline
@@ -55,69 +25,45 @@ const PAL = {
      so the art picks its outline by which way the surface is facing: `o` for
      the shadow side and the silhouette, `,` where the form turns away from
      the eye but still catches the room, `;` for the rim the lamp clips. */
-  ',': '#1e2228', ';': '#7a8088',
+  ',': '#241a1f', ';': '#6e5a52',
   'd': '#0d0a0f',                       // deepest occlusion — under overhangs
-
-  /* ---------- ORGANIC — creatures, the player, gore ----------
-     Fluorescent light is unflattering and that is the point: meat goes
-     grey-green in the midtones, bone yellows, and nothing wet shines. A wet
-     specular on meat is direction A and is on the rejected list — under a
-     tube, the only thing that shines is packaging. */
-  /* Blood, in four states: dried, fresh, wet, and the highlight on wet. The
-     one thing allowed in every band, because everything in this building
-     eventually wears some. */
+  /* Blood, in four states: dried, fresh, wet, and the highlight on wet. Kept
+     global because everything in this building eventually wears some. */
   '#': '#4a0d13', '%': '#8c141d', '&': '#c81f26', '*': '#ff5b5b',
   '~': '#6d2230',                       // viscera / exposed muscle
-  '+': '#f4ecc8', '!': '#cfc49a',       // bone highlight / teeth — yellowed
-  'u': '#ded2a8', 'U': '#a89e78',      // bone
-  'v': '#74504e', 'V': '#43292c',      // meat, greyed under the tube
-  'f': '#b09a98', 'F': '#7e6a6a', 'k': '#40302f',  // pale flesh
-  's': '#aa9a76', 'S': '#7d7052',      // skin — Damjan looks ill, deliberately
+  '+': '#f4eede', '!': '#cfc6ae',       // bone highlight / teeth
+  '=': '#9aa2ae',                       // metal highlight
+  /* A neutral value ramp for dithering any surface toward light or dark
+     without inventing a new hue for it. */
+  '1': '#141218', '2': '#201d25', '3': '#2e2a33', '4': '#3f3a45',
+  '5': '#524c58', '6': '#68616d', '7': '#807885', '8': '#9a929e', '9': '#b5adb8',
+  'h': '#2b1a13', 'H': '#3d2718',      // hair
+  'r': '#c9232c', 'R': '#7c1219', 'w': '#e8dcc8',  // HEADBAND
+  's': '#c9926a', 'S': '#a06f4a',      // skin
   'e': '#efe6d4', 'p': '#0f0a0d',      // eye / pupil
   'm': '#5e2626',
-  'h': '#2b1a13', 'H': '#3d2718',      // hair
-  'j': '#35443c', 'J': '#1f2a25',      // jacket
+  'j': '#31483a', 'J': '#1d2c24',      // jacket
+  'b': '#4a3421',                       // strap
   'n': '#242833', 'N': '#171a23',      // pants
   't': '#120f10',                       // boots
-
-  /* ---------- RETAIL NEUTRAL — the building ----------
-     Lino, shelving, steel, cardboard. This band is boring on purpose: it is
-     the silence that makes the PRODUCT band audible. Never on a creature. */
-  /* A neutral value ramp for dithering any surface toward light or dark
-     without inventing a new hue for it. Cool retail grey — the old ramp was
-     violet, which quietly tinted every wall in the game. */
-  '1': '#14161a', '2': '#1e2126', '3': '#2b2f35', '4': '#3b4048',
-  '5': '#4e535c', '6': '#646a74', '7': '#7c828c', '8': '#969ca6', '9': '#b2b8c2',
-  '=': '#a5acb6',                       // metal highlight
-  'g': '#5a616b', 'G': '#343a42',      // gunmetal
-  'T': '#8d949e', 'X': '#ccd2da',      // bright steel / shelving
-  'q': '#1a1d22',
-  'B': '#6b5636',                       // cardboard
-  'b': '#7a6242',                       // strap / carton band
-
-  /* ---------- PRODUCT — the only saturated colour in the game ----------
-     Signage, labels, stickers, packaging, creature markings, hazards, UI.
-     An accent, never a field. If it is bright and saturated it is either
-     dangerous, useful, or light — and the player must be able to trust that
-     from floor 1 to floor 10. */
-  'c': '#6ee68a', 'C': '#2f9a52',      // fluorescent green — the shelf-edge colour
-  'y': '#ffd21e', 'Y': '#b8901a',      // sale yellow
-  'K': '#ff4ab0', 'L': '#a01a68',      // price-tag magenta
-  'z': '#4fd6e8', 'Z': '#1c7f92',      // packaging cyan / plasma
+  'g': '#565c66', 'G': '#31363d',      // gunmetal
+  'y': '#f2d14a', 'Y': '#b2911f',      // brass / banana
+  'l': '#ff2b2b',
+  'f': '#c09292', 'F': '#8e6666', 'k': '#4a2a2a',  // pale flesh
+  'v': '#8a3540', 'V': '#4e1e26',      // meat red
+  'c': '#9fb08a', 'C': '#68785a',      // sick green
+  'u': '#ded8c6', 'U': '#a8a294',      // bone
+  'x': '#ff4242',                       // glow eye
+  'q': '#1a1c22',
+  'B': '#2e2013',                       // dark wood
+  'z': '#4fd6e8', 'Z': '#1c7f92',      // plasma
   'i': '#a8e8ff',                       // rail glow
   'M': '#c05cff', 'W': '#6a2aa8',      // omega
   'O': '#ff9a3a', 'A': '#b04408',      // rotisserie fire
   'E': '#e8f8ff', 'D': '#4f9ec8',      // freezer burn
-  'l': '#ff2b2b',                       // alert
-  'x': '#ff4242',                       // glow eye
-  'r': '#c9232c', 'R': '#7c1219', 'w': '#e8dcc8'   // HEADBAND
+  'K': '#ff4ab0', 'L': '#a01a68',      // price-tag magenta
+  'T': '#8a8f98', 'X': '#c8ccd4'       // bright steel
 };
-
-/* RESERVED. drawLight() gives Damjan the only warm light in the building, and
-   nothing else in the game may use this temperature — it is what makes him
-   findable in a seventy-body room by colour rather than by luck. If you are
-   about to paint something warm-orange, it belongs to him. */
-const LAMP_WARM = '#ffba68';
 
 /* opt: { ss: sub-samples per game pixel (default 1), aa: soften diagonal steps } */
 function SPRITE(rows, pal, opt) {
@@ -1102,51 +1048,41 @@ SPR.anim = {};
    set too far apart and a mouth that opens the wrong way — sideways, all
    the way across, because there is nothing holding the jaw together. */
 {
-  /* No local hex. Global PAL keys, and the material map only remaps those --
-     u/+ for the pale tray rim, v/V for the meat in it, K for the price tag.
-     That is what makes the doctrine bind and keeps cosmetics working. */
-  const map = { u: ['+', 'U'], U: ['u', 'F'], v: ['f', 'V'], V: ['v', 'k'],
-                f: ['u', 'F'], F: ['f', 'k'], k: ['F', 'd'], K: ['+', 'L'], L: ['K', 'k'] };
-  /* A TRAY OF MINCE WITH LEGS. Wider than it is tall, flat-topped, hard
-     rectangle -- and the price tag sits on ONE corner, because nothing in
-     this direction is mirror-symmetric and the tag is where the asymmetry
-     lives. It is the first creature the player meets, so it is the one that
-     teaches the whole shape language. */
+  const pal = { L: '#d9a9a9', f: '#bb8b8b', F: '#8b6161', E: '#553a3c', k: '#2f1719', x: '#ff5252',
+                '9': '#f4dcd6', X: '#ffe6d2', ',': '#3a1e22', ';': '#ffd6cc' };
+  const map = { L: ['9', 'f'], f: ['L', 'F'], F: ['f', 'E'], E: ['F', 'k'], k: ['E', 'k'] };
   const body = [
-    '..............KK',
-    '.ooooooooooooKKK',
-    '.ouuuuuuuuuuuuuo',
-    '.ouvvvvvvvvvvvuo',
-    '.ouvvvvvvvvvvvuo',
-    '.ouvvvvvvvvvvvuo',
-    '.ouuuuuuuuuuuuuo',
-    '.oUUUUUUUUUUUUUo',
-    '.oooooooooooooo.'
+    '.....oooooo.....',
+    '...ooLLLLLLoo...',
+    '..oLLffffffLLo..',
+    '.oLLffffffffLLo.',
+    '.oLffxffffxffLo.',
+    '.offfffffffffFo.',
+    '.oFkLLLLLLLLkFo.',
+    '.oFkkkkkkkkkkFo.',
+    '.oFLkLkLkLkLkFo.'
   ];
   /* the eyes sit at different heights and the grin runs off both edges */
-  const face = { x: 0, y: 7, rows: [
-    '    ,kkkk,         ,kk,         ',
-    '   ,kkkkkkk,      ,kkkk,        ',
-    '   kkx++++xkk     kkx++xk       ',
-    '   kk++;+++kk     kk+;++k       ',
-    '   ,kkx++xkk,     ,kkxxkk,      ',
-    '    ,kkkkk,   ~~   ,kkkk,       ',
-    '  %   ,,,    ~~~~   ,,,   %     ',
-    '  %kk!kk!kk!kkkk!kk!kk!kk%&     ',
-    '  kk!kk!kk!kk!kk!kk!kk!kkk%     ',
-    '  &%%kkkkkkkkkkkkkkkkkk%%&      '
+  const face = { x: 0, y: 6, rows: [
+    '     ,EEEE,         ,EE,        ',
+    '    ,EkkkkkE,      ,EkkkE,      ',
+    '    EkxXXXxkE      EkxXxkE      ',
+    '    EkXX;XXkE      EkX;XkE      ',
+    '    EkxXXXxkE      EkxxXkE      ',
+    '     ,EkkkE,   ~~   ,EkkE,      ',
+    '   %   ,,,    ~~~~   ,,,   %    ',
+    '   %kk!kk!kk!kkkk!kk!kk!kk%&    ',
+    '   kk!kk!kk!kk!kk!kk!kk!kkk%    ',
+    '   &%%kkkkkkkkkkkkkkkkkk%%&     '
   ] };
   const t = t1 => shade(up2(t1), map);
-  SPR.anim.crawler = BANK(null, CREATURE(map, body, face), [
-    /* Legs in global keys. They were authored in a local `E` that does not
-       exist in PAL -- global `E` is freezer-burn white, so the legs would
-       have come out glowing. */
-    t(['.oUUUUUUUUUUUUo.', '.oUkUffffffUkUo.', '.oko.oUUUUo.oko.', '.oko..okko..oko.', '..o....oo....o..']),
-    t(['.oUUUUUUUUUUUUo.', 'oUkUUffffffUUkUo', 'oko..oUUUUo..oko', 'oko...okko...oko', 'oo.....oo.....oo']),
-    t(['.oUUUUUUUUUUUUo.', '.oUkUffffffUkUo.', '..okooUUUUooko..', '..oko.okko.oko..', '...o...oo...o...']),
-    t(['.oUUUUUUUUUUUUo.', 'oUkUUffffffUUkUo', 'oko...oUUo...oko', 'oko..okkkko..oko', 'oo....o..o....oo'])
-  ], // coiled to spring — the tray tips forward
-    t(['.oUUUUUUUUUUUUo.', '.oUUUffffffUUUo.', '..okkoUUUUokko..', '...okokkkkoko...', '....o.o..o.o....']),
+  SPR.anim.crawler = BANK(pal, CREATURE(map, body, face), [
+    t(['..oFFffffffFFo..', '..oFEFffffFEFo..', '.oEo.oFFFFo.oEo.', '.oEo..oEEo..oEo.', '..o....oo....o..']),
+    t(['..oFFffffffFFo..', '.oFEFFffffFFEFo.', 'oEo..oFFFFo..oEo', 'oEo...oEEo...oEo', 'oo.....oo.....oo']),
+    t(['..oFFffffffFFo..', '..oFEFffffFEFo..', '..oEooFFFFooEo..', '..oEo.oEEo.oEo..', '...o...oo...o...']),
+    t(['..oFFffffffFFo..', '.oFEFFffffFFEFo.', 'oEo...oFFo...oEo', 'oEo..oEEEEo..oEo', 'oo....o..o....oo'])
+  ], // coiled to spring
+    t(['..oFFffffffFFo..', '..oFFFffffFFFo..', '..oEEoFFFFoEEo..', '...oEoEEEEoEo...', '....o.o..o.o....']),
     { y: -2.5, sep: 2.5 }, { ss: 2 });
 }
 
@@ -1154,114 +1090,95 @@ SPR.anim = {};
    Blind. The eyes went milky a long time ago and the film over them has
    split. It finds you by the noise you make and answers with its own. */
 {
-  /* No local hex — global PAL keys only, so the palette doctrine binds and
-     cosmetics keep working. c/C are PRODUCT fluorescent green, used as the
-     MARKING on the header card; the body under it is ORGANIC f/F/k. */
-  const map = { c: ['+', 'C'], C: ['c', 'k'], f: ['u', 'F'], F: ['f', 'k'],
-                k: ['F', 'd'], u: ['+', 'U'], U: ['u', 'F'] };
-  /* A HANGING PACK. The read is the PUNCHED HEADER CARD at the top — a flat
-     card with a hole in it, the thing a pack hangs off a rail by — and then
-     a taper down into the body. Tall and narrow where the crawler is low and
-     wide, and the hole is off-centre because nothing here is symmetrical. */
+  const pal = { L: '#c4dda6', c: '#9dbd7e', C: '#6b8a52', D: '#42582f', k: '#1d1010', x: '#ff3b3b',
+                '9': '#e6f6cd', X: '#3a0c0c', ',': '#2c3a1e', ';': '#f2ffe0' };
+  const map = { L: ['9', 'c'], c: ['L', 'C'], C: ['c', 'D'], D: ['C', 'k'], k: ['D', 'k'] };
   const body = [
-    '...oooooooooo...',
-    '...occcccccco...',
-    '...occoooccco...',
-    '...occo.occco...',
-    '...occoooccco...',
-    '...occcccccco...',
-    '..ooffffffffoo..',
-    '.offffffffffffo.',
-    '.offffffffffffo.',
-    '.oFffffffffffFo.',
-    '..oFfffffffffo..',
-    '..oFFfffffffFo..'
+    '....oooooooo....',
+    '..ooLLccccLLoo..',
+    '.oLLccccccccLLo.',
+    '.oLccccccccccLo.',
+    '.oLccxccccxccLo.',
+    '.occcccccccccco.',
+    '.occcccccccccco.',
+    '.oCccccccccccCo.',
+    '.oCccccccccccCo.',
+    '.occcccccccccco.'
   ];
-  /* the blind milky eyes sit BELOW the header card, on the body */
-  const face = { x: 0, y: 14, rows: [
-    '     ,kkkk,      ,kkkk,         ',
-    '    ,kkkkkkk,   ,kkkkkkk,       ',
-    '    kk+!!!+kk   kk+!!!+kk       ',
-    '    kk!+ff+!k   kk!+ff+!k       ',
-    '    kk+!!!+kk   kk!+f+!kk       ',
-    '     ,kkkkk,     ,kkkkk,        ',
+  const face = { x: 0, y: 6, rows: [
+    '     ,DDDD,      ,DDDD,         ',
+    '    ,DkkkkkD,   ,DkkkkkD,       ',
+    '    Dk+!!!+kD   Dk+!!!+kD       ',
+    '    Dk!+XX+!D   Dk!+XX+!D       ',
+    '    Dk+!!!+kD   Dk!+X+!kD       ',
+    '     ,Dkkkk,     ,Dkkkk,        ',
     '       %%           %%          ',
     '        %            %%         '
   ] };
   const t = t1 => shade(up2(t1), map);
   /* the scream: the whole front of the head hinges open */
-  /* the scream: the whole front of the pack splits open down the seam.
-     Authored in ORGANIC keys — the old version used `D`, which in the global
-     palette is freezer-burn blue, so the maw would have glowed. */
-  const scream = stamp(t(['..oFkkkkkkkkFo..', '.oFkkkkkkkkkkFo.', '.oFkkkkkkkkkkFo.',
-                          '..oFkkkkkkkkFo..', '...oFo....oFo...', '...ooo....ooo...']),
+  const scream = stamp(t(['.oCkkkkkkkkkkCo.', '.ockkkkkkkkkkco.', '.ockkkkkkkkkkco.', '.oCckkkkkkkkcCo.',
+                          '..oCDDccccDDCo..', '...oCo....oCo...', '...oCo....oCo...', '...ooo....ooo...']),
     0, 0, [
-    '   ,k!k!k!k!k!k!k!k!k!k!k,      ',
-    '   k!kkkkkkkkkkkkkkkkkkk!k      ',
-    '   kkkk~~~~~~~~~~~~~~~kkkk      ',
-    '   kkk~~%%%%%%%%%%%%%~~kkk      ',
-    '   ,kk~~%%##########%%~~kk,     ',
-    '    kk~~%%##########%%~~kk      ',
-    '    ,kk~~%%########%%~~kk,      ',
-    '     k!kk~~%%%%%%%%~~kk!k       ',
-    '     ,k!k!k!k!k!k!k!k!k,        '
+    '    ,Dk!k!k!k!k!k!k!k!k!kD,     ',
+    '    Dk!kkkkkkkkkkkkkkkkk!kD     ',
+    '    Dkkkk~~~~~~~~~~~~~~kkkD     ',
+    '    Dkkk~~%%%%%%%%%%%%~~kkD     ',
+    '    ,Dkk~~%%########%%~~kD,     ',
+    '     Dkk~~%%########%%~~kD      ',
+    '     ,Dkk~~%%######%%~~kD,      ',
+    '      Dk!kk~~%%%%%%~~kk!kD      ',
+    '      ,Dk!k!k!k!k!k!k!kD,       '
   ]);
-  SPR.anim.shrieker = BANK(null, CREATURE(map, body, face), [
-    t(['..oFFfffffffFo..', '...oFfffffffo...', '....oFo..oFo....', '....oFo..oFo....', '....ooo..ooo....']),
-    t(['..oFFfffffffFo..', '...oFfffffffo...', '...oFo....oFo...', '...oFo....oFo...', '...ooo....ooo...']),
-    t(['..oFFfffffffFo..', '...oFfffffffo...', '....oFo..oFo....', '.....oFooFo.....', '.....ooooo......']),
-    t(['..oFFfffffffFo..', '...oFfffffffo...', '...oFo....oFo...', '..oFo......oFo..', '..ooo......ooo..'])
-  ], scream, { y: -7.5, sep: 2.5 }, { ss: 2 });
+  SPR.anim.shrieker = BANK(pal, CREATURE(map, body, face), [
+    t(['.oCcccckkccccCo.', '.oCcccckkccccCo.', '.occcccckccccco.', '.oCccccccccccCo.', '..oCDDccccDDCo..', '...oCo....oCo...', '...oCo....oCo...', '...ooo....ooo...']),
+    t(['.oCccckkkkcccCo.', '.oCcckkkkkkccCo.', '.occcckkkkcccco.', '.oCccccccccccCo.', '..oCDDccccDDCo..', '..oCo......oCo..', '..oCo......oCo..', '..ooo......ooo..']),
+    t(['.oCcccckkccccCo.', '.oCcccckkccccCo.', '.occcccckccccco.', '.oCccccccccccCo.', '..oCDDccccDDCo..', '....oCCCCCCo....', '....oCccccCo....', '....oooooooo....']),
+    t(['.oCccckkkkcccCo.', '.oCcckkkkkkccCo.', '.occcckkkkcccco.', '.oCccccccccccCo.', '..oCDDccccDDCo..', '..oCo......oCo..', '..oCo......oCo..', '..ooo......ooo..'])
+  ], scream, { y: -4.5, sep: 2.5 }, { ss: 2 });
 }
 
 /* ---------- STALKER 14x18 — tall, gaunt, long stride ----------
    Skull-faced, and the skin was pulled back over it and stitched shut in a
    hurry. What is left of the mouth cannot close over the teeth. */
 {
-  /* Global PAL keys only. u/U/+ are ORGANIC bone, K the PRODUCT tag. */
-  const map = { u: ['+', 'U'], U: ['u', 'F'], F: ['u', 'k'], k: ['F', 'd'],
-                K: ['+', 'L'], L: ['K', 'k'] };
-  /* SHRINK-WRAPPED, LIMBS BOUND. The rule for this one is MORE NEGATIVE SPACE
-     THAN SOLID — it is the only creature in the game you can see the floor
-     through, which is what separates it from the shrieker at a glance when
-     both are upright with two legs. The arms are strapped to the body and the
-     gaps between them are the read. Tag on the left shoulder only. */
+  const pal = { L: '#f0e9d4', u: '#d5cdb6', U: '#9a927e', E: '#5f5847', k: '#241d18', x: '#ff2020',
+                X: '#ff6a4a', ',': '#403829', ';': '#fffbe8' };
+  const map = { L: ['+', 'u'], u: ['L', 'U'], U: ['u', 'E'], E: ['U', 'k'], k: ['E', 'k'] };
   const body = [
-    '....oooooo....',
+    '.....oooo.....',
+    '...ooLLLLoo...',
+    '..oLLuuuuLLo..',
+    '..oLuuuuuuLo..',
+    '..oLuxuuxuLo..',
+    '..oUukkkkuUo..',
     '...oUuuuuUo...',
-    '...oUuuuuUo...',
-    'KK.oUuuuuUo...',
-    'KKooUuuuuUoo..',
-    'oUo.oUuuuUo.oU',
-    'oUo.oUuuuUo.oU',
-    'oUo.oUuuuUo.oU',
-    '.o..oUuuuUo..o',
-    '....oUUUUUo...'
+    '....oUUUUo....',
+    '..ooLuuuuLoo..',
+    '.oLuuuuuuuuLo.'
   ];
-  const face = { x: 0, y: 3, rows: [
-    '     ,kkkk,,kkkk,           ',
-    '    ,kkkkkkkkkkkk,          ',
-    '    kkxx!xkkkx!xxkk         ',
-    '    kk!!!kkkk!!!kk          ',
-    '    ,kkxkk,,kkxkk,          ',
-    '     ,kkkkkkkkkk,           ',
-    '       %%    %%             ',
-    '    ,kkkkkkkkkkkkk,         ',
-    '    k!k!k!k!k!k!k!k         ',
-    '    ,kkkkkkkkkkkkk,         '
+  const face = { x: 0, y: 6, rows: [
+    '    ,EEEEE,,EEEEE,          ',
+    '   ,EkkkkkEEkkkkkE,         ',
+    '   EkkxXxkkEkkxXxkkE        ',
+    '   EkkXXXkkEkkXXXkkE        ',
+    '   ,Ekkxkk,,Ekkxkk,E        ',
+    '    ,EEkEE,,EEkEE,          ',
+    '      %%      %%            ',
+    '   ,EkkkkkkkkkkkkkkE,       ',
+    '   Ek!k!k!k!k!k!k!kE        ',
+    '   ,EkkkkkkkkkkkkkkE,       ',
+    '     ,%EEEEEEEE%,           '
   ] };
   const t = t1 => shade(up2(t1), map);
-  SPR.anim.stalker = BANK(null, CREATURE(map, body, face), [
-    /* Legs keep the gap open: this creature is read by the floor showing
-       THROUGH it, so the stride never closes the negative space. Rewritten
-       off the old local `E`, which in the global palette is freezer white. */
-    t(['....oUuuuUo...', '....oUuuuUo...', '...oUo...oUo..', '...oUo...oUo..', '...ooo...ooo..']),
-    t(['....oUuuuUo...', '....oUuuuUo...', '..oUo.....oUo.', '..oUo.....oUo.', '..ooo.....ooo.']),
-    t(['....oUuuuUo...', '....oUuuuUo...', '...oUo...oUo..', '....oUo.oUo...', '....ooo.ooo...']),
-    t(['....oUuuuUo...', '....oUuuuUo...', '.oUo.......oUo', '.oUo.......oUo', '.ooo.......ooo'])
-  ], // coiled, about to blink — it draws itself in and the gaps close up
-    t(['....oUuuuUo...', '....oUUUUUo...', '....oUo.oUo...', '....oUo.oUo...', '....ooo.ooo...']),
-    { y: -6.5, sep: 1.5 }, { ss: 2 });
+  SPR.anim.stalker = BANK(pal, CREATURE(map, body, face), [
+    t(['.oUuuuuuuuuUo.', '.oUuEuuuuEuUo.', '..oUuuuuuuUo..', '..oEUuuuuUEo..', '..oUUo..oUUo..', '..ouuo..ouuo..', '..oUo....oUo..', '..ooo....ooo..']),
+    t(['.oUuuuuuuuuUo.', '.oUuEuuuuEuUo.', '..oUuuuuuuUo..', '.oEUuuuuuuUEo.', '.oUUo....oUUo.', 'oUUo......oUUo', 'oUo........oUo', 'ooo........ooo']),
+    t(['.oUuuuuuuuuUo.', '.oUuEuuuuEuUo.', '..oUuuuuuuUo..', '..oEUuuuuUEo..', '...oUUUUUUo...', '...ouuuuuuo...', '....oUUUUo....', '....oooooo....']),
+    t(['.oUuuuuuuuuUo.', '.oUuEuuuuEuUo.', '..oUuuuuuuUo..', '.oEUuuuuuuUEo.', 'oUUo......oUUo', '.oUUo....oUUo.', '..oUo....oUo..', '..ooo....ooo..'])
+  ], // coiled, about to blink
+    t(['.oUuuuuuuuuUo.', '.oUEEuuuuEEUo.', '..oUEuuuuEUo..', '..oEEuuuuEEo..', '...oUUUUUUo...', '...oEEuuEEo...', '...oUo..oUo...', '...ooo..ooo...']),
+    { y: -4.5, sep: 1.5 }, { ss: 2 });
 }
 
 /* ---------- BLOATER 20x18 — a pulsing sack with ribs showing ----------
@@ -1306,126 +1223,6 @@ SPR.anim = {};
   ], // swollen, about to burst forward
     t(['ovvuvvuvvuuvvuvvuvvo', 'ovvvvvvvvvvvvvvvvvvo', 'ovvuuuuuuuuuuuuuuvvo', 'ovvvvvvvvvvvvvvvvvvo', 'oVvvvvvvvvvvvvvvvVo.', '.oVVvvvvvvvvvvvvVVo.', '..oVVo........oVVo..', '..ooo..........ooo..']),
     { y: -4.5, sep: 3.5 }, { ss: 2 });
-}
-
-/* ============================================================
-   HUSK and CYST — bodies of their own at last
-
-   Both of these were the BLOATER's bank with a tint and a scale on it, which
-   is the practice this project already decided was wrong, in writing, and
-   then enforced on the ten bosses a run meets nine times instead of the six
-   enemies it meets thousands of times. See Bugs Found #31.
-
-   They are three different instructions and they now have three different
-   outlines, provable with no colour information at all:
-
-     BLOATER   CONVEX   one unbroken swollen curve      kill it at range
-     HUSK      CONCAVE  collapsed, a hollow in the top  do NOT splash it
-     CYST      ROOTED   wider at the floor than the top go to it
-
-   Neither declares a single local hex. They are authored in the global PAL
-   keys and their material maps only remap those, which is what makes the
-   palette doctrine actually bind and keeps cosmetics working.
-   ============================================================ */
-
-/* ---------- HUSK 18x16 — a crushed carton ----------
-   A bloater that dried out and caved in. The silhouette is the ONLY inward
-   one in the game: two surviving corners with a collapse between them, and
-   the left corner stands higher than the right because nothing in this
-   direction is mirror-symmetric. Splash it and you get two crawlers, so the
-   shape has to say "already broken" before the player commits the shot. */
-{
-  const map = { f: ['u', 'F'], F: ['f', 'k'], k: ['F', 'd'], u: ['+', 'U'], U: ['u', 'F'] };
-  /* The collapse is a NOTCH, not a pinch. Cut all the way through and the
-     outline reads as a bow tie -- two lumps rather than one caved-in body,
-     and the creature loses the mass that says it used to be a bloater. The
-     dip stops at row 4 and the belly below it stays whole. */
-  /* The collapse is a NOTCH, not a pinch. Cut it deep and the outline reads
-     as a bow tie -- two lumps rather than one caved-in body -- and the
-     creature loses the mass that says it used to be a bloater. The dip is
-     shallow, it closes a third of the way down, and the belly below it is
-     the widest thing on the sprite. Corners stubby, left one higher: nothing
-     in this direction is mirror-symmetric. */
-  const body = [
-    '..ooo.........oo..',
-    '..offo.......offo.',
-    '..offfoo...offffo.',
-    '.offffffo.offffffo',
-    '.offffffffffffffo.',
-    '.offffffffffffffo.',
-    '.oFffffffffffffFo.',
-    'oFFffffffffffffFFo',
-    'oFFFFFFFFFFFFFFFFo'
-  ];
-  /* sunken sockets set at different heights, and the split across the belly
-     that the two crawlers come out of */
-  const face = { x: 0, y: 10, rows: [
-    '      ,kk,        ,kk,      ',
-    '      kxxk        kxxk      ',
-    '      ,kk,        ,kk,      ',
-    '                            ',
-    '   ,kkkkkkkkkkkkkkkkkkkk,   ',
-    '   kk~~%%%%%%%%%%%%~~kkkk   ',
-    '   ,kkk~~~~~~~~~~~~kkkk,    '
-  ] };
-  const t = t1 => shade(up2(t1), map);
-  /* it does not walk so much as SETTLE -- the collapse works itself deeper */
-  SPR.anim.husk = BANK(null, CREATURE(map, body, face), [
-    t(['oFFffffffffffffFFo', '.oFFffffffffffFFo.', '..oFFo......oFFo..', '..ooo........ooo..']),
-    t(['oFFffffffffffffFFo', '.oFFffffffffffFFo.', '..oFo........oFFo.', '..oo..........ooo.']),
-    t(['oFFffffffffffffFFo', '.oFFffffffffffFFo.', '..oFFo......oFo...', '..ooo........oo...']),
-    t(['oFFffffffffffffFFo', '.oFFffffffffffFFo.', '..oFFo......oFFo..', '..ooo........ooo..'])
-  ],
-    t(['oFFffffffffffffFFo', 'oFFffffffffffffFFo', '.oFFo........oFFo.', '.ooo..........ooo.']),
-    { y: -3.5, sep: 3.2 }, { ss: 2 });
-}
-
-/* ---------- CYST 18x16 — a display pyramid ----------
-   It never comes to you: it sits where the wave dropped it, swells, and
-   hatches. So the silhouette had to say ROOTED before anything else -- it is
-   the only creature in the game wider at the floor than at the top, and the
-   only one with no gap under it at all. You cannot kite a thing that was
-   never chasing you, and the shape is what tells you that.
-
-   Banded in PRODUCT green, because a stack of identical product IS the joke
-   and green is the shelf-edge colour. The green is a MARKING on an ORGANIC
-   body, which is the one place the PRODUCT band is allowed on a creature. */
-{
-  const map = { f: ['u', 'F'], F: ['f', 'k'], k: ['F', 'd'], c: ['+', 'C'], C: ['c', 'k'], u: ['+', 'U'] };
-  const body = [
-    '........oo........',
-    '.......offo.......',
-    '......offffo......',
-    '.....occcccco.....',
-    '....offffffffo....',
-    '...offffffffffo...',
-    '..occcccccccccco..',
-    '.offffffffffffffo.',
-    'offffffffffffffffo'
-  ];
-  /* the eyes sit low and wide, near the base, so it reads as looking UP at
-     you -- it is the one thing in the game you have to walk over to */
-  const face = { x: 0, y: 12, rows: [
-    '     ,kk,          ,kk,     ',
-    '     kxxk          kxxk     ',
-    '     ,kk,          ,kk,     ',
-    '                            ',
-    '  ,kkkkkkkkkkkkkkkkkkkkkk,  ',
-    '  kk!kk!kk!kk!kk!kk!kk!kkk  '
-  ] };
-  const t = t1 => shade(up2(t1), map);
-  /* it does not have a walk. It SWELLS -- the base spreads and settles back,
-     and that is the only motion, because motion it does not have is the
-     whole point of the creature. */
-  SPR.anim.cyst = BANK(null, CREATURE(map, body, face), [
-    t(['offffffffffffffffo', 'oFFffffffffffffFFo', 'ooFFFFFFFFFFFFFFoo']),
-    t(['offffffffffffffffo', 'oFffffffffffffffFo', 'ooFFFFFFFFFFFFFFoo']),
-    t(['offffffffffffffffo', 'oFFffffffffffffFFo', 'ooFFFFFFFFFFFFFFoo']),
-    t(['offffffffffffffffo', 'oFffffffffffffffFo', 'ooFFFFFFFFFFFFFFoo'])
-  ],
-    // about to hatch: it draws itself up and the base tightens
-    t(['occcccccccccccccco', 'oFFffffffffffffFFo', 'ooFFFFFFFFFFFFFFoo']),
-    { y: -2.5, sep: 4.2 }, { ss: 2 });
 }
 
 /* ============================================================
@@ -2291,8 +2088,6 @@ SPR.crawler  = SPR.anim.crawler.walk[0];
 SPR.shrieker = SPR.anim.shrieker.walk[0];
 SPR.stalker  = SPR.anim.stalker.walk[0];
 SPR.bloater  = SPR.anim.bloater.walk[0];
-SPR.husk     = SPR.anim.husk.walk[0];
-SPR.cyst     = SPR.anim.cyst.walk[0];
 SPR.bossA    = SPR.anim.bossA.walk[0];
 SPR.bossB    = SPR.anim.bossB.walk[0];
 

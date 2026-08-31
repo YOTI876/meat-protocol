@@ -425,57 +425,57 @@ cv.addEventListener('wheel', e => { e.preventDefault(); if (S.mode === 'play') c
 const ROOMS = [
   /* ---- ACT ONE: it is only a building ---- */
   { name: 'THE ABATTOIR', sub: 'floor 01 // where the meat is hung',
-    aw: 940, ah: 660, floor: ['#b9bcbb', '#a8adac', '#979d9c'], grout: '#6e7574',
-    wall: ['#8d9491', '#6b716f', '#a9b0ad'], fog: 'rgba(200,215,210,0.05)', dark: 0.30,
-    layout: 'scatter', motif: 'hook', vat: '#c81f26', twist: null,
+    aw: 940, ah: 660, floor: ['#4a382f', '#42302a', '#392722'], grout: '#241a16',
+    wall: ['#5e4840', '#3a2c28', '#725648'], fog: 'rgba(48,8,12,0.12)', dark: 0.76,
+    layout: 'scatter', motif: 'hook', vat: '#78121a', twist: null,
     // The one floor with no rule of its own. You have enough to learn already.
     tw: '' },
   { name: 'THE HOLLOW', sub: 'floor 02 // it goes down further than it should',
-    aw: 1020, ah: 720, floor: ['#3a3f44', '#31363a', '#282c30'], grout: '#1b1e21',
-    wall: ['#454b50', '#2c3135', '#575e64'], fog: 'rgba(30,40,50,0.10)', dark: 0.72,
-    layout: 'pillars', motif: 'drip', vat: '#4fd6e8', twist: 'dark',
+    aw: 1020, ah: 720, floor: ['#2f3a43', '#27313a', '#212a31'], grout: '#141c22',
+    wall: ['#425460', '#28343c', '#556878'], fog: 'rgba(10,30,50,0.13)', dark: 0.80,
+    layout: 'pillars', motif: 'drip', vat: '#1d4a58', twist: 'dark',
     tw: 'THE LIGHT DOES NOT REACH' },
   { name: 'THE MEAT LOOP', sub: 'floor 03 // you have been here before',
-    aw: 1080, ah: 760, floor: ['#8e948f', '#7f857f', '#70766f'], grout: '#565c57',
-    wall: ['#767c78', '#565b58', '#8f9691'], fog: 'rgba(190,200,195,0.05)', dark: 0.38,
-    layout: 'ring', motif: 'rust', vat: '#c05cff', twist: 'slick',
+    aw: 1080, ah: 760, floor: ['#42313c', '#392833', '#30212b'], grout: '#1c1319',
+    wall: ['#583f50', '#342532', '#6d5062'], fog: 'rgba(60,0,50,0.13)', dark: 0.80,
+    layout: 'ring', motif: 'rust', vat: '#5a1848', twist: 'slick',
     tw: 'THE FLOOR IS GREASED' },
   /* ---- ACT TWO: it starts taking an interest ---- */
   { name: 'THE RED KITCHEN', sub: 'floor 04 // dinner',
-    aw: 1120, ah: 780, floor: ['#c2c0b4', '#b3b1a5', '#a3a196'], grout: '#7d7c71',
-    wall: ['#9a988c', '#75746a', '#b4b2a6'], fog: 'rgba(255,240,215,0.06)', dark: 0.28,
-    layout: 'corridors', motif: 'ember', vat: '#ff9a3a', twist: 'heat',
+    aw: 1120, ah: 780, floor: ['#4e2d2a', '#432422', '#391d1c'], grout: '#20100f',
+    wall: ['#6a3835', '#3e2020', '#84463f'], fog: 'rgba(90,0,10,0.16)', dark: 0.82,
+    layout: 'corridors', motif: 'ember', vat: '#8a2410', twist: 'heat',
     tw: 'THE BURNERS ARE STILL ON' },
   { name: 'THE FREEZER', sub: 'floor 05 // nothing in here has finished dying',
-    aw: 1140, ah: 800, floor: ['#d6e2e8', '#c6d4dc', '#b4c4cd'], grout: '#8ea2ac',
-    wall: ['#aebeca', '#8a9aa6', '#cfdde6'], fog: 'rgba(230,248,255,0.07)', dark: 0.15,
-    layout: 'bunkers', motif: 'frost', vat: '#4f9ec8', twist: 'frost',
+    aw: 1140, ah: 800, floor: ['#39474e', '#31404a', '#2a3740'], grout: '#16232b',
+    wall: ['#5a7280', '#33454f', '#8aa8b8'], fog: 'rgba(150,220,255,0.10)', dark: 0.74,
+    layout: 'bunkers', motif: 'frost', vat: '#2a6a80', twist: 'frost',
     tw: 'THE COLD COMES IN WAVES' },
   { name: 'THE RENDERING', sub: 'floor 06 // everything they could not sell',
-    aw: 1200, ah: 830, floor: ['#585a4e', '#4c4e43', '#414338'], grout: '#2e3027',
-    wall: ['#5c5e52', '#3c3e34', '#74776a'], fog: 'rgba(90,100,70,0.09)', dark: 0.62,
-    layout: 'scatter', motif: 'sludge', vat: '#6ee68a', twist: 'swarm',
+    aw: 1200, ah: 830, floor: ['#38412a', '#303924', '#28301e'], grout: '#171c10',
+    wall: ['#4e5a34', '#2d3520', '#68783f'], fog: 'rgba(90,130,20,0.13)', dark: 0.80,
+    layout: 'scatter', motif: 'sludge', vat: '#4a6a12', twist: 'swarm',
     tw: 'MORE OF THEM. LESS OF EACH.' },
   /* ---- ACT THREE: it stops pretending ---- */
   { name: 'THE LONG TABLE', sub: 'floor 07 // twelve places, all of them set',
-    aw: 1240, ah: 850, floor: ['#3a352f', '#312d28', '#282521'], grout: '#1a1815',
-    wall: ['#413b34', '#2a2622', '#524b42'], fog: 'rgba(40,35,28,0.10)', dark: 0.88,
-    layout: 'corridors', motif: 'candle', vat: '#ffd21e', twist: 'blackout',
+    aw: 1240, ah: 850, floor: ['#4a3c22', '#41341d', '#382c18'], grout: '#211a0d',
+    wall: ['#6a5528', '#3d3018', '#8a7038'], fog: 'rgba(120,80,0,0.13)', dark: 0.82,
+    layout: 'corridors', motif: 'candle', vat: '#7a5410', twist: 'blackout',
     tw: 'THE LIGHTS GO OUT ON A COUNT' },
   { name: 'THE SALT LINE', sub: 'floor 08 // it cures. it does not heal.',
-    aw: 1280, ah: 880, floor: ['#dcd9cf', '#cfccc2', '#c0bdb3'], grout: '#9a978e',
-    wall: ['#c3c0b6', '#9d9a91', '#dedbd2'], fog: 'rgba(255,252,240,0.07)', dark: 0.22,
-    layout: 'pillars', motif: 'salt', vat: '#a8e8ff', twist: 'frail',
+    aw: 1280, ah: 880, floor: ['#4a4640', '#413d38', '#383430'], grout: '#201e1b',
+    wall: ['#6a6459', '#3d3a34', '#8f887a'], fog: 'rgba(220,210,190,0.09)', dark: 0.78,
+    layout: 'pillars', motif: 'salt', vat: '#6a6050', twist: 'frail',
     tw: 'EVERYTHING CUTS DEEPER HERE' },
   { name: 'THE LAST AISLE', sub: 'floor 09 // there is nothing after this one',
-    aw: 1320, ah: 900, floor: ['#b0aeaa', '#a2a09c', '#93918d'], grout: '#6d6b68',
-    wall: ['#96948f', '#706e6a', '#adaba6'], fog: 'rgba(230,225,215,0.05)', dark: 0.35,
-    layout: 'ring', motif: 'eye', vat: '#ff4ab0', twist: 'hunt',
+    aw: 1320, ah: 900, floor: ['#2e2438', '#281f31', '#221a2a'], grout: '#130e19',
+    wall: ['#463c5a', '#2a2134', '#5e4a78'], fog: 'rgba(90,20,140,0.15)', dark: 0.84,
+    layout: 'ring', motif: 'eye', vat: '#4a1c6a', twist: 'hunt',
     tw: 'SOMETHING IS WALKING THE AISLE WITH YOU' },
   { name: 'THE KILLING FLOOR', sub: 'floor 10 // this is what the building is for',
-    aw: 1180, ah: 820, floor: ['#5e5f5c', '#525350', '#464745'], grout: '#313230',
-    wall: ['#585956', '#3a3b39', '#6d6e6a'], fog: 'rgba(120,20,25,0.10)', dark: 0.55,
-    layout: 'bunkers', motif: 'hook', vat: '#c81f26', twist: 'final',
+    aw: 1180, ah: 820, floor: ['#3a1416', '#321012', '#2a0d0f'], grout: '#160607',
+    wall: ['#6a1c22', '#380f12', '#a02a30'], fog: 'rgba(160,0,10,0.18)', dark: 0.86,
+    layout: 'bunkers', motif: 'hook', vat: '#a01018', twist: 'final',
     tw: 'IT HAS BEEN WAITING THE WHOLE TIME' }
 ];
 const FLOORS = ROOMS.length;                 // the run ends when this one does
@@ -545,11 +545,10 @@ const ETYPE = {
      kill it carelessly and you have two more problems. The CYST does not come
      to you at all: it sits where it landed and hatches, and either you cross
      the room to burst it or the wave never thins. */
-  husk:     { bank: SPR.anim.husk,     hp: 62,  spd: 36, dmg: 22, r: 8, score: 30, gib: '#b8b0a0', name: 'HUSK',
-              /* no tint, no rescale -- it has its own body now. Bugs Found #31 */
-              split: 2 },
-  cyst:     { bank: SPR.anim.cyst,     hp: 170, spd: 0,  dmg: 18, r: 10, score: 55, gib: '#8fae4a', name: 'CYST',
-              nest: 1 },
+  husk:     { bank: SPR.anim.bloater,  hp: 62,  spd: 36, dmg: 22, r: 8, score: 30, gib: '#b8b0a0', name: 'HUSK',
+              tint: 'rgba(216,210,196,0.45)', scale: 0.85, split: 2 },
+  cyst:     { bank: SPR.anim.bloater,  hp: 170, spd: 0,  dmg: 18, r: 10, score: 55, gib: '#8fae4a', name: 'CYST',
+              tint: 'rgba(150,210,70,0.42)', scale: 1.12, nest: 1 },
   /* ---- THE DEEP ROSTER ----
      Everything above is unlocked by floor 3, so floors 4 to 10 used to show
      you nothing you had not already learned to kill. These three arrive later
@@ -6806,18 +6805,11 @@ function drawWorld() {
     }
   }
 
-  /* DAMJAN IS NOT IN THE DEPTH SORT.
-     He used to be, and on floor 9 with seventy bodies on the room an elite
-     drew straight over him -- you could not find the player in a game whose
-     whole subject is being surrounded. Depth ordering is worth less than
-     knowing where you are, so the sort runs on the enemies and he goes on
-     top of all of it, unconditionally. See the art-bible: THE PLAYER IS
-     ALWAYS FINDABLE. */
   const actors = S.en.slice();
+  actors.push(S.p);
   actors.sort((a, b) => a.y - b.y);
   const _a0 = performance.now();
-  for (const a of actors) drawEnemy(a);
-  drawPlayer(S.p);
+  for (const a of actors) { if (a === S.p) drawPlayer(a); else drawEnemy(a); }
   _accAct += performance.now() - _a0;
 
   /* THE HOOKS. Drawn over the actors — they are on a rail above the floor,
@@ -7729,17 +7721,8 @@ function drawPlayer(p) {
   const kx = -Math.cos(p.ang) * p.kick * 0.3, ky = -Math.sin(p.ang) * p.kick * 0.3;
   const px = p.x + kx, py = p.y + ky;
 
-  /* ---- the standing mark ----
-     The warm lamp in drawLight() separates Damjan from a DARK floor. It does
-     almost nothing on a bright one, and THE FREEZER now runs at 0.15 -- so
-     the other half of "always findable" is a hard dark contact ring under
-     him, which reads against any floor value in the game because it is a
-     VALUE break rather than a colour one. Two channels, one job: on a dark
-     floor the lamp does the work, on a bright floor this does. */
   ctx.fillStyle = 'rgba(0,0,0,0.42)';
   ctx.beginPath(); ctx.ellipse(p.x, p.y + 9, 7, 3, 0, 0, TAU); ctx.fill();
-  ctx.strokeStyle = 'rgba(10,7,12,0.55)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.ellipse(p.x, p.y + 9, 9.5, 4.5, 0, 0, TAU); ctx.stroke();
 
   if (p.dash > 0) drawSpr(ctx, bodySprite(), px - p.vx * 0.03, py - p.vy * 0.03 - 6 + bob, 1, p.flip, 0.3);
 
@@ -8067,18 +8050,10 @@ function drawEnemy(e) {
      weight — nothing in here is ever perfectly still or perfectly upright. */
   const breath = 1 + Math.sin(e.bob * 0.5) * (e.boss ? 0.035 : 0.05);
   const lean = clamp(e.vx * 0.0012, -0.13, 0.13);
-  /* FOOTFALL. Breath is idle motion and it runs whether or not the thing is
-     going anywhere; this is the weight of a step LANDING, so it is scaled by
-     how fast the creature is actually travelling. Without it the walk cycle
-     is legs moving under a body that floats -- the frames carry the gait and
-     nothing carries the mass. Twice per cycle, because two feet. */
-  const moving = Math.min(1, Math.hypot(e.vx, e.vy) / 42);
-  const foot = Math.abs(Math.sin(e.anim * Math.PI)) * moving * (e.boss ? 0.045 : 0.075);
   ctx.save();
   ctx.translate(e.x + (e.twx || 0), e.y + (e.twy || 0) + bob - lift);
   ctx.rotate(lean);
-  // squash on impact, and again on every footfall
-  ctx.scale((1 + e.sq * 0.3 + foot) / breath, (1 - e.sq * 0.25 - foot) * breath);
+  ctx.scale((1 + e.sq * 0.3) / breath, (1 - e.sq * 0.25) * breath);   // squash on impact
   drawSpr(ctx, spr, 0, 0, sc, e.flip, 1, tint);
   ctx.restore();
 
@@ -8119,61 +8094,9 @@ function drawLight() {
      go — a room you cannot see AT ALL is not tense, it is a loading screen. */
   const bo = blackoutK();
   const dark = S.god ? 0.55 : Math.min(0.97, R.dark + bo * 0.14);
-  /* CLEAR FIRST. The lightmap canvas is persistent and this fill used to be
-     laid straight on top of last frame's leftovers, so the darkness
-     ACCUMULATED: alpha 0.30 a frame reaches 0.97 in ten frames. Nobody saw it
-     while every floor ran at 0.76-0.86, because that saturates on frame one
-     and looks identical either way -- it only became visible the moment the
-     band opened and a floor asked to be genuinely bright. A room set to
-     dark: 0 still rendered black.
-     'copy' rather than a clearRect plus a fill: one op, same result. */
-  lctx.globalCompositeOperation = 'copy';
+  lctx.globalCompositeOperation = 'source-over';
   lctx.fillStyle = 'rgba(4,2,6,' + dark + ')';
   lctx.fillRect(0, 0, W, H);
-  lctx.globalCompositeOperation = 'source-over';
-
-  /* ---- DEAD TUBES ----
-     THE PRICE TAG lights the building with overhead fluorescent: flat, even,
-     unflattering, and refusing darkness as a mood. So the dark cannot be a
-     soft vignette any more -- it is a tube that has failed, and it has hard
-     rectangular edges.
-
-     The grid is deterministic per floor, so the dark patches sit in the same
-     places every run on a given floor and can be LEARNED. That is the whole
-     difference between a lighting rule and a filter: this one is information.
-
-     Bright floors get few dead tubes and dark floors get many, so the same
-     mechanic carries THE FREEZER at 0.15 and THE LONG TABLE at 0.88. */
-  if (!S.god) {
-    const TW = 152, TH = 88;                      // one fitting, in world units
-    const z2 = S.cam.z;
-    const x0 = Math.floor((S.cam.x - W / (2 * z2)) / TW) - 1;
-    const x1 = Math.ceil((S.cam.x + W / (2 * z2)) / TW) + 1;
-    const y0 = Math.floor((S.cam.y - H / (2 * z2)) / TH) - 1;
-    const y1 = Math.ceil((S.cam.y + H / (2 * z2)) / TH) + 1;
-    /* how many of the fittings are out. A near-black floor is a floor where
-       almost nothing is still lit. */
-    const outRate = clamp((dark - 0.10) * 1.05, 0, 0.92);
-    const seed = (S.room + 1) * 2654435761;
-    for (let ty = y0; ty <= y1; ty++) {
-      for (let tx = x0; tx <= x1; tx++) {
-        /* cheap deterministic hash -- same tube, same state, every run */
-        let h = (tx * 374761393 + ty * 668265263 + seed) | 0;
-        h = (h ^ (h >>> 13)) * 1274126177 | 0;
-        const r01 = ((h ^ (h >>> 16)) >>> 0) / 4294967296;
-        if (r01 > outRate) continue;              // this one still works
-        const s = worldToScreen(tx * TW, ty * TH);
-        const w2 = TW * z2, h2 = TH * z2;
-        if (s.x > W || s.y > H || s.x + w2 < 0 || s.y + h2 < 0) continue;
-        /* a failed tube is not total black -- the room next to it spills in.
-           Deeper on the darker floors, so the contrast stays legible. */
-        const a = 0.30 + dark * 0.42;
-        lctx.fillStyle = 'rgba(3,2,5,' + a.toFixed(3) + ')';
-        lctx.fillRect(s.x | 0, s.y | 0, Math.ceil(w2), Math.ceil(h2));
-      }
-    }
-  }
-
   lctx.globalCompositeOperation = 'destination-out';
 
   const z = S.cam.z;
@@ -8184,19 +8107,9 @@ function drawLight() {
      for the two and a half seconds it lasts. */
   const sight = ST().sight * (isTwist('dark') ? 0.68 : 1) * (1 - bo * 0.75);
   const lamp = 104 * sight;
-  /* ---- the lamp carves in proportion to how dark the room actually is ----
-     This used to carve at full strength on every floor, which under the new
-     value spread put a huge soft white spotlight in the middle of a room that
-     was already lit -- a vignette, which is the thing B rejects, and it made
-     THE ABATTOIR at 0.30 look like a torchlit dungeon again.
-
-     On a bright floor there is nothing to carve and the lamp is barely there;
-     on THE LONG TABLE at 0.88 it is the only reason you can see anything. The
-     WARMTH is what identifies Damjan, not the hole. */
-  const carve = clamp((dark - 0.18) / 0.62, 0.10, 1);
   let g = lctx.createRadialGradient(ps.x, ps.y, 4, ps.x, ps.y, lamp * z);
-  g.addColorStop(0, 'rgba(0,0,0,' + carve.toFixed(3) + ')');
-  g.addColorStop(0.5, 'rgba(0,0,0,' + (carve * 0.72).toFixed(3) + ')');
+  g.addColorStop(0, 'rgba(0,0,0,1)');
+  g.addColorStop(0.5, 'rgba(0,0,0,0.72)');
   g.addColorStop(1, 'rgba(0,0,0,0)');
   lctx.fillStyle = g; lctx.beginPath(); lctx.arc(ps.x, ps.y, lamp * z, 0, TAU); lctx.fill();
 
@@ -8204,8 +8117,8 @@ function drawLight() {
   lctx.save();
   lctx.translate(ps.x, ps.y); lctx.rotate(S.p.ang);
   const cg = lctx.createLinearGradient(0, 0, len, 0);
-  cg.addColorStop(0, 'rgba(0,0,0,' + carve.toFixed(3) + ')');
-  cg.addColorStop(0.5, 'rgba(0,0,0,' + (carve * 0.78).toFixed(3) + ')');
+  cg.addColorStop(0, 'rgba(0,0,0,1)');
+  cg.addColorStop(0.5, 'rgba(0,0,0,0.78)');
   cg.addColorStop(1, 'rgba(0,0,0,0)');
   lctx.fillStyle = cg;
   lctx.beginPath(); lctx.moveTo(0, 0); lctx.arc(0, 0, len, -spread, spread); lctx.closePath(); lctx.fill();
@@ -8273,29 +8186,6 @@ function drawLight() {
   lctx.globalCompositeOperation = 'source-over';
   blit(ctx, lcan, 0, 0);
   ctx.fillStyle = R.fog; ctx.fillRect(0, 0, W, H);
-
-  /* ---- THE ONLY WARM LIGHT IN THE BUILDING ----
-     Damjan is findable unconditionally (art-bible: THE PLAYER IS ALWAYS
-     FINDABLE). Under a doctrine where the whole world is retail-neutral and
-     lit by dead fluorescent, the cheapest and most structural way to do that
-     is to give him the one warm source on screen -- so he is legible by
-     COLOUR TEMPERATURE rather than by luck of contrast.
-
-     Additive, after the lightmap and the fog, so nothing can darken it back
-     down. This colour is reserved: no enemy, prop, hazard or effect may use
-     it. See LAMP_WARM. */
-  if (!S.won) {
-    const lw = 74 * ST().sight * z;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const wg = ctx.createRadialGradient(ps.x, ps.y, 1, ps.x, ps.y, lw);
-    wg.addColorStop(0, 'rgba(255,186,104,0.34)');
-    wg.addColorStop(0.45, 'rgba(255,150,64,0.13)');
-    wg.addColorStop(1, 'rgba(255,140,50,0)');
-    ctx.fillStyle = wg;
-    ctx.beginPath(); ctx.arc(ps.x, ps.y, lw, 0, TAU); ctx.fill();
-    ctx.restore();
-  }
 }
 
 /* ---------- post ---------- */
@@ -8323,14 +8213,8 @@ const scan = subCanvas(W, H).can;
 })();
 
 function post() {
-  /* The screen vignette rides the floor's own darkness now. At a flat 0.60 it
-     was a second lighting model arguing with the first: THE FREEZER at 0.15 is
-     supposed to be the brightest room in the game and a fixed vignette put a
-     dungeon frame around it anyway. B lights rooms evenly — the edges of the
-     screen are not automatically darker than the middle. */
-  const vg = 0.14 + curRoom().dark * 0.44;
   const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.40, W / 2, H / 2, H * 0.98);
-  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,' + vg.toFixed(3) + ')');
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.60)');
   ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
   if (S.redness > 0.01) { ctx.fillStyle = 'rgba(150,0,10,' + (S.redness * 0.34) + ')'; ctx.fillRect(0, 0, W, H); }

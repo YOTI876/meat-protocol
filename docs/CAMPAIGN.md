@@ -20,84 +20,19 @@ tags: [plan, art, state]
 
 ## CURRENT POSITION
 
-**Last updated:** 2026-08-30, after Pass 1 and Pass 2a/2b.
+**Last updated:** 2026-08-30, end of the planning session.
 
-> [!important] PICK UP EXACTLY HERE
-> **All six enemy SILHOUETTES are done.** Every one meets its rule and all six
-> are distinguishable at 4x filled pure black, with no colour information:
->
-> | creature | silhouette | verified |
-> |---|---|---|
-> | crawler | tray of mince — flat-topped rectangle, tag on one corner | yes |
-> | shrieker | hanging pack — punched header card, taper below | yes |
-> | stalker | shrink-wrapped — arms off the torso, floor visible through it | yes |
-> | bloater | convex — one unbroken swollen curve | yes |
-> | husk | concave — the only inward silhouette in the game | yes |
-> | cyst | rooted — wider at the floor than the top | yes |
->
-> **WHAT IS LEFT IN PASS 2 — the animation half, and none of it is started:**
-> 1. **hurt frames (2, ~6–8 frames total)** — nothing in the game has one.
-> 2. **death frames (3, 14–18 frames)** — a collapse, not a fade. Nothing has one.
-> 3. ~~the body must move in the walk cycle~~ **DONE.** A FOOTFALL squash was
->    added to drawEnemy, scaled by travel speed, twice per cycle. Note the
->    review overstated this one: breath, lean and impact-squash already
->    existed — what was missing was only the weight of the step landing.
->
-> Do those three across all six, then Pass 2 is done.
->
-> Three rules learned the hard way — follow them or repeat the mistakes:
-> 1. **Author in global `PAL` keys and pass `null` as the bank palette.** All
->    six enemies now do this; the ten bosses still declare local hex and are
->    the remaining violation (Passes 8–9).
-> 2. **Check every key a walk tail uses against global `PAL` first.** The
->    crawler's legs were a local `E`; global `E` is freezer-burn white, so
->    they came out as glowing sticks. The shrieker and stalker had the same
->    trap in their tails and scream/coil poses.
-> 3. **A silhouette rule is only proven with the colour thrown away.** Use the
->    black-fill recipe in the skill every time, not the coloured sprite.
+**Just finished:** planning. The direction is chosen and both blocking
+decisions are answered. These exist and nothing has been built yet:
+- [[Art Review]] — the audit, with evidence
+- [[Art Direction]] — the three directions; **B was chosen**
+- [[Bugs Found#31]] — the husk/cyst/bloater shared-sprite defect
+- this file, and `.claude/skills/art-bible/SKILL.md`
 
-**Just finished: PASS 1 — DOCTRINE. The game no longer looks like itself.**
+**Next pass:** **Pass 1 — Doctrine.** Nothing blocks it. Read the art-bible
+skill first; the direction and darkness spec are filled in there.
 
-- `PAL` regrouped into the three B bands with a comment per band saying what
-  it is *for*. All 68 keys kept, none duplicated. The neutral ramp was violet
-  and is now cool retail grey, which was quietly tinting every wall.
-- All ten floors re-palettised to RETAIL NEUTRAL, **value-differentiated**,
-  with a saturated PRODUCT `vat` accent each. PACI's back room deliberately
-  keeps its own violet — he is not in the building.
-- Darkness band opened to the per-floor spec: **0.15 → 0.88**, was 0.74–0.86.
-- Fluorescent model: **dead tubes** as hard rectangular patches on a
-  deterministic per-floor grid, so a floor's dark spots are in the same places
-  every run and can be learned. Replaces the vignette as the source of dark.
-- The lamp carve and the `post()` vignette now **scale with the floor's
-  darkness** — at full strength on a bright floor they put a torchlit-dungeon
-  spotlight in the middle of a lit room, which is direction A's logic.
-- **Damjan is out of the depth sort** and draws last, unconditionally, with a
-  reserved warm lamp (`LAMP_WARM`) and a hard contact ring. Two channels:
-  warmth carries him on dark floors, the ring carries him on bright ones.
-
-**Verified:** 87 enemies on floor 9 — findable in under a second. `--selftest`
-passes, `MEAT.soak` verified, light pass 0.218 ms/frame, avg 3.14.
-
-**Then PASS 2a:** `husk` and `cyst` stopped being the bloater re-tinted
-([[Bugs Found#31]]). Convex / concave / rooted, verified at 5x filled pure
-black — three different shapes with no colour information at all.
-
-**Then PASS 2b (part):** the `crawler` became a tray of mince — flat-topped
-hard rectangle, wider than tall, price tag on one corner. It is the first
-creature a player meets, so it is the one that teaches the shape language.
-
-**Half-done: PASS 2 — the silhouettes are done, the ANIMATION is not. See the box at the top.**
-
-> [!warning] A real bug came out of Pass 1 and is worth knowing about
-> **The lightmap canvas was never cleared.** `drawLight()` laid its darkness
-> fill straight over the previous frame's, so darkness *accumulated* — alpha
-> 0.30 a frame reaches 0.97 in ten frames. It was invisible for the whole
-> project because every floor ran at 0.76–0.86, which saturates on frame one
-> and looks identical either way. The moment a floor asked to be genuinely
-> bright it surfaced: a room set to `dark: 0` still rendered black.
->
-> Fixed with a `'copy'` composite on the fill. **If a future pass finds a
-> floor refusing to get brighter, look here first.**
+**Half-done:** nothing.
 
 **Do not relitigate:**
 - The pipeline stays — grids, `up2`/`shade`/`stamp`, the 68-key palette
@@ -148,8 +83,8 @@ first four are front-loaded so the game looks transformed early.
 
 | # | pass | status | depends on | frame risk | effort |
 |---|---|---|---|---|---|
-| 1 | **Doctrine** — palette bands, material maps, lighting model | **DONE** | decisions 005 + 006 | **high** | 1 session |
-| 2 | **The six enemies** | **IN PROGRESS** | 1 | low | 2 sessions |
+| 1 | **Doctrine** — palette bands, material maps, lighting model | NOT STARTED | decisions 005 + 006 | **high** | 1 session |
+| 2 | **The six enemies** | NOT STARTED | 1 | low | 2 sessions |
 | 3 | **Damjan + player priority** | NOT STARTED | 1 | med | 1 session |
 | 4 | **HUD** | NOT STARTED | 1 | low | 1 session |
 | 5 | **ACT ONE — floors 1–3** | NOT STARTED | 1 | med | 1–2 sessions |
@@ -213,7 +148,7 @@ rather than a pile.
 
 | item | pass | what is weak | status |
 |---|---|---|---|
-| **HUSK** body | 2 | Silhouette is provably concave and provably distinct, which is what the rule asked for. It still reads more like a moth or a bow tie than a crushed carton. Three iterations got the mass right and the *character* wrong. | open |
+| *(none yet)* | | | |
 
 ### Pass 3 — Damjan + player priority
 Damjan to doctrine, plus whatever makes the player never lost in a crowd — rim
